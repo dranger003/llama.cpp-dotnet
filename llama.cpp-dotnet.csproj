@@ -9,4 +9,7 @@
 		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
 		<BaseOutputPath>.</BaseOutputPath>
 	</PropertyGroup>
+	<ItemGroup>
+	  <None Include=".gitmodules" />
+	</ItemGroup>
 </Project>
