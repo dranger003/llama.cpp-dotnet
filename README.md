@@ -24,3 +24,6 @@ msbuild
 - Dynamic model loading
 - Exposing a minimal completion API
 - Add a basic web frontend
+
+### Acknowledgments
+[ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) for the LLaMA implementation in C++
