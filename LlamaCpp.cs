@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace LlamaCppDotNet
 {
@@ -8,15 +9,13 @@ namespace LlamaCppDotNet
         private delegate string NextInputDelegate();
         private delegate void NextOutputDelegate(string token);
 
-        [DllImport("main.dll", EntryPoint = "DOTNET_set_callbacks")]
-        private static extern void SetCallbacks(NextInputDelegate ni, NextOutputDelegate no);
-
         [DllImport("main.dll", EntryPoint = "DOTNET_set_interacting")]
         private static extern void SetInteracting(bool interacting);
 
         [DllImport("main.dll", EntryPoint = "DOTNET_main")]
-        private static extern int MainOverride(int argc, string[] argv);
+        private static extern int MainOverride(int argc, string[] argv, NextInputDelegate ni, NextOutputDelegate no);
 
+        private bool _running = false;
         private string[] _args;
         private LlamaCppOptions _options;
 
@@ -28,22 +27,26 @@ namespace LlamaCppDotNet
 
         public void Run()
         {
-            Console.CancelKeyPress += (s, e) =>
+            if (_running)
+                throw new Exception("Model is already running.");
+
+            _running = true;
+            Console.CancelKeyPress += CancelKeyPressHandler;
             {
-                e.Cancel = true;
-                SetInteracting(true);
-                Console.WriteLine();
-            };
+                var argc = 1 + _args.Length;
+                var argv = new[] { Path.GetFileName(Assembly.GetExecutingAssembly().Location) }.Concat(_args).ToArray();
 
-            var argc = 1 + _args.Length;
-            var argv = new[] { Path.GetFileName(Assembly.GetExecutingAssembly().Location) }.Concat(_args).ToArray();
-
-            SetCallbacks(NextInput, NextOutput);
-            _ = MainOverride(argc, argv);
+                _ = MainOverride(argc, argv, NextInput, NextOutput);
+            }
+            Console.CancelKeyPress -= CancelKeyPressHandler;
+            _running = false;
         }
 
-        public void Reload(LlamaCppOptions options)
+        private void CancelKeyPressHandler(object? sender, ConsoleCancelEventArgs e)
         {
+            e.Cancel = true;
+            SetInteracting(true);
+            Console.WriteLine();
         }
 
         private string NextInput()
