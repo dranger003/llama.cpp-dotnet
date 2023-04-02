@@ -10,20 +10,12 @@
 		<BaseOutputPath>.</BaseOutputPath>
 	</PropertyGroup>
 	<ItemGroup>
-	  <Compile Remove="upstream.support\**" />
-	  <Compile Remove="UpstreamSupport\**" />
 	  <Compile Remove="upstream\**" />
 	  <Compile Remove="x64\**" />
-	  <Content Remove="upstream.support\**" />
-	  <Content Remove="UpstreamSupport\**" />
 	  <Content Remove="upstream\**" />
 	  <Content Remove="x64\**" />
-	  <EmbeddedResource Remove="upstream.support\**" />
-	  <EmbeddedResource Remove="UpstreamSupport\**" />
 	  <EmbeddedResource Remove="upstream\**" />
 	  <EmbeddedResource Remove="x64\**" />
-	  <None Remove="upstream.support\**" />
-	  <None Remove="UpstreamSupport\**" />
 	  <None Remove="upstream\**" />
 	  <None Remove="x64\**" />
 	</ItemGroup>
