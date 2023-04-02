@@ -10,6 +10,20 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\common\common.vcxproj">
+      <Project>{8967352b-6ee9-489f-bc31-530d34698e10}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\ggml\ggml.vcxproj">
+      <Project>{c882031e-0155-4e94-baef-f00ba040e4db}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\llama\llama.vcxproj">
+      <Project>{50fc1d34-a717-481f-a565-bee45724a2f7}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\llama.cpp\examples\main\main.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -50,7 +64,7 @@
       <PreprocessorDefinitions>_DEBUG;MAIN_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions);_DOTNET</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>..\llama.cpp;..\llama.cpp\examples</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\llama.cpp;..\..\llama.cpp\examples</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -68,7 +82,7 @@
       <PreprocessorDefinitions>NDEBUG;MAIN_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions);_DOTNET</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>..\llama.cpp;..\llama.cpp\examples</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\llama.cpp;..\..\llama.cpp\examples</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -79,23 +93,6 @@
       <EnableUAC>false</EnableUAC>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="..\llama.cpp\examples\main\main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\llama.cpp\llama.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\common\common.vcxproj">
-      <Project>{8967352b-6ee9-489f-bc31-530d34698e10}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\ggml\ggml.vcxproj">
-      <Project>{c882031e-0155-4e94-baef-f00ba040e4db}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\llama\llama.vcxproj">
-      <Project>{50fc1d34-a717-481f-a565-bee45724a2f7}</Project>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

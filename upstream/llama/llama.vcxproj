@@ -11,16 +11,16 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\llama.cpp\examples\common.h" />
+    <ClInclude Include="..\..\llama.cpp\llama.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\llama.cpp\examples\common.cpp" />
+    <ClCompile Include="..\..\llama.cpp\llama.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{8967352b-6ee9-489f-bc31-530d34698e10}</ProjectGuid>
-    <RootNamespace>common</RootNamespace>
+    <ProjectGuid>{50fc1d34-a717-481f-a565-bee45724a2f7}</ProjectGuid>
+    <RootNamespace>llama</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -56,8 +56,8 @@
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions);_DOTNET</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\..\llama.cpp</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>..\llama.cpp</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -74,8 +74,8 @@
       <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions);_DOTNET</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\..\llama.cpp</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>..\llama.cpp</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>

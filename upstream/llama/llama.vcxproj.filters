@@ -15,12 +15,12 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\llama.cpp\examples\common.h">
+    <ClInclude Include="..\..\llama.cpp\llama.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\llama.cpp\examples\common.cpp">
+    <ClCompile Include="..\..\llama.cpp\llama.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
