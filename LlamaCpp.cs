@@ -8,13 +8,14 @@ namespace LlamaCppDotNet
         private delegate string NextInputDelegate();
         private delegate void NextOutputDelegate(string token);
 
-        [DllImport("main.dll", EntryPoint = "set_callbacks")]
+        [DllImport("main.dll", EntryPoint = "DOTNET_set_callbacks")]
         private static extern void SetCallbacks(NextInputDelegate ni, NextOutputDelegate no);
 
-#pragma warning disable CS0028
-        [DllImport("main.dll", EntryPoint = "main")]
-        private static extern int Main(int argc, string[] argv);
-#pragma warning restore CS0028
+        [DllImport("main.dll", EntryPoint = "DOTNET_set_interacting")]
+        private static extern void SetInteracting(bool interacting);
+
+        [DllImport("main.dll", EntryPoint = "DOTNET_main")]
+        private static extern int MainOverride(int argc, string[] argv);
 
         private string[] _args;
         private LlamaCppOptions _options;
@@ -27,15 +28,41 @@ namespace LlamaCppDotNet
 
         public void Run()
         {
+            Console.CancelKeyPress += (s, e) =>
+            {
+                e.Cancel = true;
+                SetInteracting(true);
+                Console.WriteLine();
+            };
+
             var argc = 1 + _args.Length;
             var argv = new[] { Path.GetFileName(Assembly.GetExecutingAssembly().Location) }.Concat(_args).ToArray();
 
-            SetCallbacks(
-                () => Console.ReadLine() ?? String.Empty,
-                Console.Write
-            );
+            SetCallbacks(NextInput, NextOutput);
+            _ = MainOverride(argc, argv);
+        }
 
-            _ = Main(argc, argv);
+        public void Reload(LlamaCppOptions options)
+        {
+        }
+
+        private string NextInput()
+        {
+            while (true)
+            {
+                var input = Console.ReadLine() ?? String.Empty;
+
+                if (input.ToUpper() == "QUIT")
+                    return String.Empty;
+
+                if (!String.IsNullOrWhiteSpace(input))
+                    return input;
+            }
+        }
+
+        private void NextOutput(string token)
+        {
+            Console.Write(token);
         }
     }
 }
