@@ -14,7 +14,7 @@ Open a vs2022 x64 develper command prompt and type:
 ```
 git clone --recursive https://github.com/dranger003/llama.cpp-dotnet.git
 cd llama.cpp-dotnet
-msbuild /property:Configuration=Release
+MSBuild.exe /property:Configuration=Release
 x64\Release\llama.cpp-dotnet.exe
 ```
 
