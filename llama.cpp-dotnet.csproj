@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 	<PropertyGroup>
-		<TargetFramework>net7.0</TargetFramework>
+		<TargetFramework>net7.0-windows</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<RootNamespace>LlamaCppDotNet</RootNamespace>
@@ -23,8 +23,10 @@
 	<ItemGroup>
 	  <Compile Include="CmdLineMappingAttribute.cs" />
 	  <Compile Include="CmdLineValidationException.cs" />
+	  <Compile Include="Extensions.cs" />
 	  <Compile Include="LlamaCpp.cs" />
 	  <Compile Include="LlamaCppOptions.cs" />
+	  <Compile Include="Pipe.cs" />
 	  <Compile Include="Program.cs" />
 	</ItemGroup>
 	<ItemGroup>
