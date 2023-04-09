@@ -56,7 +56,7 @@ namespace LlamaCppDotNet
             var last_n_tokens = Enumerable.Repeat(0, n_ctx).ToList();
             var embd = new List<int>();
 
-            bool is_infering = true;
+            bool is_inferring = true;
 
             while (true)
             {
@@ -75,7 +75,7 @@ namespace LlamaCppDotNet
                 n_past += embd.Count;
                 embd.Clear();
 
-                if (n_consumed >= embd_inp.Count && is_infering)
+                if (n_consumed >= embd_inp.Count && is_inferring)
                 {
                     int id = 0;
                     {
@@ -129,7 +129,7 @@ namespace LlamaCppDotNet
                             {
                                 if (last_output.ToString().EndsWith(antiprompt))
                                 {
-                                    is_infering = false;
+                                    is_inferring = false;
                                     n = 0;
                                     Console.Write(" ");
                                     break;
@@ -138,17 +138,13 @@ namespace LlamaCppDotNet
                         }
                     }
 
-                    if (n_past > 0 && !is_infering)
+                    if (n_past > 0 && !is_inferring)
                     {
-                        if (input.TryTake(out var next_prompt, (int)TimeSpan.FromSeconds(2).TotalMilliseconds, cts.Token))
-                        {
-                            embd_inp.AddRange(LlamaCppInterop.llama_tokenize(ctx, next_prompt, false));
-                            is_infering = true;
-                        }
-                        else
-                        {
+                        if (!input.TryTake(out var next_prompt, (int)TimeSpan.FromSeconds(2).TotalMilliseconds, cts.Token))
                             break;
-                        }
+
+                        embd_inp.AddRange(LlamaCppInterop.llama_tokenize(ctx, next_prompt, false));
+                        is_inferring = true;
                     }
                 }
             }
