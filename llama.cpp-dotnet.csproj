@@ -21,15 +21,20 @@
 	  <None Remove="x64\**" />
 	</ItemGroup>
 	<ItemGroup>
-	  <Compile Include="CmdLineMappingAttribute.cs" />
+	  <Compile Include="CmdLineMappedAttribute.cs" />
 	  <Compile Include="CmdLineValidationException.cs" />
 	  <Compile Include="Extensions.cs" />
 	  <Compile Include="LlamaCpp.cs" />
+	  <Compile Include="LlamaCppInterop.cs" />
+	  <Compile Include="LlamaCppService.cs" />
 	  <Compile Include="LlamaCppOptions.cs" />
 	  <Compile Include="Pipe.cs" />
 	  <Compile Include="Program.cs" />
 	</ItemGroup>
 	<ItemGroup>
 	  <None Include=".gitmodules" />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="llama.cpp-interop\llama.cpp-interop.vcxproj" />
 	</ItemGroup>
 </Project>

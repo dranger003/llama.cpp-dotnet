@@ -4,14 +4,31 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.5.33516.290
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "llama.cpp-dotnet", "llama.cpp-dotnet.csproj", "{81F2D6E8-9A33-4ECF-A828-7CF17F6DAA84}"
+	ProjectSection(ProjectDependencies) = postProject
+		{8861A446-A7C2-451C-AA4E-B3C269DA6B3B} = {8861A446-A7C2-451C-AA4E-B3C269DA6B3B}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "common", "upstream\common\common.vcxproj", "{8967352B-6EE9-489F-BC31-530D34698E10}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ggml", "upstream\ggml\ggml.vcxproj", "{C882031E-0155-4E94-BAEF-F00BA040E4DB}"
+	ProjectSection(ProjectDependencies) = postProject
+		{8967352B-6EE9-489F-BC31-530D34698E10} = {8967352B-6EE9-489F-BC31-530D34698E10}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "llama", "upstream\llama\llama.vcxproj", "{50FC1D34-A717-481F-A565-BEE45724A2F7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{8967352B-6EE9-489F-BC31-530D34698E10} = {8967352B-6EE9-489F-BC31-530D34698E10}
+		{C882031E-0155-4E94-BAEF-F00BA040E4DB} = {C882031E-0155-4E94-BAEF-F00BA040E4DB}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "main", "upstream\main\main.vcxproj", "{574412B0-40F9-4DDC-877D-77746B5DCE5A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "llama.cpp-interop", "llama.cpp-interop\llama.cpp-interop.vcxproj", "{8861A446-A7C2-451C-AA4E-B3C269DA6B3B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{50FC1D34-A717-481F-A565-BEE45724A2F7} = {50FC1D34-A717-481F-A565-BEE45724A2F7}
+		{8967352B-6EE9-489F-BC31-530D34698E10} = {8967352B-6EE9-489F-BC31-530D34698E10}
+		{C882031E-0155-4E94-BAEF-F00BA040E4DB} = {C882031E-0155-4E94-BAEF-F00BA040E4DB}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,6 +56,10 @@ Global
 		{574412B0-40F9-4DDC-877D-77746B5DCE5A}.Debug|x64.Build.0 = Debug|x64
 		{574412B0-40F9-4DDC-877D-77746B5DCE5A}.Release|x64.ActiveCfg = Release|x64
 		{574412B0-40F9-4DDC-877D-77746B5DCE5A}.Release|x64.Build.0 = Release|x64
+		{8861A446-A7C2-451C-AA4E-B3C269DA6B3B}.Debug|x64.ActiveCfg = Debug|x64
+		{8861A446-A7C2-451C-AA4E-B3C269DA6B3B}.Debug|x64.Build.0 = Debug|x64
+		{8861A446-A7C2-451C-AA4E-B3C269DA6B3B}.Release|x64.ActiveCfg = Release|x64
+		{8861A446-A7C2-451C-AA4E-B3C269DA6B3B}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
