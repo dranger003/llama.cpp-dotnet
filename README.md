@@ -4,13 +4,13 @@
 
 ### Description
 
-Quick hooks to run llama.cpp in dotnet using light modifications for easy future upstream merges.
+~~Quick hooks to run llama.cpp in dotnet using light modifications for easy future upstream merges.~~
 
-The original project can also run as is without any required changes.
+I might revisit this idea of running main.exe separately, however for now I am focusing on bindings for additional flexibility. The original project remains unmodified and can run as is and will be compiled as part of this project.
 
 ### Quick Start
 
-Open a vs2022 x64 develper command prompt and type:
+Open a VS2022 x64 develper command prompt and type:
 ```
 git clone --recursive https://github.com/dranger003/llama.cpp-dotnet.git
 cd llama.cpp-dotnet
