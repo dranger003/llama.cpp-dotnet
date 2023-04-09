@@ -26,6 +26,9 @@
 	  <Compile Include="Program.cs" />
 	</ItemGroup>
 	<ItemGroup>
+	  <Content Include="personality.txt" />
+	</ItemGroup>
+	<ItemGroup>
 	  <None Include=".gitmodules" />
 	</ItemGroup>
 </Project>

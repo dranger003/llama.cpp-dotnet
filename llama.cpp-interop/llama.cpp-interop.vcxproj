@@ -167,9 +167,6 @@
       <Project>{50fc1d34-a717-481f-a565-bee45724a2f7}</Project>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="personality.txt" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
