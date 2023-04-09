@@ -29,6 +29,20 @@ namespace LlamaCppDotNet
         [DllImport("llama.cpp-interop", EntryPoint = "_llama_init_from_file")]
         public static extern nint llama_init_from_file(string path_model, llama_context_params ctx_params);
 
+        [DllImport("llama.cpp-interop", EntryPoint = "_llama_print_system_info")]
+        private static extern nint _llama_print_system_info();
+
+        [DllImport("llama.cpp-interop", EntryPoint = "_llama_print_system_info")]
+        private static extern void _llama_print_system_info_free(nint info);
+
+        public static string llama_print_system_info()
+        {
+            var str = LlamaCppInterop._llama_print_system_info();
+            var info_str = Marshal.PtrToStringAnsi(str) ?? String.Empty;
+            LlamaCppInterop._llama_print_system_info_free(str);
+            return info_str;
+        }
+
         [DllImport("llama.cpp-interop", EntryPoint = "_llama_tokenize")]
         private static extern void _llama_tokenize(nint ctx, string text, bool add_bos, out nint r_tokens, out int r_tokens_len);
 
@@ -61,9 +75,9 @@ namespace LlamaCppDotNet
 
         public static string llama_token_to_str(nint ctx, int token)
         {
-            var ptr = _llama_token_to_str(ctx, token);
-            var token_str = Marshal.PtrToStringAnsi(ptr) ?? String.Empty;
-            _llama_tokenize_free(ptr);
+            var str = _llama_token_to_str(ctx, token);
+            var token_str = Marshal.PtrToStringAnsi(str) ?? String.Empty;
+            _llama_tokenize_free(str);
             return token_str;
         }
 

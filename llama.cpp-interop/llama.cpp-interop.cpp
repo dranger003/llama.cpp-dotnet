@@ -10,6 +10,24 @@ extern "C"
 		return llama_context_default_params();
 	}
 
+	// const char * llama_print_system_info(void)
+	DLLEXPORT const char* _llama_print_system_info() {
+		auto info = llama_print_system_info();
+
+		auto len = std::strlen(info);
+		auto buf = (char*)malloc(len + 1);
+		if (buf) {
+			std::strcpy(buf, info);
+			return buf;
+		}
+
+		return nullptr;
+	}
+
+	DLLEXPORT void _llama_print_system_info_free(void* info) {
+		free(info);
+	}
+
 	// llama_context* llama_init_from_file(const char* path_model, llama_context_params params)
 	DLLEXPORT llama_context* _llama_init_from_file(const char* path_model, llama_context_params params) {
 		return llama_init_from_file(path_model, params);
