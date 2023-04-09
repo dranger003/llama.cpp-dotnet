@@ -1,9 +1,26 @@
+using System.Collections.Concurrent;
+using System.Text;
+
 namespace LlamaCppDotNet
 {
     internal class Program
     {
         private static async Task Main(string[] args)
         {
+            var cts = new CancellationTokenSource();
+
+            var input = new BlockingCollection<string>();
+            var output = new BlockingCollection<string>();
+
+            var context = "";
+            //var context = """
+            //    ### Human: What is the role of the Oort Cloud in our solar system?
+            //    ### Assistant: The Oort Cloud is a hypothetical, vast, spherical region surrounding our solar system, containing billions of icy objects and comets. Its role is primarily as a reservoir for long-period comets, which occasionally enter the inner solar system due to gravitational perturbations from nearby stars or other celestial objects.
+            //    """;
+
+            input.Add("Hi! I have a question, can you help me?");
+            input.Add("What on Earth causes the distinct features of the moon?");
+
             // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
             var cparams = LlamaCppInterop.llama_context_default_params();
             cparams.n_ctx = 2048;
@@ -13,23 +30,25 @@ namespace LlamaCppDotNet
             cparams.use_mlock = false;
             var ctx = LlamaCppInterop.llama_init_from_file(@"D:\LLM_MODELS\eachadea\ggml-vicuna-13b-4bit\ggml-vicuna-13b-4bit-rev1.bin", cparams);
 
-            var embd_inp = LlamaCppInterop.llama_tokenize(
-                ctx,
-                " You are a helpful assistant providing precise and truthful answers to questions and if you don't know the answer you say \"I don't know\". Acknowledge you understand the request by saying \"I confirm\".",
-                true
-            ).ToList();
+            Console.Error.WriteLine($"llama_print_system_info: {LlamaCppInterop.llama_print_system_info()}");
+
+            var prompt = new StringBuilder();
+            prompt.Append(File.ReadAllText("personality.txt"));
+            prompt.Append(context);
+
+            var embd_inp = LlamaCppInterop.llama_tokenize(ctx, prompt.ToString(), false).ToList();
             var n_ctx = LlamaCppInterop.llama_n_ctx(ctx);
 
             var antiprompts = new[] { "### Human:" };
 
-            int n_keep = 0;
+            int n_keep = embd_inp.Count;
             int n_threads = 16;
-            int n_batch = 8;
-            int repeat_last_n = 64;
+            int n_batch = n_ctx;
+            int repeat_last_n = n_ctx;
             int top_k = 40;
             float top_p = 0.95f;
             float temp = 0.0f;
-            float repeat_penalty = 1.10f;
+            float repeat_penalty = 1.5f;
 
             int n_past = 0;
             int n_consumed = 0;
@@ -37,14 +56,7 @@ namespace LlamaCppDotNet
             var last_n_tokens = Enumerable.Repeat(0, n_ctx).ToList();
             var embd = new List<int>();
 
-            bool is_interacting = false;
-
-            var prompt_idx = 0;
-            var prompts = new[]
-            {
-                "What is the second planet of the solar system?",
-                "What is the second to last planet in the solar system?",
-            };
+            bool is_infering = true;
 
             while (true)
             {
@@ -63,11 +75,20 @@ namespace LlamaCppDotNet
                 n_past += embd.Count;
                 embd.Clear();
 
-                if (n_consumed >= embd_inp.Count && !is_interacting)
+                if (n_consumed >= embd_inp.Count && is_infering)
                 {
                     int id = 0;
                     {
-                        id = LlamaCppInterop.llama_sample_top_p_top_k(ctx, last_n_tokens.GetRange(n_ctx - repeat_last_n, repeat_last_n).ToArray(), repeat_last_n, top_k, top_p, temp, repeat_penalty);
+                        id = LlamaCppInterop.llama_sample_top_p_top_k(
+                            ctx,
+                            last_n_tokens.GetRange(n_ctx - repeat_last_n, repeat_last_n).ToArray(),
+                            repeat_last_n,
+                            top_k,
+                            top_p,
+                            temp,
+                            repeat_penalty
+                        );
+
                         last_n_tokens.RemoveAt(0);
                         last_n_tokens.Add(id);
                     }
@@ -98,32 +119,36 @@ namespace LlamaCppDotNet
                 {
                     if (antiprompts.Any())
                     {
-                        string last_output = String.Empty;
-                        foreach (var id in last_n_tokens)
+                        var last_output = new StringBuilder();
+                        var n = last_n_tokens.Count;
+                        while (--n > 0)
                         {
-                            last_output += LlamaCppInterop.llama_token_to_str(ctx, id);
-                        }
+                            last_output.Insert(0, LlamaCppInterop.llama_token_to_str(ctx, last_n_tokens[n]));
 
-                        foreach (var antiprompt in antiprompts)
-                        {
-                            if (last_output.EndsWith(antiprompt))
+                            foreach (var antiprompt in antiprompts)
                             {
-                                is_interacting = true;
-                                Console.Write(" ");
-                                break;
+                                if (last_output.ToString().EndsWith(antiprompt))
+                                {
+                                    is_infering = false;
+                                    n = 0;
+                                    Console.Write(" ");
+                                    break;
+                                }
                             }
                         }
                     }
 
-                    if (n_past > 0 && is_interacting)
+                    if (n_past > 0 && !is_infering)
                     {
-                        if (prompt_idx >= prompts.Length)
+                        if (input.TryTake(out var next_prompt, (int)TimeSpan.FromSeconds(2).TotalMilliseconds, cts.Token))
+                        {
+                            embd_inp.AddRange(LlamaCppInterop.llama_tokenize(ctx, next_prompt, false));
+                            is_infering = true;
+                        }
+                        else
+                        {
                             break;
-
-                        var line_inp = LlamaCppInterop.llama_tokenize(ctx, prompts[prompt_idx++], false);
-                        embd_inp.AddRange(line_inp);
-
-                        is_interacting = false;
+                        }
                     }
                 }
             }
