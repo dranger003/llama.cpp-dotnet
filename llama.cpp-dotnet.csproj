@@ -22,7 +22,9 @@
 	</ItemGroup>
 	<ItemGroup>
 	  <Compile Include="Extensions.cs" />
+	  <Compile Include="LlamaCpp.cs" />
 	  <Compile Include="LlamaCppInterop.cs" />
+	  <Compile Include="LlamaCppOptions.cs" />
 	  <Compile Include="Program.cs" />
 	</ItemGroup>
 	<ItemGroup>
