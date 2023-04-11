@@ -92,4 +92,14 @@ extern "C"
 	DLLEXPORT void _llama_free(llama_context* ctx) {
 		llama_free(ctx);
 	}
+
+	// llama_token _llama_token_bos()
+	DLLEXPORT llama_token _llama_token_bos() {
+		return llama_token_bos();
+	}
+
+	// llama_token llama_token_eos()
+	DLLEXPORT llama_token _llama_token_eos() {
+		return llama_token_eos();
+	}
 }

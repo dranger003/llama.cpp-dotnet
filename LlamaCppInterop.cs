@@ -49,7 +49,7 @@ namespace LlamaCppDotNet
         [DllImport("llama.cpp-interop", EntryPoint = "_llama_tokenize_free")]
         private static extern void _llama_tokenize_free(nint tokens);
 
-        public static int[] llama_tokenize(nint ctx, string text, bool add_bos)
+        public static int[] llama_tokenize(nint ctx, string text, bool add_bos = false)
         {
             LlamaCppInterop._llama_tokenize(ctx, text, false, out var r_tokens, out var r_tokens_len);
             var tokens = new int[r_tokens_len];
@@ -62,10 +62,16 @@ namespace LlamaCppDotNet
         public static extern int llama_n_ctx(nint ctx);
 
         [DllImport("llama.cpp-interop", EntryPoint = "_llama_eval")]
-        public static extern int llama_eval(nint ctx, int[] tokens, int n_tokens, int n_past, int n_threads);
+        private static extern int _llama_eval(nint ctx, int[] tokens, int n_tokens, int n_past, int n_threads);
+
+        public static int llama_eval(nint ctx, IEnumerable<int> tokens, int n_tokens, int n_past, int n_threads) =>
+            LlamaCppInterop._llama_eval(ctx, tokens.ToArray(), n_tokens, n_past, n_threads);
 
         [DllImport("llama.cpp-interop", EntryPoint = "_llama_sample_top_p_top_k")]
-        public static extern int llama_sample_top_p_top_k(nint ctx, int[] last_n_tokens_data, int last_n_tokens_size, int top_k, float top_p, float temp, float repeat_penalty);
+        private static extern int _llama_sample_top_p_top_k(nint ctx, int[] last_n_tokens_data, int last_n_tokens_size, int top_k, float top_p, float temp, float repeat_penalty);
+
+        public static int llama_sample_top_p_top_k(nint ctx, IEnumerable<int> last_n_tokens_data, int last_n_tokens_size, int top_k, float top_p, float temp, float repeat_penalty) =>
+            LlamaCppInterop._llama_sample_top_p_top_k(ctx, last_n_tokens_data.ToArray(), last_n_tokens_size, top_k, top_p, temp, repeat_penalty);
 
         [DllImport("llama.cpp-interop", EntryPoint = "_llama_token_to_str")]
         private static extern nint _llama_token_to_str(nint ctx, int token);
@@ -86,5 +92,11 @@ namespace LlamaCppDotNet
 
         [DllImport("llama.cpp-interop", EntryPoint = "_llama_free")]
         public static extern void llama_free(nint ctx);
+
+        [DllImport("llama.cpp-interop", EntryPoint = "_llama_token_bos")]
+        public static extern int llama_token_bos();
+
+        [DllImport("llama.cpp-interop", EntryPoint = "_llama_token_eos")]
+        public static extern int llama_token_eos();
     }
 }
