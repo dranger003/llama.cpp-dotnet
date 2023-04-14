@@ -1,17 +1,16 @@
-﻿using System.Linq;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace LlamaCppDotNet
+namespace LlamaCppLib
 {
     public class LlamaCpp : IDisposable
     {
         private nint _handle = nint.Zero;
-        private string _modelFile = string.Empty;
+        private string _modelName;
+        private string _modelPath = string.Empty;
         private LlamaCppOptions _options = new();
 
-        public LlamaCpp()
-        { }
+        public LlamaCpp(string name) => _modelName = name;
 
         public void Dispose()
         {
@@ -22,11 +21,16 @@ namespace LlamaCppDotNet
             }
         }
 
-        public string ModelFile { get => _modelFile; }
+        public string ModelName { get => _modelName; }
+        public string ModelPath { get => _modelPath; }
 
-        public void Load(string modelFile, int contextSize = 2048, int seed = 0, bool useFloat32 = true)
+        public void Load(string modelPath, int contextSize = 2048, int seed = 0, bool useFloat32 = true)
         {
-            Dispose();
+            if (!File.Exists(modelPath))
+                throw new FileNotFoundException($"Model file not found \"{modelPath}\".");
+
+            if (_handle != nint.Zero)
+                throw new InvalidOperationException($"Model already laoded.");
 
             var cparams = LlamaCppInterop.llama_context_default_params();
             cparams.n_ctx = contextSize;
@@ -34,9 +38,9 @@ namespace LlamaCppDotNet
             cparams.seed = seed;
             cparams.f16_kv = !useFloat32;
             cparams.use_mlock = false;
-            _handle = LlamaCppInterop.llama_init_from_file(modelFile, cparams);
+            _handle = LlamaCppInterop.llama_init_from_file(modelPath, cparams);
 
-            _modelFile = modelFile;
+            _modelPath = modelPath;
         }
 
         public void Configure(LlamaCppOptions options) => _options = options;
@@ -73,7 +77,8 @@ namespace LlamaCppDotNet
 
             while (true)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                if (cancellationToken.IsCancellationRequested)
+                    break;
 
                 LlamaCppInterop.llama_eval(_handle, sampledVocabIds, sampledVocabIds.Count, evaluatedVocabIdCount, _options.ThreadCount);
 

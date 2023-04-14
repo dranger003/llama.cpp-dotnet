@@ -1,4 +1,4 @@
-﻿namespace LlamaCppDotNet
+﻿namespace LlamaCppLib
 {
     public class LlamaCppOptions
     {

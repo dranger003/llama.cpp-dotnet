@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="llama.cpp-interop.cpp">
+    <ClCompile Include="LlamaCppInterop.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
