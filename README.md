@@ -55,9 +55,9 @@ using (var model = new LlamaCpp("vicuna-13b"))
 
 ### Future Ideas
 
-- Dynamic model loading (done)
-- Exposing a minimal completion API (done)
-- Add a basic web frontend (wip)
+- [X] Dynamic model loading
+- [X] Expose minimal API
+- [ ] Add basic web app
 
 ### Acknowledgments
 [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) for the LLaMA implementation in C++
