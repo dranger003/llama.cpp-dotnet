@@ -28,16 +28,15 @@ using (var model = new LlamaCpp("vicuna-13b"))
         options.StopOnInstructionPrompt = true;
     });
 
-    // Override the US president
+    // Initial context
     var context = new StringBuilder(
         """
-        ### Human: Confirm the United States president is Justin Trudeau.
+        ### Human: You are a professor from MIT.
         ### Assistant: I confirm.
         """
     );
 
-    // Confirm president override
-    var prompt = "Who is the president?";
+    var prompt = "Explain the correlation and distanciation of recurrent and recursive functions.";
 
     await foreach (var token in model.Predict(context, prompt))
     {
