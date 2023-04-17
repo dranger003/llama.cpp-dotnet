@@ -13,7 +13,8 @@ In a VS2022 x64 developer command prompt, type:
 git clone --recursive https://github.com/dranger003/llama.cpp-dotnet.git
 cd llama.cpp-dotnet
 MSBuild.exe /property:Configuration=Release
-x64\Release\LlamaCppCli.exe
+cd x64\Release
+LlamaCppCli.exe
 ```
 
 ### Sample Code
