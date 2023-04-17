@@ -57,11 +57,22 @@ namespace LlamaCppLib
             if (_handle == nint.Zero)
                 throw new InvalidOperationException("You must load a model first.");
 
-            if (!String.IsNullOrEmpty(_options.InstructionPrompt))
-                prompt = $"{_options.InstructionPrompt} {prompt}";
+            {
+                var instructPrompt = !String.IsNullOrEmpty(_options.InstructionPrompt);
 
-            if (updateContext)
-                context.AppendNewLineIfMissing().Append(prompt);
+                if (updateContext && instructPrompt)
+                {
+                    context.Append($" {prompt}");
+                }
+                else if (updateContext)
+                {
+                    prompt = $"{prompt}\n";
+                    context.Append(prompt);
+                }
+
+                if (instructPrompt)
+                    prompt = $"{_options.InstructionPrompt} {prompt}";
+            }
 
             var contextVocabIds = new List<int>();
             var sampledVocabIds = new List<int>();
