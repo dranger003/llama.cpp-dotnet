@@ -1,10 +1,11 @@
-using System.Text;
 using LlamaCppLib;
 using LlamaCppWeb;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<LlamaCppLoader>();
+builder.Services.AddSingleton<LlamaContext>();
+
 builder.Services.AddCors();
 
 var app = builder.Build();
@@ -26,11 +27,22 @@ app.MapGet("/models", async (HttpContext httpContext) =>
     await httpContext.Response.WriteAsJsonAsync(loader.Models.Select((modelName, i) => new { Id = $"{i}", ModelName = modelName }));
 });
 
-app.MapGet("/load", async (HttpContext httpContext, string modelName) =>
+app.MapGet("/load", async (HttpContext httpContext, string? modelName) =>
 {
-    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
+    if (modelName == null)
+    {
+        await httpContext.Response.WriteAsJsonAsync(new { ModelName = String.Empty });
+        return;
+    }
 
-    loader.Load(modelName);
+    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
+    var state = httpContext.RequestServices.GetRequiredService<LlamaContext>();
+
+    loader.Load(modelName, out var initialContext);
+
+    state.InitialContext = initialContext;
+    state.Context.Clear();
+    state.Context.Append(initialContext ?? String.Empty);
 
     await httpContext.Response.WriteAsJsonAsync(new { ModelName = modelName });
 });
@@ -39,7 +51,7 @@ app.MapGet("/unload", async (HttpContext httpContext) =>
 {
     var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
 
-    var modelName = loader.Model.ModelName;
+    var modelName = loader.Model?.ModelName;
     loader.Unload();
 
     await httpContext.Response.WriteAsJsonAsync(new { ModelName = modelName });
@@ -49,36 +61,41 @@ app.MapGet("/status", async (HttpContext httpContext) =>
 {
     var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
 
-    await httpContext.Response.WriteAsJsonAsync(new { ModelName = loader.IsModelLoaded ? loader.Model.ModelName : String.Empty });
+    await httpContext.Response.WriteAsJsonAsync(new { ModelName = loader.Model != null ? loader.Model.ModelName : String.Empty });
 });
 
-app.MapGet("/configure", async (HttpContext httpContext, QueryConfigure query) =>
+app.MapGet("/context", async (HttpContext httpContext, string? context, bool? reset) =>
+{
+    var state = httpContext.RequestServices.GetRequiredService<LlamaContext>();
+
+    if (reset != null && reset.Value)
+        state.ResetContext();
+
+    if (context != null)
+        state.Context.Append(context);
+
+    await httpContext.Response.WriteAsJsonAsync(new { Context = $"{state.Context}" });
+});
+
+app.MapGet("/predict", async (HttpContext httpContext, string? prompt) =>
 {
     var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
+    var model = loader.Model;
 
-    loader.Model.Configure(options =>
+    if (model == null)
     {
-        options.ThreadCount = query.ThreadCount;
-        options.InstructionPrompt = query.InstructionPrompt ?? String.Empty;
-        options.StopOnInstructionPrompt = query.StopOnInstructionPrompt;
-    });
+        await httpContext.Response.WriteAsync("No model loaded.");
+        return;
+    }
 
-    await httpContext.Response.WriteAsJsonAsync(new { loader.Model.ModelName });
-});
-
-app.MapGet("/predict", async (HttpContext httpContext, QueryPredict query, ILogger<Program> logger) =>
-{
     var lifetime = httpContext.RequestServices.GetRequiredService<IHostApplicationLifetime>();
     using var cts = CancellationTokenSource.CreateLinkedTokenSource(httpContext.RequestAborted, lifetime.ApplicationStopping);
 
     httpContext.Response.ContentType = "text/event-stream";
 
-    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-    var model = loader.Model;
+    var state = httpContext.RequestServices.GetRequiredService<LlamaContext>();
 
-    var chatContext = new StringBuilder(query.Context);
-
-    await foreach (var token in model.Predict(chatContext, query.Prompt ?? String.Empty, true, cts.Token))
+    await foreach (var token in model.Predict(state.Context, prompt ?? String.Empty, true, cts.Token))
     {
         await httpContext.Response.WriteAsync(token);
         await httpContext.Response.Body.FlushAsync();

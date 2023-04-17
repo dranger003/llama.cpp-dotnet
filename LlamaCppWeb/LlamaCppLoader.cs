@@ -1,55 +1,33 @@
-﻿namespace LlamaCppLib
+﻿using LlamaCppWeb;
+
+namespace LlamaCppLib
 {
     public class LlamaCppLoader
     {
-        private IConfiguration _configuration;
-        private Dictionary<string, string> _modelPathsByName = new();
+        private LlamaCppConfiguration _configuration;
         private LlamaCpp? _model;
 
         public LlamaCppLoader(IConfiguration configuration)
         {
-            _configuration = configuration;
-            _ReadModels();
+            _configuration = new LlamaCppConfiguration(configuration);
+            _configuration.Load();
         }
 
-        private void _ReadModels()
+        public IEnumerable<string> Models => _configuration.Models.Select(x => x.Name).ToList();
+
+        public LlamaCpp? Model => _model;
+
+        public void Load(string modelName, out string? initialContext)
         {
-            _modelPathsByName = _configuration
-                .GetSection("LlamaCpp:Models")
-                .GetChildren()
-                .ToDictionary(
-                    k => k.GetValue<string>("Name") ?? String.Empty,
-                    v => v.GetValue<string>("Path") ?? String.Empty
-                );
-        }
+            initialContext = null;
 
-        public IEnumerable<string> Models
-        {
-            get
-            {
-                _ReadModels();
-                return _modelPathsByName
-                    .Select(model => model.Key)
-                    .ToList();
-            }
-        }
+            var modelIndex = _configuration.Models
+                .Select((model, index) => (Model: model, Index: index))
+                .Where(x => x.Model.Name == modelName)
+                .Single()
+                .Index;
 
-        public LlamaCpp Model
-        {
-            get
-            {
-                if (_model == null)
-                    throw new InvalidOperationException("No model loaded.");
-
-                return _model;
-            }
-        }
-
-        public bool IsModelLoaded => _model != null;
-
-        public void Load(string modelName)
-        {
-            var modelPath = _modelPathsByName[modelName];
+            var modelPath = _configuration.Models[modelIndex].Path;
 
             // Different model requested? If so, dispose current
             if (_model != null && _model.ModelPath != modelPath)
@@ -60,6 +38,23 @@
             {
                 _model = new LlamaCpp(modelName);
                 _model.Load(modelPath);
+
+                var modelOptions = _configuration.Models[modelIndex].Options;
+
+                // Use model options, with fallback on global options
+                _model.Configure(configure =>
+                {
+                    configure.ThreadCount = modelOptions.ThreadCount ?? _configuration.ThreadCount;
+                    configure.TopK = modelOptions.TopK ?? _configuration.TopK;
+                    configure.TopP = modelOptions.TopP ?? _configuration.TopP;
+                    configure.Temperature = modelOptions.Temperature ?? _configuration.Temperature;
+                    configure.RepeatPenalty = modelOptions.RepeatPenalty ?? _configuration.RepeatPenalty;
+                    configure.IgnoreEndOfStream = modelOptions.IgnoreEndOfStream ?? _configuration.IgnoreEndOfStream;
+                    configure.InstructionPrompt = modelOptions.InstructionPrompt ?? _configuration.InstructionPrompt;
+                    configure.StopOnInstructionPrompt = modelOptions.StopOnInstructionPrompt ?? _configuration.StopOnInstructionPrompt;
+                });
+
+                initialContext = modelOptions.InitialContext ?? _configuration.InitialContext;
             }
         }
 
