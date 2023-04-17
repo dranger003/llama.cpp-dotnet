@@ -52,6 +52,16 @@ using (var model = new LlamaCpp("vicuna-13b"))
 }
 ```
 
+### API Endpoints
+```
+GET /models
+GET /load?modelName={modelName}
+GET /unload
+GET /status
+GET /context?context={context}&reset={false|true}
+GET /predict?prompt={prompt}
+```
+
 ### Future Ideas
 
 - [X] Dynamic model loading
