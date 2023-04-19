@@ -43,6 +43,12 @@ app.MapGet("/model/status", async (HttpContext httpContext) =>
 
 // Session Operations
 
+app.MapGet("/session/list", async (HttpContext httpContext) =>
+{
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    await httpContext.Response.WriteAsJsonAsync(new { manager.Sessions });
+});
+
 app.MapGet("/session/create", (HttpContext httpContext, string sessionName) =>
 {
     var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
@@ -59,12 +65,6 @@ app.MapGet("/session/configure", (HttpContext httpContext, string sessionName, S
 {
     var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
     manager.ConfigureSession(sessionName, initialContext);
-});
-
-app.MapGet("/session/list", async (HttpContext httpContext) =>
-{
-    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
-    await httpContext.Response.WriteAsJsonAsync(new { manager.Sessions });
 });
 
 app.MapGet("/session/predict", async (HttpContext httpContext, string sessionName, string prompt) =>
