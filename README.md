@@ -89,8 +89,9 @@ GET /model/status
 ### API Endpoints (Session - i.e. Conversation)
 ```
 GET /session/list
-GET /session/new?sessionName={sessionName}
-GET /session/delete?sessionName={sessionName}
+GET /session/create?sessionName={sessionName}
+GET /session/destroy?sessionName={sessionName}
+GET /session/configure?sessionName={sessionName}&initialContext={initialContext}
 GET /session/predict?sessionName={sessionName}&prompt={prompt}
 ```
 
