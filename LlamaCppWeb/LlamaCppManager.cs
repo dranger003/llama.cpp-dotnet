@@ -2,28 +2,28 @@
 
 namespace LlamaCppLib
 {
-    public class LlamaCppLoader
+    public enum LlamaCppModelStatus { Unloaded, Loaded }
+
+    public class LlamaCppManager
     {
         private LlamaCppConfiguration _configuration;
         private LlamaCpp? _model;
         private List<LlamaCppSession> _sessions = new();
 
-        public LlamaCppLoader(IConfiguration configuration)
+        public LlamaCppManager(IConfiguration configuration)
         {
             _configuration = new LlamaCppConfiguration(configuration);
             _configuration.Load();
         }
 
-        public IEnumerable<string> Models => _configuration.Models.Select(x => x.Name).ToList();
+        public IEnumerable<string> Models => _configuration.Models.Select(x => x.Name);
 
-        public LlamaCpp? Model => _model;
+        public IEnumerable<string> Sessions => _sessions.Select(session => session.Name);
 
-        public IEnumerable<LlamaCppSession> Sessions { get => _sessions; }
+        public LlamaCppModelStatus Status => _model == null ? LlamaCppModelStatus.Unloaded : LlamaCppModelStatus.Loaded;
 
-        public void Load(string modelName, out string? initialContext)
+        public void LoadModel(string modelName)
         {
-            initialContext = null;
-
             var modelIndex = _configuration.Models
                 .Select((model, index) => (Model: model, Index: index))
                 .Where(x => x.Model.Name == modelName)
@@ -34,7 +34,7 @@ namespace LlamaCppLib
 
             // Different model requested? If so, dispose current
             if (_model != null && _model.ModelPath != modelPath)
-                Unload();
+                UnloadModel();
 
             // No model loaded, load it
             if (_model == null)
@@ -57,13 +57,13 @@ namespace LlamaCppLib
             }
         }
 
-        public void Unload()
+        public void UnloadModel()
         {
             _model?.Dispose();
             _model = null;
         }
 
-        public LlamaCppSession NewSession(string sessionName)
+        public LlamaCppSession CreateSession(string sessionName)
         {
             if (_model == null)
                 throw new InvalidOperationException("No model loaded.");
@@ -74,7 +74,9 @@ namespace LlamaCppLib
             return session;
         }
 
-        public void DeleteSession(string sessionName) => _sessions.Remove(_sessions.Single(x => x.Name == sessionName));
+        public void DestroySession(string sessionName) => _sessions.Remove(_sessions.Single(x => x.Name == sessionName));
+
+        public void ConfigureSession(string sessionName, List<string> initialContext) => GetSession(sessionName).Configure(options => options.InitialContext.AddRange(initialContext));
 
         public LlamaCppSession GetSession(string sessionName) => _sessions.Single(session => session.Name == sessionName);
     }

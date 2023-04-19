@@ -1,5 +1,4 @@
-﻿using Microsoft.Win32.SafeHandles;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace LlamaCppLib

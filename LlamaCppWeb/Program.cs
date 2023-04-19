@@ -1,17 +1,14 @@
 using LlamaCppLib;
+using LlamaCppWeb;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSingleton<LlamaCppLoader>();
-
+builder.Services.AddSingleton<LlamaCppManager>();
 builder.Services.AddCors();
 
 var app = builder.Build();
 
-app.UseCors(configure =>
-{
-    configure.AllowAnyOrigin();
-});
+app.UseCors(configure => configure.AllowAnyOrigin());
 
 app.MapGet("/", async (HttpContext httpContext) =>
 {
@@ -22,56 +19,58 @@ app.MapGet("/", async (HttpContext httpContext) =>
 
 app.MapGet("/model/list", async (HttpContext httpContext) =>
 {
-    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-    await httpContext.Response.WriteAsJsonAsync(loader.Models);
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    await httpContext.Response.WriteAsJsonAsync(new { manager.Models });
 });
 
-app.MapGet("/model/load", async (HttpContext httpContext, string modelName) =>
+app.MapGet("/model/load", (HttpContext httpContext, string modelName) =>
 {
-    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-    loader.Load(modelName, out var initialContext);
-    await httpContext.Response.WriteAsJsonAsync(new { ModelName = modelName });
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    manager.LoadModel(modelName);
 });
 
-app.MapGet("/model/unload", async (HttpContext httpContext, string modelName) =>
+app.MapGet("/model/unload", (HttpContext httpContext, string modelName) =>
 {
-    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-    loader.Unload();
-    await httpContext.Response.WriteAsJsonAsync(new { ModelName = modelName });
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    manager.UnloadModel();
 });
 
 app.MapGet("/model/status", async (HttpContext httpContext) =>
 {
-    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-    await httpContext.Response.WriteAsJsonAsync(new { ModelName = loader.Model != null ? loader.Model.ModelName : String.Empty });
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    await httpContext.Response.WriteAsJsonAsync(new { Status = Enum.GetName(manager.Status) });
 });
 
 // Session Operations
 
-app.MapGet("/session/new", async (HttpContext httpContext, string sessionName) =>
+app.MapGet("/session/create", (HttpContext httpContext, string sessionName) =>
 {
-    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-    loader.NewSession(sessionName);
-    await httpContext.Response.WriteAsJsonAsync(new { SessionName = sessionName });
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    manager.CreateSession(sessionName);
 });
 
-app.MapGet("/session/delete", async (HttpContext httpContext, string sessionName) =>
+app.MapGet("/session/destroy", (HttpContext httpContext, string sessionName) =>
 {
-    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-    loader.DeleteSession(sessionName);
-    await httpContext.Response.WriteAsJsonAsync(new { SessionName = sessionName });
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    manager.DestroySession(sessionName);
+});
+
+app.MapGet("/session/configure", (HttpContext httpContext, string sessionName, StringList initialContext) =>
+{
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    manager.ConfigureSession(sessionName, initialContext);
 });
 
 app.MapGet("/session/list", async (HttpContext httpContext) =>
 {
-    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-    await httpContext.Response.WriteAsJsonAsync(loader.Sessions);
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    await httpContext.Response.WriteAsJsonAsync(new { manager.Sessions });
 });
 
 app.MapGet("/session/predict", async (HttpContext httpContext, string sessionName, string prompt) =>
 {
-    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-    var session = loader.GetSession(sessionName);
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    var session = manager.GetSession(sessionName);
 
     var lifetime = httpContext.RequestServices.GetRequiredService<IHostApplicationLifetime>();
     using var cts = CancellationTokenSource.CreateLinkedTokenSource(httpContext.RequestAborted, lifetime.ApplicationStopping);
