@@ -6,6 +6,7 @@ namespace LlamaCppLib
     {
         private LlamaCppConfiguration _configuration;
         private LlamaCpp? _model;
+        private List<LlamaCppSession> _sessions = new();
 
         public LlamaCppLoader(IConfiguration configuration)
         {
@@ -16,6 +17,8 @@ namespace LlamaCppLib
         public IEnumerable<string> Models => _configuration.Models.Select(x => x.Name).ToList();
 
         public LlamaCpp? Model => _model;
+
+        public IEnumerable<LlamaCppSession> Sessions { get => _sessions; }
 
         public void Load(string modelName, out string? initialContext)
         {
@@ -49,12 +52,8 @@ namespace LlamaCppLib
                     configure.TopP = modelOptions.TopP ?? _configuration.TopP;
                     configure.Temperature = modelOptions.Temperature ?? _configuration.Temperature;
                     configure.RepeatPenalty = modelOptions.RepeatPenalty ?? _configuration.RepeatPenalty;
-                    configure.IgnoreEndOfStream = modelOptions.IgnoreEndOfStream ?? _configuration.IgnoreEndOfStream;
-                    configure.InstructionPrompt = modelOptions.InstructionPrompt ?? _configuration.InstructionPrompt;
-                    configure.StopOnInstructionPrompt = modelOptions.StopOnInstructionPrompt ?? _configuration.StopOnInstructionPrompt;
+                    configure.EndOfStreamToken = modelOptions.EndOfStreamToken ?? _configuration.EndOfStreamToken;
                 });
-
-                initialContext = modelOptions.InitialContext ?? _configuration.InitialContext;
             }
         }
 
@@ -63,5 +62,20 @@ namespace LlamaCppLib
             _model?.Dispose();
             _model = null;
         }
+
+        public LlamaCppSession NewSession(string sessionName)
+        {
+            if (_model == null)
+                throw new InvalidOperationException("No model loaded.");
+
+            var session = new LlamaCppSession(_model, sessionName);
+            _sessions.Add(session);
+
+            return session;
+        }
+
+        public void DeleteSession(string sessionName) => _sessions.Remove(_sessions.Single(x => x.Name == sessionName));
+
+        public LlamaCppSession GetSession(string sessionName) => _sessions.Single(session => session.Name == sessionName);
     }
 }

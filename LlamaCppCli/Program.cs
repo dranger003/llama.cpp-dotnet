@@ -1,36 +1,57 @@
-﻿using System.Text;
-using LlamaCppLib;
+﻿using LlamaCppLib;
 
-using (var model = new LlamaCpp("vicuna-13b"))
+using (var model = new LlamaCpp("vicuna-13b-v1.1"))
 {
-    model.Load(@"D:\LLM_MODELS\lmsys\vicuna-13b\ggjt-vicuna-13b-f16-q4_0.bin");
+    model.Load(@"D:\LLM_MODELS\lmsys\vicuna-13b-v1.1\ggml-vicuna-13b-v1.1-q4_0.bin");
 
     model.Configure(options =>
     {
         options.ThreadCount = 16;
-        options.InstructionPrompt = "### Human:";
-        options.StopOnInstructionPrompt = true;
+        options.EndOfStreamToken = "</s>";
     });
 
-    // Initial context
-    var context = new StringBuilder(
-        """
-        ### Human: You are a professor from MIT.
-        ### Assistant: I confirm.
-        """
-    );
+    var session = model.NewSession("Conversation #1");
 
-    var prompt = "Explain the correlation and distanciation of recurrent and recursive functions.";
-
-    await foreach (var token in model.Predict(context, prompt))
+    session.Configure(options =>
     {
-        Console.Write(token);
+        options.InitialContext.AddRange(
+            new[]
+            {
+                "A chat between a user and an assistant.",
+                "USER: Hello!",
+                "ASSISTANT: Hello!</s>",
+                "USER: How are you?",
+                "ASSISTANT: I am good.</s>",
+            }
+        );
+
+        options.Roles.AddRange(new[] { "USER", "ASSISTANT", "ASSIST" });
+    });
+
+    var prompts = new[]
+    {
+        "USER: How many planets are there in the solar system?",
+        "USER: Can you list the planets?",
+        "USER: What is Vicuna 13B?",
+        "USER: It is a large language model.",
+    };
+
+    Console.WriteLine(session.InitialContext.Aggregate((a, b) => $"{a}\n{b}"));
+
+    foreach (var prompt in prompts)
+    {
+        Console.WriteLine(prompt);
+
+        await foreach (var token in session.Predict(prompt))
+            Console.Write(token);
     }
 
     // Print conversation
-    Console.WriteLine("\n");
-    Console.WriteLine($" ---------------------------------------------------------------------------------");
-    Console.WriteLine($"| Transcript                                                                      |");
-    Console.WriteLine($" ---------------------------------------------------------------------------------");
-    Console.WriteLine(context);
+    Console.WriteLine();
+    Console.WriteLine($" --------------------------------------------------------------------------------------------------");
+    Console.WriteLine($"| Transcript                                                                                       |");
+    Console.WriteLine($" --------------------------------------------------------------------------------------------------");
+
+    foreach (var topic in session.Conversation)
+        Console.WriteLine(topic);
 }

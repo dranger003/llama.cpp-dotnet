@@ -9,10 +9,7 @@
             public float? TopP { get; set; }
             public float? Temperature { get; set; }
             public float? RepeatPenalty { get; set; }
-            public bool? IgnoreEndOfStream { get; set; }
-            public string? InstructionPrompt { get; set; }
-            public bool? StopOnInstructionPrompt { get; set; }
-            public string? InitialContext { get; set; }
+            public string? EndOfStreamToken { get; set; }
         }
 
         public class Model
@@ -27,10 +24,7 @@
         public float TopP { get; set; } = 0.95f;
         public float Temperature { get; set; } = 0.0f;
         public float RepeatPenalty { get; set; } = 1.5f;
-        public bool IgnoreEndOfStream { get; set; } = false;
-        public string InstructionPrompt { get; set; } = String.Empty;
-        public bool StopOnInstructionPrompt { get; set; } = false;
-        public string InitialContext { get; set; } = String.Empty;
+        public string EndOfStreamToken { get; set; } = String.Empty;
 
         public List<Model> Models { get; set; } = new();
 

@@ -7,8 +7,6 @@
         public float TopP { get; set; } = 0.95f;
         public float Temperature { get; set; } = 0.0f;
         public float RepeatPenalty { get; set; } = 1.5f;
-        public bool IgnoreEndOfStream { get; set; } = false;
-        public string InstructionPrompt { get; set; } = String.Empty;
-        public bool StopOnInstructionPrompt { get; set; } = false;
+        public string EndOfStreamToken { get; set; } = String.Empty;
     }
 }

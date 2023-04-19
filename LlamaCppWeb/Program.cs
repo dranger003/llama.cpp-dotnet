@@ -1,10 +1,8 @@
 using LlamaCppLib;
-using LlamaCppWeb;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<LlamaCppLoader>();
-builder.Services.AddSingleton<LlamaContext>();
 
 builder.Services.AddCors();
 
@@ -20,82 +18,67 @@ app.MapGet("/", async (HttpContext httpContext) =>
     await httpContext.Response.WriteAsync("Welcome to LLaMA C++!");
 });
 
-app.MapGet("/models", async (HttpContext httpContext) =>
+// Model Operations
+
+app.MapGet("/model/list", async (HttpContext httpContext) =>
 {
     var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-
-    await httpContext.Response.WriteAsJsonAsync(loader.Models.Select((modelName, i) => new { Id = $"{i}", ModelName = modelName }));
+    await httpContext.Response.WriteAsJsonAsync(loader.Models);
 });
 
-app.MapGet("/load", async (HttpContext httpContext, string? modelName) =>
+app.MapGet("/model/load", async (HttpContext httpContext, string modelName) =>
 {
-    if (modelName == null)
-    {
-        await httpContext.Response.WriteAsJsonAsync(new { ModelName = String.Empty });
-        return;
-    }
-
     var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-    var state = httpContext.RequestServices.GetRequiredService<LlamaContext>();
-
     loader.Load(modelName, out var initialContext);
-
-    state.InitialContext = initialContext;
-    state.Context.Clear();
-    state.Context.Append(initialContext ?? String.Empty);
-
     await httpContext.Response.WriteAsJsonAsync(new { ModelName = modelName });
 });
 
-app.MapGet("/unload", async (HttpContext httpContext) =>
+app.MapGet("/model/unload", async (HttpContext httpContext, string modelName) =>
 {
     var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-
-    var modelName = loader.Model?.ModelName;
     loader.Unload();
-
     await httpContext.Response.WriteAsJsonAsync(new { ModelName = modelName });
 });
 
-app.MapGet("/status", async (HttpContext httpContext) =>
+app.MapGet("/model/status", async (HttpContext httpContext) =>
 {
     var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-
     await httpContext.Response.WriteAsJsonAsync(new { ModelName = loader.Model != null ? loader.Model.ModelName : String.Empty });
 });
 
-app.MapGet("/context", async (HttpContext httpContext, string? context, bool? reset) =>
-{
-    var state = httpContext.RequestServices.GetRequiredService<LlamaContext>();
+// Session Operations
 
-    if (reset != null && reset.Value)
-        state.ResetContext();
-
-    if (context != null)
-        state.Context.Append(context);
-
-    await httpContext.Response.WriteAsJsonAsync(new { Context = $"{state.Context}" });
-});
-
-app.MapGet("/predict", async (HttpContext httpContext, string? prompt) =>
+app.MapGet("/session/new", async (HttpContext httpContext, string sessionName) =>
 {
     var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
-    var model = loader.Model;
+    loader.NewSession(sessionName);
+    await httpContext.Response.WriteAsJsonAsync(new { SessionName = sessionName });
+});
 
-    if (model == null)
-    {
-        await httpContext.Response.WriteAsync("No model loaded.");
-        return;
-    }
+app.MapGet("/session/delete", async (HttpContext httpContext, string sessionName) =>
+{
+    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
+    loader.DeleteSession(sessionName);
+    await httpContext.Response.WriteAsJsonAsync(new { SessionName = sessionName });
+});
+
+app.MapGet("/session/list", async (HttpContext httpContext) =>
+{
+    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
+    await httpContext.Response.WriteAsJsonAsync(loader.Sessions);
+});
+
+app.MapGet("/session/predict", async (HttpContext httpContext, string sessionName, string prompt) =>
+{
+    var loader = httpContext.RequestServices.GetRequiredService<LlamaCppLoader>();
+    var session = loader.GetSession(sessionName);
 
     var lifetime = httpContext.RequestServices.GetRequiredService<IHostApplicationLifetime>();
     using var cts = CancellationTokenSource.CreateLinkedTokenSource(httpContext.RequestAborted, lifetime.ApplicationStopping);
 
     httpContext.Response.ContentType = "text/event-stream";
 
-    var state = httpContext.RequestServices.GetRequiredService<LlamaContext>();
-
-    await foreach (var token in model.Predict(state.Context, prompt ?? String.Empty, true, cts.Token))
+    await foreach (var token in session.Predict(prompt, cts.Token))
     {
         await httpContext.Response.WriteAsync(token);
         await httpContext.Response.Body.FlushAsync();
