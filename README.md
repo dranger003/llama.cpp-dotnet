@@ -4,7 +4,7 @@
 
 ### Description
 
-Simple C# bindings for llama.cpp with two sample projects (cli & web).
+C# bindings for llama.cpp including a .NET core library and sample projects (cli & web).
 
 ### Quick Start
 
