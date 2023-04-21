@@ -23,58 +23,39 @@ using LlamaCppLib;
 
 using (var model = new LlamaCpp("vicuna-13b-v1.1"))
 {
-    model.Load(@"D:\LLM_MODELS\lmsys\vicuna-13b-v1.1\ggml-vicuna-13b-v1.1-q4_0.bin");
+    model.Load("ggml-vicuna-13b-v1.1-q4_1.bin");
 
     model.Configure(options =>
     {
         options.ThreadCount = 16;
-        options.EndOfStreamToken = "</s>";
+        options.TopK = 40;
+        options.TopP = 0.95f;
+        options.Temperature = 0.0f;
+        options.RepeatPenalty = 1.1f;
     });
 
-    var session = model.NewSession("Conversation #1");
-
-    session.Configure(options =>
-    {
-        options.InitialContext.AddRange(
-            new[]
-            {
-                "A chat between a user and an assistant.",
-                "USER: Hello!",
-                "ASSISTANT: Hello!</s>",
-                "USER: How are you?",
-                "ASSISTANT: I am good.</s>",
-            }
-        );
-
-        options.Roles.AddRange(new[] { "USER", "ASSISTANT", "ASSIST" });
-    });
-
-    var prompts = new[]
-    {
-        "USER: How many planets are there in the solar system?",
-        "USER: Can you list the planets?",
-        "USER: What is Vicuna 13B?",
-        "USER: It is a large language model.",
-    };
+    var session = model.CreateSession("Conversation #1");
+    session.Configure(options => options.InitialContext.AddRange(new[] {
+        $"Hi! How can I be of service today?",
+        $"Hello! How are you doing?",
+        $"I am doing great! Thanks for asking.",
+        $"Can you help me with some questions please?",
+        $"Absolutely, what questions can I help you with?",
+        $"How many planets are there in the solar system?",
+    }));
 
     Console.WriteLine(session.InitialContext.Aggregate((a, b) => $"{a}\n{b}"));
 
-    foreach (var prompt in prompts)
+    foreach (var prompt in new[] {
+        $"Can you list the planets of our solar system?",
+        $"What do you think Vicuna 13B is according to you?",
+        $"Vicuna 13B is a large language model (LLM).",
+    })
     {
         Console.WriteLine(prompt);
-
         await foreach (var token in session.Predict(prompt))
             Console.Write(token);
     }
-
-    // Print conversation
-    Console.WriteLine();
-    Console.WriteLine($" --------------------------------------------------------------------------------------------------");
-    Console.WriteLine($"| Transcript                                                                                       |");
-    Console.WriteLine($" --------------------------------------------------------------------------------------------------");
-
-    foreach (var topic in session.Conversation)
-        Console.WriteLine(topic);
 }
 ```
 
