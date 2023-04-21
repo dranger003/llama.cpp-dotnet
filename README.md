@@ -17,6 +17,12 @@ cd x64\Release
 LlamaCppCli.exe
 ```
 
+## Models
+
+You will need a model in GGML format.
+
+[ggml-vicuna-13b-1.1-q4_1.bin](https://huggingface.co/eachadea/ggml-vicuna-13b-1.1/resolve/main/ggml-vicuna-13b-1.1-q4_1.bin)
+
 ### Sample Code (CLI)
 ```
 using LlamaCppLib;
