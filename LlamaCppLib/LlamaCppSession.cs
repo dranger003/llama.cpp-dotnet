@@ -1,8 +1,9 @@
 ﻿using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace LlamaCppLib
 {
+    using LlamaToken = System.Int32;
+
     public class LlamaCppSession
     {
         private LlamaCpp _model;
@@ -10,7 +11,6 @@ namespace LlamaCppLib
 
         private List<int> _contextVocabIds = new();
         private List<string> _initialContext = new();
-        private List<string> _conversation = new();
 
         public LlamaCppSession(LlamaCpp model, string name)
         {
@@ -22,9 +22,9 @@ namespace LlamaCppLib
 
         public List<string> InitialContext { get => _initialContext; }
 
-        public List<string> Roles { get; set; } = new();
+        public List<LlamaToken> TokenizedContext => _contextVocabIds;
 
-        public IEnumerable<string> Conversation { get => _conversation; }
+        public string Conversation => _model.Detokenize(_contextVocabIds.Skip(1)).Substring(1); // Skip BOS
 
         public void Configure(Action<LlamaCppSession> configure) => configure(this);
 
@@ -32,25 +32,26 @@ namespace LlamaCppLib
 
         public async IAsyncEnumerable<string> Predict(string prompt, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            if (!_contextVocabIds.Any())
-            {
-                _conversation.Clear();
-                _conversation.AddRange(_initialContext);
+            var start = !_contextVocabIds.Any();
 
-                prompt = $"{_initialContext.DefaultIfEmpty().Aggregate((a, b) => $"{a}\n{b}")}\n{prompt}";
+            prompt = $"USER:\n{prompt}\n\nASSISTANT:\n";
+
+            if (start && _initialContext.Any())
+            {
+                var context = _initialContext
+                    .Select((x, i) => $"{(i % 2 == 0 ? "ASSISTANT" : "USER")}:\n{x}\n")
+                    .Aggregate((a, b) => $"{a}\n{b}");
+
+                prompt = $"{context}\n{prompt}";
             }
 
-            _conversation.Add(prompt);
+            var promptVocabIds = _model.Tokenize(prompt, start);
 
-            var topic = new StringBuilder();
+            await foreach (var token in _model.Predict(_contextVocabIds, promptVocabIds, cancellationToken))
+                yield return token.Value;
 
-            await foreach (var token in _model.Predict(_contextVocabIds, $"{prompt}\n", cancellationToken))
-            {
-                topic.Append(token);
-                yield return token;
-            }
-
-            _conversation.Add(topic.ToString().TrimEnd('\n'));
+            _contextVocabIds.AddRange(_model.Tokenize("\n\n"));
+            yield return "\n";
         }
     }
 }

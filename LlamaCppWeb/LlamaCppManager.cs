@@ -30,15 +30,14 @@ namespace LlamaCppLib
                 .Single()
                 .Index;
 
-            var modelPath = _configuration.Models[modelIndex].Path;
-
-            // Different model requested? If so, dispose current
-            if (_model != null && _model.ModelPath != modelPath)
+            if (_model != null)
                 UnloadModel();
 
             // No model loaded, load it
             if (_model == null)
             {
+                var modelPath = _configuration.Models[modelIndex].Path;
+
                 _model = new LlamaCpp(modelName);
                 _model.Load(modelPath);
 
@@ -52,7 +51,6 @@ namespace LlamaCppLib
                     configure.TopP = modelOptions.TopP ?? _configuration.TopP;
                     configure.Temperature = modelOptions.Temperature ?? _configuration.Temperature;
                     configure.RepeatPenalty = modelOptions.RepeatPenalty ?? _configuration.RepeatPenalty;
-                    configure.EndOfStreamToken = modelOptions.EndOfStreamToken ?? _configuration.EndOfStreamToken;
                 });
             }
         }
@@ -74,7 +72,13 @@ namespace LlamaCppLib
             return session;
         }
 
-        public void DestroySession(string sessionName) => _sessions.Remove(_sessions.Single(x => x.Name == sessionName));
+        public void DestroySession(string sessionName)
+        {
+            if (_sessions.Count(session => session.Name == sessionName) != 1)
+                return;
+
+            _sessions.Remove(_sessions.Single(x => x.Name == sessionName));
+        }
 
         public void ConfigureSession(string sessionName, List<string> initialContext) => GetSession(sessionName).Configure(options => options.InitialContext.AddRange(initialContext));
 
