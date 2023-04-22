@@ -24,7 +24,7 @@ namespace LlamaCppLib
 
         public List<LlamaToken> TokenizedContext => _contextVocabIds;
 
-        public string Conversation => _model.Detokenize(_contextVocabIds.Skip(1)).Substring(1); // Skip BOS
+        public string Conversation => _model.Detokenize(_contextVocabIds);
 
         public void Configure(Action<LlamaCppSession> configure) => configure(this);
 
@@ -39,7 +39,8 @@ namespace LlamaCppLib
             if (start && _initialContext.Any())
             {
                 var context = _initialContext
-                    .Select((x, i) => $"{(i % 2 == 0 ? "ASSISTANT" : "USER")}:\n{x}\n")
+                    //.Select((x, i) => $"{(i % 2 == 0 ? "ASSISTANT" : "USER")}:\n{x}\n")
+                    .Select(x => $"{x}\n")
                     .Aggregate((a, b) => $"{a}\n{b}");
 
                 prompt = $"{context}\n{prompt}";
