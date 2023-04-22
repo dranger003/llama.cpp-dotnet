@@ -21,7 +21,7 @@ LlamaCppCli.exe
 
 You will need a model in GGML format.
 
-[ggml-vicuna-13b-1.1-q4_1.bin](https://huggingface.co/eachadea/ggml-vicuna-13b-1.1/resolve/main/ggml-vicuna-13b-1.1-q4_1.bin)
+[ggml-vicuna-13b](https://huggingface.co/eachadea/ggml-vicuna-13b-1.1/tree/main)
 
 ### Sample Code (CLI)
 ```
