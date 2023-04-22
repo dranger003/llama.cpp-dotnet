@@ -25,10 +25,14 @@ namespace LlamaCppLib
 
         public string ModelName { get => _modelName; }
 
+        public LlamaCppOptions Options { get => _options; }
+
         public LlamaCppSession CreateSession(string sessionName) => new(this, sessionName);
 
         public IEnumerable<LlamaToken> Tokenize(string text, bool addBos = false) => LlamaCppInterop.llama_tokenize(_model, $"{(addBos ? " " : String.Empty)}{text}", addBos);
-        public string Detokenize(IEnumerable<LlamaToken> vocabIds) => vocabIds.Select(vocabId => LlamaCppInterop.llama_token_to_str(_model, vocabId)).Aggregate((a, b) => $"{a}{b}");
+
+        public string Detokenize(IEnumerable<LlamaToken> vocabIds) =>
+            vocabIds.Select(vocabId => LlamaCppInterop.llama_token_to_str(_model, vocabId)).DefaultIfEmpty().Aggregate((a, b) => $"{a}{b}") ?? String.Empty;
 
         public LlamaToken EosToken { get => LlamaCppInterop.llama_token_eos(); }
 

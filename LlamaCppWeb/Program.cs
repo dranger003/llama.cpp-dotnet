@@ -41,7 +41,21 @@ app.MapGet("/model/unload", async (HttpContext httpContext, string modelName) =>
 app.MapGet("/model/status", async (HttpContext httpContext) =>
 {
     var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
-    await httpContext.Response.WriteAsJsonAsync(new { Status = Enum.GetName(manager.Status) });
+    await httpContext.Response.WriteAsJsonAsync(new { Status = Enum.GetName(manager.Status), manager.ModelName });
+});
+
+app.MapGet("/model/configure", async (HttpContext httpContext, int threadCount = 4, int topK = 50, float topP = 0.95f, float temperature = 0.1f, float repeatPenalty = 1.5f) =>
+{
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    manager.ConfigureModel(options =>
+    {
+        options.ThreadCount = threadCount;
+        options.TopK = topK;
+        options.TopP = topP;
+        options.Temperature = temperature;
+        options.RepeatPenalty = repeatPenalty;
+    });
+    await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
 });
 
 // Session endpoints
