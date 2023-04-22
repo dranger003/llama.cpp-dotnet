@@ -44,8 +44,9 @@ namespace LlamaCppCli
         static async Task Main()
         {
             //await RawInterfaceSample();
-            await WrappedInterfaceSampleWithoutSession();
+            //await WrappedInterfaceSampleWithoutSession();
             //await WrappedInterfaceSampleWithSession();
+            await WrappedInterfaceSampleWithSessionInteractive();
             //await GetEmbeddingsAsync();
         }
 
@@ -139,11 +140,11 @@ namespace LlamaCppCli
 
                 model.Configure(options =>
                 {
-                    options.ThreadCount = 16;
-                    options.TopK = 40;
-                    options.TopP = 0.95f;
-                    options.Temperature = 0.0f;
-                    options.RepeatPenalty = 1.1f;
+                    options.ThreadCount = ThreadCount;
+                    options.TopK = TopK;
+                    options.TopP = TopP;
+                    options.Temperature = Temperature;
+                    options.RepeatPenalty = RepeatPenalty;
                 });
 
                 var session = model.CreateSession("Conversation #1");
@@ -162,6 +163,37 @@ namespace LlamaCppCli
                 }
 
                 PrintTranscript(session.Conversation);
+            }
+        }
+
+        static async Task WrappedInterfaceSampleWithSessionInteractive()
+        {
+            using (var model = new LlamaCpp(ModelName))
+            {
+                model.Load(ModelPath);
+
+                model.Configure(options =>
+                {
+                    options.ThreadCount = ThreadCount;
+                    options.TopK = TopK;
+                    options.TopP = TopP;
+                    options.Temperature = Temperature;
+                    options.RepeatPenalty = RepeatPenalty;
+                });
+
+                var session = model.CreateSession("Conversation #1");
+
+                while (true)
+                {
+                    Console.Write("> ");
+                    var prompt = Console.ReadLine();
+
+                    if (String.IsNullOrWhiteSpace(prompt))
+                        break;
+
+                    await foreach (var token in session.Predict(prompt))
+                        Console.Write(token);
+                }
             }
         }
 
