@@ -44,7 +44,7 @@ app.MapGet("/model/status", async (HttpContext httpContext) =>
     await httpContext.Response.WriteAsJsonAsync(new { Status = Enum.GetName(manager.Status), manager.ModelName });
 });
 
-app.MapGet("/model/configure", async (HttpContext httpContext, int threadCount = 4, int topK = 50, float topP = 0.95f, float temperature = 0.1f, float repeatPenalty = 1.5f) =>
+app.MapGet("/model/configure", async (HttpContext httpContext, int threadCount = 4, int topK = 50, float topP = 0.95f, float temperature = 0.1f, float repeatPenalty = 1.1f) =>
 {
     var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
     manager.ConfigureModel(options =>
