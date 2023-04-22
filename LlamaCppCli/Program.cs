@@ -14,12 +14,12 @@ namespace LlamaCppCli
         {
             get => new[]
             {
-                $"Hi! How can I be of service today?",
-                $"Hello! How are you doing?",
-                $"I am doing great! Thanks for asking.",
-                $"Can you help me with some questions please?",
-                $"Absolutely, what questions can I help you with?",
-                $"How many planets are there in the solar system?",
+                "Hi! How can I be of service today?",
+                "Hello! How are you doing?",
+                "I am doing great! Thanks for asking.",
+                "Can you help me with some questions please?",
+                "Absolutely, what questions can I help you with?",
+                "How many planets are there in the solar system?",
             };
         }
 
@@ -27,9 +27,9 @@ namespace LlamaCppCli
         {
             get => new[]
             {
-                $"Can you list the planets of our solar system?",
-                $"What do you think Vicuna 13B is according to you?",
-                $"Vicuna 13B is a large language model (LLM).",
+                "Can you list the planets of our solar system?",
+                "What do you think Vicuna 13B is according to you?",
+                "Vicuna 13B is a large language model (LLM).",
             };
         }
 
