@@ -71,6 +71,7 @@ GET /model/list
 GET /model/load?modelName={modelName}
 GET /model/unload?modelName={modelName}
 GET /model/status
+GET /model/configure?threadCount={threadCount}&topK={topK}&topP{topP}&temperature={temperature}&repeatPenalty={repeatPenalty}
 ```
 
 ### API Endpoints (Session - i.e. Conversation)
