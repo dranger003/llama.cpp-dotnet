@@ -16,11 +16,13 @@ namespace LlamaCppLib
             _configuration.Load();
         }
 
-        public IEnumerable<string> Models => _configuration.Models.Select(x => x.Name);
+        public IEnumerable<string> Models { get => _configuration.Models.Select(x => x.Name); }
 
-        public IEnumerable<string> Sessions => _sessions.Select(session => session.Name);
+        public IEnumerable<string> Sessions { get => _sessions.Select(session => session.Name); }
 
-        public LlamaCppModelStatus Status => _model == null ? LlamaCppModelStatus.Unloaded : LlamaCppModelStatus.Loaded;
+        public LlamaCppModelStatus Status { get => _model == null ? LlamaCppModelStatus.Unloaded : LlamaCppModelStatus.Loaded; }
+
+        public string? ModelName { get => _model?.ModelName; }
 
         public void LoadModel(string modelName)
         {
@@ -61,6 +63,8 @@ namespace LlamaCppLib
             _model = null;
         }
 
+        public void ConfigureModel(Action<LlamaCppOptions> configure) => configure(_model?.Options ?? new());
+
         public LlamaCppSession CreateSession(string sessionName)
         {
             if (_model == null)
@@ -80,6 +84,7 @@ namespace LlamaCppLib
             _sessions.Remove(_sessions.Single(x => x.Name == sessionName));
         }
 
+        public void ConfigureSession(string sessionName, params string[] initialContext) => ConfigureSession(sessionName, initialContext.ToList());
         public void ConfigureSession(string sessionName, List<string> initialContext) => GetSession(sessionName).Configure(options => options.InitialContext.AddRange(initialContext));
 
         public LlamaCppSession GetSession(string sessionName) => _sessions.Single(session => session.Name == sessionName);
