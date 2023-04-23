@@ -31,9 +31,13 @@ cd x64/Release
 
 ## Models
 
-You will need a model in GGML format.
+You will need a model in GGML format, the 13B parameters appear to perform well if you have the memory (7-10GB depending on the model).
 
-[ggml-vicuna-13b](https://huggingface.co/eachadea/ggml-vicuna-13b-1.1/tree/main)
+Some models can be found below.
+
+[eachadea/ggml-vicuna-13b-1.1](https://huggingface.co/eachadea/ggml-vicuna-13b-1.1/tree/main)
+
+[TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g-GGML](https://huggingface.co/TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g-GGML/tree/main)
 
 ### Sample Code (CLI)
 ```
