@@ -10,13 +10,23 @@ C# bindings for llama.cpp including a .NET core library and sample projects (cli
 
 ### Quick Start
 
-In a VS2022 x64 developer command prompt, type:
+Build (on Windows use the VS2022 x64 command prompt):
 ```
 git clone --recursive https://github.com/dranger003/llama.cpp-dotnet.git
 cd llama.cpp-dotnet
-MSBuild.exe /property:Configuration=Release
+dotnet build -c Release
+```
+
+Windows:
+```
 cd x64\Release
-LlamaCppCli.exe
+LlamaCppCli.exe RawInterfaceSample ggml-vicuna-13b-1.1-q4_0.bin
+```
+
+Linux:
+```
+cd x64/Release
+./LlamaCppCli RawInterfaceSample ggml-vicuna-13b-1.1-q4_0.bin
 ```
 
 ## Models
@@ -89,6 +99,7 @@ GET /session/predict?sessionName={sessionName}&prompt={prompt}
 - [X] Dynamic model loading
 - [X] Expose minimal API
 - [X] Session/conversation support
+- [X] Support Windows/Linux
 - [ ] Add basic web app
 
 ### Acknowledgments
