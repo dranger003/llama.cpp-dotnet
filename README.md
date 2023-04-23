@@ -96,7 +96,7 @@ GET /model/configure?threadCount={threadCount}&topK={topK}&topP{topP}&temperatur
 GET /session/list
 GET /session/create?sessionName={sessionName}
 GET /session/destroy?sessionName={sessionName}
-GET /session/configure?sessionName={sessionName}
+GET /session/configure?sessionName={sessionName}&template={template}
 GET /session/predict?sessionName={sessionName}&prompt={prompt}
 ```
 
@@ -106,7 +106,7 @@ GET /session/predict?sessionName={sessionName}&prompt={prompt}
 - [X] Expose minimal API
 - [X] Session/conversation support
 - [X] Support Windows/Linux
-- [ ] Add basic web app
+- [ ] Add basic web app (WIP)
 
 ### Acknowledgments
 [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) for the LLaMA implementation in C++
