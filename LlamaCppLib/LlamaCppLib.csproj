@@ -11,4 +11,31 @@
 		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
 	</PropertyGroup>
 
+	<Target Name="CMakeGenerate" BeforeTargets="Build">
+		<PropertyGroup>
+			<CMakeCompilerFlags Condition="'$(OS)' == 'Windows_NT'">-DCMAKE_CXX_FLAGS="/W0 /EHsc /w" -DCMAKE_C_FLAGS="/W0 /w"</CMakeCompilerFlags>
+			<CMakeCompilerFlags Condition="$([System.String]::new('$(OS)').StartsWith('Unix'))">-DCMAKE_CXX_FLAGS=-w -DCMAKE_C_FLAGS=-w</CMakeCompilerFlags>
+		</PropertyGroup>
+		<Exec Command="cmake -DLLAMA_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=ON -S $(CMakeBuildDir) -B $(CMakeBuildDir) $(CMakeCompilerFlags)" />
+	</Target>
+
+	<Target Name="CMakeBuild" AfterTargets="CMakeGenerate">
+		<Exec Command="cmake --build $(CMakeBuildDir) --config $(Configuration)" />
+	</Target>
+
+	<Target Name="CopyCMakeOutput" AfterTargets="CMakeBuild">
+		<PropertyGroup>
+			<LibraryFileExtension Condition="'$(OS)' == 'Windows_NT'">*.dll</LibraryFileExtension>
+			<LibraryFileExtension Condition="$([System.String]::new('$(OS)').StartsWith('Unix'))">*.so</LibraryFileExtension>
+		</PropertyGroup>
+		<ItemGroup>
+			<LibraryFiles Include="$(CMakeBuildDir)/bin/$(Configuration)/$(LibraryFileExtension)" />
+		</ItemGroup>
+		<Copy SourceFiles="@(LibraryFiles)" DestinationFolder="$(SolutionDir)/$(Platform)/$(Configuration)" />
+	</Target>
+
+	<Target Name="CMakeClean" AfterTargets="Clean">
+		<Exec Command="cmake --build $(CMakeBuildDir) --target clean" />
+	</Target>
+
 </Project>
