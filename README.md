@@ -20,13 +20,13 @@ dotnet build -c Release
 Windows:
 ```
 cd x64\Release
-LlamaCppCli.exe RawInterfaceSample ggml-vicuna-13b-1.1-q4_0.bin
+LlamaCppCli.exe WrappedInterfaceSampleWithSessionInteractive ggml-vicuna-13b-1.1-q4_0.bin
 ```
 
 Linux:
 ```
 cd x64/Release
-./LlamaCppCli RawInterfaceSample ggml-vicuna-13b-1.1-q4_0.bin
+./LlamaCppCli WrappedInterfaceSampleWithSessionInteractive ggml-vicuna-13b-1.1-q4_0.bin
 ```
 
 ## Models
