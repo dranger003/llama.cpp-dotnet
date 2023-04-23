@@ -29,38 +29,37 @@ You will need a model in GGML format.
 ```
 using LlamaCppLib;
 
-using (var model = new LlamaCpp("vicuna-13b-v1.1"))
+using (var model = new LlamaCpp("Model X"))
 {
-    model.Load("ggml-vicuna-13b-v1.1-q4_1.bin");
+    // Load model
+    model.Load("ggml-vicuna-13b-v1.1-q4_0.bin");
 
+    // Configure model
     model.Configure(options =>
     {
-        options.ThreadCount = 16;
-        options.TopK = 40;
+        options.ThreadCount = 4;
+        options.TopK = 50;
         options.TopP = 0.95f;
-        options.Temperature = 0.0f;
+        options.Temperature = 0.1f;
         options.RepeatPenalty = 1.1f;
     });
 
-    var session = model.CreateSession("Conversation #1");
-    session.Configure(options => options.InitialContext.AddRange(new[] {
-        $"Hi! How can I be of service today?",
-        $"Hello! How are you doing?",
-        $"I am doing great! Thanks for asking.",
-        $"Can you help me with some questions please?",
-        $"Absolutely, what questions can I help you with?",
-        $"How many planets are there in the solar system?",
-    }));
+    // Create a new conversation session
+    var session = model.CreateSession("Conversation X");
 
-    Console.WriteLine(session.InitialContext.Aggregate((a, b) => $"{a}\n{b}"));
-
-    foreach (var prompt in new[] {
-        $"Can you list the planets of our solar system?",
-        $"What do you think Vicuna 13B is according to you?",
-        $"Vicuna 13B is a large language model (LLM).",
-    })
+    while (true)
     {
-        Console.WriteLine(prompt);
+        // Get a prompt
+        Console.Write("> ");
+        var prompt = Console.ReadLine();
+
+        // Quit on blank prompt
+        if (String.IsNullOrWhiteSpace(prompt))
+            break;
+
+        // If your model needs a template, here you would format it
+
+        // Run the predictions
         await foreach (var token in session.Predict(prompt))
             Console.Write(token);
     }
@@ -81,7 +80,7 @@ GET /model/configure?threadCount={threadCount}&topK={topK}&topP{topP}&temperatur
 GET /session/list
 GET /session/create?sessionName={sessionName}
 GET /session/destroy?sessionName={sessionName}
-GET /session/configure?sessionName={sessionName}&initialContext={initialContext}
+GET /session/configure?sessionName={sessionName}
 GET /session/predict?sessionName={sessionName}&prompt={prompt}
 ```
 
