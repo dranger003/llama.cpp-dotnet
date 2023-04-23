@@ -8,9 +8,8 @@ namespace LlamaCppLib
     {
         private LlamaCpp _model;
         private string _name;
-
         private List<int> _contextVocabIds = new();
-        private List<string> _initialContext = new();
+        private LlamaCppSessionOptions _options = new();
 
         public LlamaCppSession(LlamaCpp model, string name)
         {
@@ -20,30 +19,27 @@ namespace LlamaCppLib
 
         public string Name { get => _name; }
 
-        public List<string> InitialContext { get => _initialContext; }
-
         public List<LlamaToken> TokenizedContext => _contextVocabIds;
 
         public string Conversation => _model.Detokenize(_contextVocabIds);
 
-        public void Configure(Action<LlamaCppSession> configure) => configure(this);
+        public void Configure(Action<LlamaCppSessionOptions> configure) => configure(_options);
 
         public void Reset() => _contextVocabIds.Clear();
 
-        public async IAsyncEnumerable<string> Predict(string prompt, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        public async IAsyncEnumerable<string> Predict(string prompt, string? context = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             var start = !_contextVocabIds.Any();
 
-            prompt = $"USER:\n{prompt}\n\nASSISTANT:\n";
-
-            if (start && _initialContext.Any())
+            if (_options.Template != null)
             {
-                var context = _initialContext
-                    //.Select((x, i) => $"{(i % 2 == 0 ? "ASSISTANT" : "USER")}:\n{x}\n")
-                    .Select(x => $"{x}\n")
-                    .Aggregate((a, b) => $"{a}\n{b}");
+                if (context != null)
+                    prompt = String.Format(_options.Template, prompt, context);
+                else
+                    prompt = String.Format(_options.Template, prompt);
 
-                prompt = $"{context}\n{prompt}";
+                //prompt = $"USER:\n{prompt}\n\nASSISTANT:\n";
+                //prompt = $"### Instruction:\n{prompt}\n\n### Response:\n";
             }
 
             var promptVocabIds = _model.Tokenize(prompt, start);
