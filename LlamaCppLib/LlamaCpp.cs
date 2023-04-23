@@ -1,5 +1,4 @@
 ﻿using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace LlamaCppLib
 {
@@ -27,16 +26,19 @@ namespace LlamaCppLib
 
         public LlamaCppOptions Options { get => _options; }
 
-        public LlamaCppSession CreateSession(string sessionName) => new(this, sessionName);
+        public LlamaCppSession CreateSession(string sessionName) =>
+            new(this, sessionName);
 
-        public IEnumerable<LlamaToken> Tokenize(string text, bool addBos = false) => LlamaCppInterop.llama_tokenize(_model, $"{(addBos ? " " : String.Empty)}{text}", addBos);
+        public IEnumerable<LlamaToken> Tokenize(string text, bool addBos = false) =>
+            LlamaCppInterop.llama_tokenize(_model, $"{(addBos ? " " : String.Empty)}{text}", addBos);
 
         public string Detokenize(IEnumerable<LlamaToken> vocabIds) =>
-            vocabIds.Select(vocabId => LlamaCppInterop.llama_token_to_str(_model, vocabId)).DefaultIfEmpty().Aggregate((a, b) => $"{a}{b}") ?? String.Empty;
+            vocabIds
+                .Select(vocabId => LlamaCppInterop.llama_token_to_str(_model, vocabId))
+                .DefaultIfEmpty()
+                .Aggregate((a, b) => $"{a}{b}") ?? String.Empty;
 
-        public LlamaToken EosToken { get => LlamaCppInterop.llama_token_eos(); }
-
-        public void Load(string modelPath, int contextSize = 2048, int seed = 0, bool useFloat32 = false)
+        public void Load(string modelPath, int contextSize = 2048, int seed = 0, bool keyValuesF16 = true)
         {
             if (!File.Exists(modelPath))
                 throw new FileNotFoundException($"Model file not found \"{modelPath}\".");
@@ -47,13 +49,14 @@ namespace LlamaCppLib
             var cparams = LlamaCppInterop.llama_context_default_params();
             cparams.n_ctx = contextSize;
             cparams.seed = seed;
-            cparams.f16_kv = !useFloat32;
+            cparams.f16_kv = keyValuesF16;
             _model = LlamaCppInterop.llama_init_from_file(modelPath, cparams);
         }
 
-        public void Configure(LlamaCppOptions options) => _options = options;
+        public void Configure(LlamaCppOptions options) =>  _options = options;
 
-        public void Configure(Action<LlamaCppOptions> configure) => configure(_options);
+        public void Configure(Action<LlamaCppOptions> configure) =>
+            configure(_options);
 
         public async IAsyncEnumerable<KeyValuePair<LlamaToken, string>> Predict(
             List<LlamaToken> contextVocabIds,
@@ -62,7 +65,10 @@ namespace LlamaCppLib
         )
         {
             if (_model == nint.Zero)
-                throw new InvalidOperationException("You must load a model first.");
+                throw new InvalidOperationException("You must load a model.");
+
+            if (!_options.IsConfigured)
+                throw new InvalidOperationException("You must configure the model.");
 
             var sampledVocabIds = new List<int>();
             sampledVocabIds.AddRange(promptVocabIds);
@@ -70,54 +76,27 @@ namespace LlamaCppLib
             var endOfStream = false;
             while (!endOfStream && !cancellationToken.IsCancellationRequested)
             {
-                LlamaCppInterop.llama_eval(_model, sampledVocabIds, contextVocabIds.Count, _options.ThreadCount);
+                if (contextVocabIds.Count >= LlamaCppInterop.llama_n_ctx(_model))
+                    throw new NotImplementedException($"Context rotation not yet implemented (max context reached: {contextVocabIds.Count}).");
+
+                LlamaCppInterop.llama_eval(_model, sampledVocabIds, contextVocabIds.Count, _options.ThreadCount ?? 0);
                 contextVocabIds.AddRange(sampledVocabIds);
 
-                var id = LlamaCppInterop.llama_sample_top_p_top_k(_model, contextVocabIds, _options.TopK, _options.TopP, _options.Temperature, _options.RepeatPenalty);
+                var id = LlamaCppInterop.llama_sample_top_p_top_k(
+                    _model,
+                    contextVocabIds,
+                    _options.TopK ?? 0,
+                    _options.TopP ?? 0,
+                    _options.Temperature ?? 0,
+                    _options.RepeatPenalty ?? 0
+                );
+
                 sampledVocabIds.ClearAdd(id);
-
-                //DumpContext(contextVocabIds); // DBG
-
                 yield return new(id, LlamaCppInterop.llama_token_to_str(_model, id));
-
                 endOfStream = id == LlamaCppInterop.llama_token_eos();
             }
 
             await Task.CompletedTask;
         }
-
-        //private bool EndOfStream(IList<int> vocabIds)
-        //{
-        //    if (!String.IsNullOrEmpty(_options.EndOfStreamToken))
-        //    {
-        //        // Indice based
-        //        var eosVocabIds = LlamaCppInterop.llama_tokenize(_model, _options.EndOfStreamToken);
-        //        if (vocabIds.TakeLast(eosVocabIds.Count).SequenceEqual(eosVocabIds))
-        //            return true;
-
-        //        // String based
-        //        var c = vocabIds.Count;
-        //        var s = new StringBuilder();
-
-        //        while (--c >= 0 && s.Length <= _options.EndOfStreamToken.Length)
-        //        {
-        //            s.Insert(0, LlamaCppInterop.llama_token_to_str(_model, vocabIds[c]));
-
-        //            if (s.Length > _options.EndOfStreamToken.Length && s.ToString(s.Length - _options.EndOfStreamToken.Length, _options.EndOfStreamToken.Length) == _options.EndOfStreamToken)
-        //                return true;
-        //        }
-        //    }
-
-        //    return false;
-        //}
-
-        //private void DumpContext(IEnumerable<int> contextVocabIds, string fileName = "context.txt")
-        //{
-        //    var sb = new StringBuilder();
-        //    foreach (var t in contextVocabIds)
-        //        sb.Append($"{LlamaCppInterop.llama_token_to_str(_model, t)}");
-        //        //sb.Append($"[{t}]");
-        //    File.WriteAllText(fileName, $"{sb}");
-        //}
     }
 }
