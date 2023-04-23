@@ -34,13 +34,12 @@ cd x64/Release
 ## Models
 
 You will need a model in GGML format, the 13B parameters appears to perform well if you have the memory (8-12GB depending on the model).
-If you have a lot of RAM you could try a 65B version though it is much slower on the predictions.
+If you have a lot of RAM (i.e. 48GB+) you could try a 65B version though it is much slower on the predictions.
 
 Some models can be found below.
 
-[eachadea/ggml-vicuna-13b-1.1](https://huggingface.co/eachadea/ggml-vicuna-13b-1.1/tree/main)
-
-[TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g-GGML](https://huggingface.co/TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g-GGML/tree/main)
+- [eachadea/ggml-vicuna-13b-1.1](https://huggingface.co/eachadea/ggml-vicuna-13b-1.1/tree/main)
+- [TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g-GGML](https://huggingface.co/TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g-GGML/tree/main)
 
 ### Sample Code (CLI)
 ```
