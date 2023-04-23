@@ -161,7 +161,7 @@ namespace LlamaCppLib
         public static string llama_token_to_str(LlamaContext ctx, LlamaToken token)
         {
             var ptr = _llama_token_to_str(ctx, token);
-            return Marshal.PtrToStringAnsi(ptr) ?? String.Empty;
+            return Marshal.PtrToStringUTF8(ptr) ?? String.Empty;
         }
 
         [DllImport("llama")]

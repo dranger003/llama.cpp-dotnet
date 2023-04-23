@@ -44,7 +44,7 @@ namespace LlamaCppLib
                 throw new FileNotFoundException($"Model file not found \"{modelPath}\".");
 
             if (_model != nint.Zero)
-                throw new InvalidOperationException($"Model already laoded.");
+                throw new InvalidOperationException($"Model already loaded.");
 
             var cparams = LlamaCppInterop.llama_context_default_params();
             cparams.n_ctx = contextSize;
