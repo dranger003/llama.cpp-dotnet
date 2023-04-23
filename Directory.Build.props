@@ -1,6 +1,0 @@
-<Project>
-	<PropertyGroup>
-		<SolutionDir Condition="'$(SolutionDir)' == ''">$(MSBuildProjectDirectory)..</SolutionDir>
-		<CMakeBuildDir Condition="'$(CMakeBuildDir)' == ''">$(SolutionDir)llama.cpp</CMakeBuildDir>
-	</PropertyGroup>
-</Project>
