@@ -26,10 +26,11 @@
 	<Target Name="CopyCMakeOutput" AfterTargets="CMakeBuild">
 		<PropertyGroup>
 			<LibraryFileExtension Condition="'$(OS)' == 'Windows_NT'">*.dll</LibraryFileExtension>
-			<LibraryFileExtension Condition="$([System.String]::new('$(OS)').StartsWith('Unix'))">*.so</LibraryFileExtension>
+			<LibraryFileExtension Condition="$([System.String]::new('$(OS)').StartsWith('Unix'))">lib*.so</LibraryFileExtension>
 		</PropertyGroup>
 		<ItemGroup>
 			<LibraryFiles Include="$(CMakeBuildDir)/bin/$(Configuration)/$(LibraryFileExtension)" />
+			<LibraryFiles Include="$(CMakeBuildDir)/$(LibraryFileExtension)" />
 		</ItemGroup>
 		<Copy SourceFiles="@(LibraryFiles)" DestinationFolder="$(SolutionDir)/$(Platform)/$(Configuration)" />
 	</Target>
