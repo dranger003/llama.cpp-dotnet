@@ -1,4 +1,5 @@
 ﻿using LlamaCppLib;
+using System.Reflection;
 using System.Text;
 
 namespace LlamaCppCli
@@ -7,60 +8,116 @@ namespace LlamaCppCli
 
     internal class Program
     {
-        static string ModelPath = @"D:\LLM_MODELS\lmsys\vicuna-13b-v1.1\ggml-vicuna-13b-v1.1-q4_1.bin";
-        static string ModelName = "vicuna-13b-v1.1";
+        // TODO: Change these to suit your needs
+        static int ContextSize = 2048;
+        static int Seed = 0;
 
-        static string[] Context
+        static LlamaCppOptions Options = new()
         {
-            get => new[]
+            ThreadCount = Environment.ProcessorCount / 2, // Assuming hyperthreading
+            TopK = 50,
+            TopP = 0.95f,
+            Temperature = 0.1f,
+            RepeatPenalty = 1.1f,
+        };
+
+        static string ModelName = "Model X";
+        static string ConversationName = "Conversation X";
+
+        static string[] Prompts = new[]
+        {
+            "In a very short sentence, list the main political schools of thought.",
+            "Describe quantum physics in a very short sentence.",
+        };
+
+        // TODO: Adjust templates according to your model, this is crucial for reliable predictions (refer to your model description for template structure)
+        static Dictionary<string, string> Templates = new Dictionary<string, string>
+        {
+            ["Vicuna v1.1"] = """
+                USER:
+                {0}
+
+                ASSISTANT:
+
+                """,
+            ["Alpaca (no input)"] = """
+                ### Instruction:
+                {0}
+
+                ### Response:
+                
+                """,
+            ["Alpaca (input)"] = """
+                ### Instruction:
+                {0}
+
+                ### Input:
+                {1}
+
+                ### Response:
+                
+                """,
+        };
+
+        static async Task Main(string[] args)
+        {
+            var samples = new Dictionary<string, Func<string[], Task>>
             {
-                "Hi! How can I be of service today?",
-                "Hello! How are you doing?",
-                "I am doing great! Thanks for asking.",
-                "Can you help me with some questions please?",
-                "Absolutely, what questions can I help you with?",
-                "How many planets are there in the solar system?",
+                [nameof(RawInterfaceSample)] = RawInterfaceSample,
+                [nameof(WrappedInterfaceSampleWithoutSession)] = WrappedInterfaceSampleWithoutSession,
+                [nameof(WrappedInterfaceSampleWithSession)] = WrappedInterfaceSampleWithSession,
+                [nameof(WrappedInterfaceSampleWithSessionInteractive)] = WrappedInterfaceSampleWithSessionInteractive,
+                [nameof(GetEmbeddings)] = GetEmbeddings,
             };
-        }
 
-        static string[] Prompts
-        {
-            get => new[]
+            var PrintAvailableSamples = () =>
             {
-                "Can you list the planets of our solar system?",
-                "What do you think Vicuna 13B is according to you?",
-                "Vicuna 13B is a large language model (LLM).",
+                Console.WriteLine($"SAMPLES:");
+                foreach (var sample in samples)
+                    Console.WriteLine($"    {sample.Key}");
             };
+
+            if (args.Length != 2)
+            {
+                Console.WriteLine($"USAGE:");
+                Console.WriteLine($"    {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} <Sample> <ModelPath>");
+                PrintAvailableSamples();
+                return;
+            }
+
+            var sampleName = args[0];
+            var modelPath = args[1];
+
+            if (!Path.Exists(modelPath))
+            {
+                Console.WriteLine($"ERROR: Model not found ({modelPath}).");
+                return;
+            }
+
+            if (!samples.Any(sample => sample.Key == sampleName))
+            {
+                Console.WriteLine($"ERROR: Sample not found ({sampleName}).");
+                PrintAvailableSamples();
+            }
+
+            await samples[sampleName](args);
         }
 
-        static int Seed { get => 0; }
-        static int ContextSize { get => 2048; }
-        static int ThreadCount { get => 16; }
-        static int TopK { get => 50; }
-        static float TopP { get => 0.95f; }
-        static float Temperature { get => 0.05f; }
-        static float RepeatPenalty { get => 1.1f; }
-
-        static async Task Main()
+        static async Task RawInterfaceSample(string[] args)
         {
-            //await RawInterfaceSample();
-            //await WrappedInterfaceSampleWithoutSession();
-            //await WrappedInterfaceSampleWithSession();
-            await WrappedInterfaceSampleWithSessionInteractive();
-            //await GetEmbeddingsAsync();
-        }
+            Console.WriteLine($"Running sample ({nameof(RawInterfaceSample)})...");
 
-        static async Task RawInterfaceSample()
-        {
             var cparams = LlamaCppInterop.llama_context_default_params();
             cparams.n_ctx = ContextSize;
             cparams.seed = Seed;
 
-            var model = LlamaCppInterop.llama_init_from_file(ModelPath, cparams);
+            var model = LlamaCppInterop.llama_init_from_file(args[1], cparams);
             Console.WriteLine(LlamaCppInterop.llama_print_system_info());
 
-            var prompt = Context.Select((x, i) => $"{(i % 2 == 0 ? "ASSISTANT" : "USER")}:\n{x}\n").Aggregate((a, b) => $"{a}\n{b}");
-            prompt = $"{prompt}\nASSISTANT:\n";
+            var prompt = Prompts.First();
+            Console.WriteLine(prompt);
+
+            prompt = String.Format(Templates["Vicuna v1.1"], prompt);
 
             var tokens = LlamaCppInterop.llama_tokenize(model, prompt, true);
 
@@ -69,14 +126,14 @@ namespace LlamaCppCli
 
             var conversation = new StringBuilder(prompt);
 
-            Console.WriteLine(Context.Aggregate((a, b) => $"{a}\n{b}"));
-
             while (true)
             {
+                // TODO: Context management (i.e. rotating context buffer, maybe keeping some parts, etc.)
+
                 LlamaCppInterop.llama_eval(model, sampled, context.Count, 16);
                 context.AddRange(sampled);
 
-                var id = LlamaCppInterop.llama_sample_top_p_top_k(model, context, TopK, TopP, Temperature, RepeatPenalty);
+                var id = LlamaCppInterop.llama_sample_top_p_top_k(model, context, Options.TopK ?? 0, Options.TopP ?? 0, Options.Temperature ?? 0, Options.RepeatPenalty ?? 0);
                 sampled.ClearAdd(id);
 
                 var str = LlamaCppInterop.llama_token_to_str(model, id);
@@ -96,29 +153,23 @@ namespace LlamaCppCli
             await Task.CompletedTask;
         }
 
-        static async Task WrappedInterfaceSampleWithoutSession()
+        static async Task WrappedInterfaceSampleWithoutSession(string[] args)
         {
+            Console.WriteLine($"Running sample ({nameof(WrappedInterfaceSampleWithoutSession)})...");
+
             using (var model = new LlamaCpp(ModelName))
             {
-                model.Load(ModelPath, ContextSize, Seed);
+                model.Load(args[1], ContextSize, Seed);
+                model.Configure(Options);
 
-                model.Configure(options =>
-                {
-                    options.ThreadCount = ThreadCount;
-                    options.TopK = TopK;
-                    options.TopP = TopP;
-                    options.Temperature = Temperature;
-                    options.RepeatPenalty = RepeatPenalty;
-                });
+                var prompt = Prompts.First();
+                Console.WriteLine(prompt);
 
-                var prompt = Context.Select((x, i) => $"{(i % 2 == 0 ? "ASSISTANT" : "USER")}:\n{x}\n").Aggregate((a, b) => $"{a}\n{b}");
-                prompt = $"{prompt}\nASSISTANT:\n";
+                prompt = String.Format(Templates["Vicuna v1.1"], prompt);
 
                 var promptTokens = model.Tokenize(prompt, true);
 
                 var conversation = new StringBuilder(prompt);
-
-                Console.WriteLine(Context.Aggregate((a, b) => $"{a}\n{b}"));
 
                 var contextTokens = new List<LlamaToken>();
                 await foreach (var token in model.Predict(contextTokens, promptTokens))
@@ -132,33 +183,24 @@ namespace LlamaCppCli
             }
         }
 
-        static async Task WrappedInterfaceSampleWithSession()
+        static async Task WrappedInterfaceSampleWithSession(string[] args)
         {
+            Console.WriteLine($"Running sample ({nameof(WrappedInterfaceSampleWithSession)})...");
+
             using (var model = new LlamaCpp(ModelName))
             {
-                model.Load(ModelPath);
+                model.Load(args[1]);
+                model.Configure(Options);
 
-                model.Configure(options =>
-                {
-                    options.ThreadCount = ThreadCount;
-                    options.TopK = TopK;
-                    options.TopP = TopP;
-                    options.Temperature = Temperature;
-                    options.RepeatPenalty = RepeatPenalty;
-                });
-
-                var session = model.CreateSession("Conversation #1");
-
-                // Set the initial context, skipping last line since we're going to provide the prompt next
-                session.Configure(options => options.InitialContext.AddRange(Context.SkipLast(1)));
-
-                Console.WriteLine(session.InitialContext.Aggregate((a, b) => $"{a}\n{b}"));
+                var session = model.CreateSession(ConversationName);
 
                 foreach (var prompt in Prompts)
                 {
                     Console.WriteLine(prompt);
 
-                    await foreach (var token in session.Predict(prompt))
+                    var templatizedPrompt = String.Format(Templates["Vicuna v1.1"], prompt);
+
+                    await foreach (var token in session.Predict(templatizedPrompt))
                         Console.Write(token);
                 }
 
@@ -166,22 +208,16 @@ namespace LlamaCppCli
             }
         }
 
-        static async Task WrappedInterfaceSampleWithSessionInteractive()
+        static async Task WrappedInterfaceSampleWithSessionInteractive(string[] args)
         {
+            Console.WriteLine($"Running sample ({nameof(WrappedInterfaceSampleWithSessionInteractive)})...");
+
             using (var model = new LlamaCpp(ModelName))
             {
-                model.Load(ModelPath);
+                model.Load(args[1]);
+                model.Configure(Options);
 
-                model.Configure(options =>
-                {
-                    options.ThreadCount = ThreadCount;
-                    options.TopK = TopK;
-                    options.TopP = TopP;
-                    options.Temperature = Temperature;
-                    options.RepeatPenalty = RepeatPenalty;
-                });
-
-                var session = model.CreateSession("Conversation #1");
+                var session = model.CreateSession(ConversationName);
 
                 while (true)
                 {
@@ -191,22 +227,26 @@ namespace LlamaCppCli
                     if (String.IsNullOrWhiteSpace(prompt))
                         break;
 
+                    prompt = String.Format(Templates["Vicuna v1.1"], prompt);
+
                     await foreach (var token in session.Predict(prompt))
                         Console.Write(token);
                 }
             }
         }
 
-        static async Task GetEmbeddingsAsync()
+        static async Task GetEmbeddings(string[] args)
         {
-            var n_threads = ThreadCount;
+            Console.WriteLine($"Running sample ({nameof(GetEmbeddings)})...");
+
+            var n_threads = Options.ThreadCount ?? 0;
             var n_past = 0;
 
             var cparams = LlamaCppInterop.llama_context_default_params();
             cparams.n_ctx = ContextSize;
             cparams.embedding = true;
 
-            var handle = LlamaCppInterop.llama_init_from_file(ModelPath, cparams);
+            var handle = LlamaCppInterop.llama_init_from_file(args[1], cparams);
             Console.WriteLine(LlamaCppInterop.llama_print_system_info());
 
             var embd_inp = LlamaCppInterop.llama_tokenize(handle, Prompts.First(), true);
@@ -233,7 +273,7 @@ namespace LlamaCppCli
             Console.WriteLine($" --------------------------------------------------------------------------------------------------");
             Console.WriteLine($"| Transcript                                                                                       |");
             Console.WriteLine($" --------------------------------------------------------------------------------------------------");
-            Console.Write(conversation);
+            Console.Write(conversation.Trim());
         }
     }
 }
