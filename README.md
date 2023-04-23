@@ -6,6 +6,8 @@
 
 C# bindings for llama.cpp including a .NET core library and sample projects (cli & web).
 
+![demo](https://user-images.githubusercontent.com/1760549/233812516-e1504362-8379-4c20-baef-763ffacf8ef1.gif)
+
 ### Quick Start
 
 In a VS2022 x64 developer command prompt, type:
