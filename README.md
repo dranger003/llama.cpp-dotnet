@@ -33,7 +33,8 @@ cd x64/Release
 
 ## Models
 
-You will need a model in GGML format, the 13B parameters appear to perform well if you have the memory (7-10GB depending on the model).
+You will need a model in GGML format, the 13B parameters appears to perform well if you have the memory (8-12GB depending on the model).
+If you have a lot of RAM you could try a 65B version though it is much slower on the predictions.
 
 Some models can be found below.
 
