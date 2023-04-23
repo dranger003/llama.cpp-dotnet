@@ -84,9 +84,6 @@ namespace LlamaCppLib
             _sessions.Remove(_sessions.Single(x => x.Name == sessionName));
         }
 
-        public void ConfigureSession(string sessionName, params string[] initialContext) => ConfigureSession(sessionName, initialContext.ToList());
-        public void ConfigureSession(string sessionName, List<string> initialContext) => GetSession(sessionName).Configure(options => options.InitialContext.AddRange(initialContext));
-
         public LlamaCppSession GetSession(string sessionName) => _sessions.Single(session => session.Name == sessionName);
     }
 }
