@@ -16,7 +16,7 @@ namespace LlamaCppLib
             _configuration.Load();
         }
 
-        public IEnumerable<string> Models { get => _configuration.Models.Select(x => x.Name); }
+        public IEnumerable<string> Models { get => _configuration.Models.Select(x => x.Name ?? String.Empty); }
 
         public IEnumerable<string> Sessions { get => _sessions.Select(session => session.Name); }
 
@@ -38,7 +38,7 @@ namespace LlamaCppLib
             // No model loaded, load it
             if (_model == null)
             {
-                var modelPath = _configuration.Models[modelIndex].Path;
+                var modelPath = _configuration.Models[modelIndex].Path ?? String.Empty;
 
                 _model = new LlamaCpp(modelName);
                 _model.Load(modelPath);
@@ -63,7 +63,13 @@ namespace LlamaCppLib
             _model = null;
         }
 
-        public void ConfigureModel(Action<LlamaCppOptions> configure) => configure(_model?.Options ?? new());
+        public void ConfigureModel(Action<LlamaCppOptions> configure)
+        {
+            if (_model == null)
+                throw new InvalidOperationException("No model loaded.");
+
+            configure(_model.Options);
+        }
 
         public LlamaCppSession CreateSession(string sessionName)
         {
@@ -78,12 +84,22 @@ namespace LlamaCppLib
 
         public void DestroySession(string sessionName)
         {
-            if (_sessions.Count(session => session.Name == sessionName) != 1)
+            var session = _sessions.FirstOrDefault(session => session.Name == sessionName);
+
+            if (session == null)
                 return;
 
-            _sessions.Remove(_sessions.Single(x => x.Name == sessionName));
+            _sessions.Remove(session);
         }
 
-        public LlamaCppSession GetSession(string sessionName) => _sessions.Single(session => session.Name == sessionName);
+        public LlamaCppSession GetSession(string sessionName)
+        {
+            var session = _sessions.FirstOrDefault(session => session.Name == sessionName);
+
+            if (session == null)
+                throw new NullReferenceException($"No such session ({sessionName})");
+
+            return session;
+        }
     }
 }

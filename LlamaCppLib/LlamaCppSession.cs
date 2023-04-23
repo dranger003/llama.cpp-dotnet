@@ -37,9 +37,6 @@ namespace LlamaCppLib
                     prompt = String.Format(_options.Template, prompt, context);
                 else
                     prompt = String.Format(_options.Template, prompt);
-
-                //prompt = $"USER:\n{prompt}\n\nASSISTANT:\n";
-                //prompt = $"### Instruction:\n{prompt}\n\n### Response:\n";
             }
 
             var promptVocabIds = _model.Tokenize(prompt, start);
@@ -47,6 +44,7 @@ namespace LlamaCppLib
             await foreach (var token in _model.Predict(_contextVocabIds, promptVocabIds, cancellationToken))
                 yield return token.Value;
 
+            // TODO
             _contextVocabIds.AddRange(_model.Tokenize("\n\n"));
             yield return "\n";
         }

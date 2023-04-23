@@ -1,5 +1,4 @@
 using LlamaCppLib;
-using LlamaCppWeb;
 using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -44,16 +43,16 @@ app.MapGet("/model/status", async (HttpContext httpContext) =>
     await httpContext.Response.WriteAsJsonAsync(new { Status = Enum.GetName(manager.Status), manager.ModelName });
 });
 
-app.MapGet("/model/configure", async (HttpContext httpContext, int threadCount = 4, int topK = 50, float topP = 0.95f, float temperature = 0.1f, float repeatPenalty = 1.1f) =>
+app.MapGet("/model/configure", async (HttpContext httpContext, int? threadCount, int? topK, float? topP, float? temperature, float? repeatPenalty) =>
 {
     var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
     manager.ConfigureModel(options =>
     {
-        options.ThreadCount = threadCount;
-        options.TopK = topK;
-        options.TopP = topP;
-        options.Temperature = temperature;
-        options.RepeatPenalty = repeatPenalty;
+        options.ThreadCount = threadCount ?? options.ThreadCount;
+        options.TopK = topK ?? options.TopK;
+        options.TopP = topP ?? options.TopP;
+        options.Temperature = temperature ?? options.Temperature;
+        options.RepeatPenalty = repeatPenalty ?? options.RepeatPenalty;
     });
     await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
 });
@@ -80,10 +79,11 @@ app.MapGet("/session/destroy", async (HttpContext httpContext, string sessionNam
     await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
 });
 
-app.MapGet("/session/configure", async (HttpContext httpContext, string sessionName) =>
+app.MapGet("/session/configure", async (HttpContext httpContext, string sessionName, string template) =>
 {
-    // TODO
     var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    var session = manager.GetSession(sessionName);
+    session.Configure(options => options.Template = template);
     await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
 });
 
@@ -104,59 +104,11 @@ app.MapGet("/session/predict", async (HttpContext httpContext, string sessionNam
     }
 });
 
-app.MapGet("/debug/run", async (HttpContext httpContext) =>
-{
-    var lifetime = httpContext.RequestServices.GetRequiredService<IHostApplicationLifetime>();
-    using var cts = CancellationTokenSource.CreateLinkedTokenSource(httpContext.RequestAborted, lifetime.ApplicationStopping);
-
-    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
-    manager.LoadModel("vicuna-13b-v1.1");
-    manager.ConfigureModel(options =>
-    {
-        options.ThreadCount = 16;
-        options.TopK = 50;
-        options.TopP = 0.95f;
-        options.Temperature = 0.1f;
-        options.RepeatPenalty = 1.1f;
-    });
-
-    var sessionName = "Conversation #1";
-    var session = manager.CreateSession(sessionName);
-
-    httpContext.Response.ContentType = "text/event-stream";
-
-    var prompts = new[]
-    {
-        "Describe quantum physics.",
-        //"Hi! How can I be of service today?",
-        //"Hello! How are you doing?",
-        //"I am doing great! Thanks for asking.",
-        //"Can you help me with some questions please?",
-        //"Absolutely, what questions can I help you with?",
-        //"How many planets are there in the solar system?",
-        //"Can you list the planets of our solar system?",
-        //"What do you think Vicuna 13B is according to you?",
-        //"Vicuna 13B is a large language model (LLM).",
-    };
-
-    foreach (var prompt in prompts)
-    {
-        await httpContext.Response.WriteAsync($"{prompt}\n");
-        await httpContext.Response.Body.FlushAsync();
-
-        await foreach (var token in session.Predict(prompt, cancellationToken: cts.Token))
-        {
-            await httpContext.Response.WriteAsync(token);
-            await httpContext.Response.Body.FlushAsync();
-        }
-    }
-});
-
 app.MapGet("/debug/context", async (HttpContext httpContext) =>
 {
     var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
-    var session = manager.GetSession("Conversation #1");
-    await httpContext.Response.WriteAsync(session.Conversation);
+    var session = manager.GetSession(manager.Sessions.First());
+    await httpContext.Response.WriteAsync($"<|BOS|>{session.Conversation}<|EOD|>");
 });
 
 await app.RunAsync();
