@@ -31,6 +31,23 @@ cd x64/Release
 ./LlamaCppCli WrappedInterfaceSampleWithSessionInteractive ggml-vicuna-13b-1.1-q4_0.bin
 ```
 
+## Usage
+```
+USAGE:
+    LlamaCppCli <SampleIndex> <ModelPath> [TemplateName]
+SAMPLES:
+    [1] = RawInterfaceSample
+    [2] = WrappedInterfaceSampleWithoutSession
+    [3] = WrappedInterfaceSampleWithSession
+    [4] = WrappedInterfaceSampleWithSessionInteractive
+    [5] = GetEmbeddings
+TEMPLATES:
+    "Vicuna v1.1"
+    "Alpaca (no input)"
+    "Alpaca (input)"
+    "WizardLM"
+```
+
 ## Models
 
 You will need a model in GGML format, the 13B parameters appears to perform well if you have the memory (8-12GB depending on the model).
@@ -40,6 +57,7 @@ Some models can be found below.
 
 - [eachadea/ggml-vicuna-13b-1.1](https://huggingface.co/eachadea/ggml-vicuna-13b-1.1/tree/main)
 - [TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g-GGML](https://huggingface.co/TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g-GGML/tree/main)
+- [TheBloke/wizardLM-7B-GGML](https://huggingface.co/TheBloke/wizardLM-7B-GGML)
 
 ### Sample Code (CLI)
 ```
