@@ -26,7 +26,6 @@ namespace LlamaCppCli
 
         static string[] Prompts = new[]
         {
-            "In a very short sentence, list the main political schools of thought.",
             "Describe quantum physics in a very short sentence.",
         };
 
@@ -57,35 +56,49 @@ namespace LlamaCppCli
                 ### Response:
                 
                 """,
+            ["WizardLM"] = """
+                {0}
+
+                ### Response:
+
+                """,
         };
 
         static async Task Main(string[] args)
         {
-            var samples = new Dictionary<string, Func<string[], Task>>
+            var samples = new Dictionary<string, (int Index, Func<string[], Task> Task)>
             {
-                [nameof(RawInterfaceSample)] = RawInterfaceSample,
-                [nameof(WrappedInterfaceSampleWithoutSession)] = WrappedInterfaceSampleWithoutSession,
-                [nameof(WrappedInterfaceSampleWithSession)] = WrappedInterfaceSampleWithSession,
-                [nameof(WrappedInterfaceSampleWithSessionInteractive)] = WrappedInterfaceSampleWithSessionInteractive,
-                [nameof(GetEmbeddings)] = GetEmbeddings,
+                [nameof(RawInterfaceSample)] = (1, RawInterfaceSample),
+                [nameof(WrappedInterfaceSampleWithoutSession)] = (2, WrappedInterfaceSampleWithoutSession),
+                [nameof(WrappedInterfaceSampleWithSession)] = (3, WrappedInterfaceSampleWithSession),
+                [nameof(WrappedInterfaceSampleWithSessionInteractive)] = (4, WrappedInterfaceSampleWithSessionInteractive),
+                [nameof(GetEmbeddings)] = (5, GetEmbeddings),
             };
 
             var PrintAvailableSamples = () =>
             {
                 Console.WriteLine($"SAMPLES:");
                 foreach (var sample in samples)
-                    Console.WriteLine($"    {sample.Key}");
+                    Console.WriteLine($"    [{sample.Value.Index}] = {sample.Key}");
             };
 
-            if (args.Length != 2)
+            var PrintAvailableTempaltes = () =>
+            {
+                Console.WriteLine($"TEMPLATES:");
+                foreach (var template in Templates)
+                    Console.WriteLine($"    \"{template.Key}\"");
+            };
+
+            if (args.Length < 2)
             {
                 Console.WriteLine($"USAGE:");
-                Console.WriteLine($"    {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} <Sample> <ModelPath>");
+                Console.WriteLine($"    {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} <SampleIndex> <ModelPath> [TemplateName]");
                 PrintAvailableSamples();
+                PrintAvailableTempaltes();
                 return;
             }
 
-            var sampleName = args[0];
+            var sampleIndex = Int32.Parse(args[0]);
             var modelPath = args[1];
 
             if (!Path.Exists(modelPath))
@@ -94,13 +107,15 @@ namespace LlamaCppCli
                 return;
             }
 
-            if (!samples.Any(sample => sample.Key == sampleName))
+            var sampleName = samples.FirstOrDefault(sample => sample.Value.Index == sampleIndex).Key;
+            if (sampleName == default)
             {
-                Console.WriteLine($"ERROR: Sample not found ({sampleName}).");
+                Console.WriteLine($"ERROR: Sample not found ({sampleIndex}).");
                 PrintAvailableSamples();
+                return;
             }
 
-            await samples[sampleName](args);
+            await samples[sampleName].Task(args.Skip(1).ToArray());
         }
 
         static async Task RawInterfaceSample(string[] args)
@@ -110,27 +125,42 @@ namespace LlamaCppCli
             var cparams = LlamaCppInterop.llama_context_default_params();
             cparams.n_ctx = ContextSize;
             cparams.seed = Seed;
+            //cparams.use_mmap = true; // Must be false for LoRA
 
-            var model = LlamaCppInterop.llama_init_from_file(args[1], cparams);
+            var model = LlamaCppInterop.llama_init_from_file(args[0], cparams);
+
+            //if (args.Length > 1)
+            //    LlamaCppInterop.llama_apply_lora_from_file(model, args[2], args[1], Options.ThreadCount ?? 0);
+
             Console.WriteLine(LlamaCppInterop.llama_print_system_info());
 
             var prompt = Prompts.First();
             Console.WriteLine(prompt);
 
-            prompt = String.Format(Templates["Vicuna v1.1"], prompt);
+            // Format with provided optional prompting template
+            if (args.Length > 1)
+                prompt = String.Format(Templates[args[1]], prompt);
 
-            var tokens = LlamaCppInterop.llama_tokenize(model, prompt, true);
+            var tokens = LlamaCppInterop.llama_tokenize(model, $" {prompt}", true); // LLaMA requires a space with BOS
 
             var sampled = new List<LlamaToken>(tokens);
             var context = new List<LlamaToken>();
 
             var conversation = new StringBuilder(prompt);
 
-            while (true)
+            var done = false;
+
+            Console.CancelKeyPress += (s, e) =>
+            {
+                e.Cancel = true;
+                done = true;
+            };
+
+            while (!done)
             {
                 // TODO: Context management (i.e. rotating context buffer, maybe keeping some parts, etc.)
 
-                LlamaCppInterop.llama_eval(model, sampled, context.Count, 16);
+                LlamaCppInterop.llama_eval(model, sampled, context.Count, Options.ThreadCount ?? 0);
                 context.AddRange(sampled);
 
                 var id = LlamaCppInterop.llama_sample_top_p_top_k(model, context, Options.TopK ?? 0, Options.TopP ?? 0, Options.Temperature ?? 0, Options.RepeatPenalty ?? 0);
@@ -142,7 +172,7 @@ namespace LlamaCppCli
                 Console.Write(str);
 
                 if (id == LlamaCppInterop.llama_token_eos())
-                    break;
+                    done = true;
             }
 
             LlamaCppInterop.llama_print_timings(model);
@@ -157,22 +187,31 @@ namespace LlamaCppCli
         {
             Console.WriteLine($"Running sample ({nameof(WrappedInterfaceSampleWithoutSession)})...");
 
+            using var cts = new CancellationTokenSource();
+
+            Console.CancelKeyPress += (s, e) =>
+            {
+                e.Cancel = true;
+                cts.Cancel();
+            };
+
             using (var model = new LlamaCpp(ModelName))
             {
-                model.Load(args[1], ContextSize, Seed);
+                model.Load(args[0], ContextSize, Seed);
                 model.Configure(Options);
 
                 var prompt = Prompts.First();
                 Console.WriteLine(prompt);
 
-                prompt = String.Format(Templates["Vicuna v1.1"], prompt);
+                if (args.Length > 1)
+                    prompt = String.Format(Templates[args[1]], prompt);
 
                 var promptTokens = model.Tokenize(prompt, true);
 
                 var conversation = new StringBuilder(prompt);
 
                 var contextTokens = new List<LlamaToken>();
-                await foreach (var token in model.Predict(contextTokens, promptTokens))
+                await foreach (var token in model.Predict(contextTokens, promptTokens, cancellationToken: cts.Token))
                 {
                     Console.Write(token.Value);
                     conversation.Append(token.Value);
@@ -187,9 +226,17 @@ namespace LlamaCppCli
         {
             Console.WriteLine($"Running sample ({nameof(WrappedInterfaceSampleWithSession)})...");
 
+            using var cts = new CancellationTokenSource();
+
+            Console.CancelKeyPress += (s, e) =>
+            {
+                e.Cancel = true;
+                cts.Cancel();
+            };
+
             using (var model = new LlamaCpp(ModelName))
             {
-                model.Load(args[1]);
+                model.Load(args[0]);
                 model.Configure(Options);
 
                 var session = model.CreateSession(ConversationName);
@@ -198,9 +245,11 @@ namespace LlamaCppCli
                 {
                     Console.WriteLine(prompt);
 
-                    var templatizedPrompt = String.Format(Templates["Vicuna v1.1"], prompt);
+                    var templatizedPrompt = prompt;
+                    if (args.Length > 1)
+                        templatizedPrompt = String.Format(Templates[args[1]], prompt);
 
-                    await foreach (var token in session.Predict(templatizedPrompt))
+                    await foreach (var token in session.Predict(templatizedPrompt, cancellationToken: cts.Token))
                         Console.Write(token);
                 }
 
@@ -212,12 +261,25 @@ namespace LlamaCppCli
         {
             Console.WriteLine($"Running sample ({nameof(WrappedInterfaceSampleWithSessionInteractive)})...");
 
+            var cts = new CancellationTokenSource();
+
+            Console.CancelKeyPress += (s, e) =>
+            {
+                e.Cancel = true;
+                cts.Cancel();
+            };
+
             using (var model = new LlamaCpp(ModelName))
             {
-                model.Load(args[1]);
+                model.Load(args[0]);
                 model.Configure(Options);
 
                 var session = model.CreateSession(ConversationName);
+
+                Console.WriteLine($"Entering interactive mode.");
+                Console.WriteLine($"Press <Ctrl+C> to interrupt a response.");
+                Console.WriteLine($"Press <Enter> on an emptpy prompt to quit.");
+                Console.WriteLine();
 
                 while (true)
                 {
@@ -227,10 +289,14 @@ namespace LlamaCppCli
                     if (String.IsNullOrWhiteSpace(prompt))
                         break;
 
-                    prompt = String.Format(Templates["Vicuna v1.1"], prompt);
+                    if (args.Length > 1)
+                        prompt = String.Format(Templates[args[1]], prompt);
 
-                    await foreach (var token in session.Predict(prompt))
+                    await foreach (var token in session.Predict(prompt, cancellationToken: cts.Token))
                         Console.Write(token);
+
+                    cts.Dispose();
+                    cts = new();
                 }
             }
         }
@@ -246,7 +312,7 @@ namespace LlamaCppCli
             cparams.n_ctx = ContextSize;
             cparams.embedding = true;
 
-            var handle = LlamaCppInterop.llama_init_from_file(args[1], cparams);
+            var handle = LlamaCppInterop.llama_init_from_file(args[0], cparams);
             Console.WriteLine(LlamaCppInterop.llama_print_system_info());
 
             var embd_inp = LlamaCppInterop.llama_tokenize(handle, Prompts.First(), true);
