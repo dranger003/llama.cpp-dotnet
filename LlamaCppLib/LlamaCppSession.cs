@@ -9,7 +9,6 @@ namespace LlamaCppLib
         private LlamaCpp _model;
         private string _name;
         private List<int> _contextVocabIds = new();
-        private LlamaCppSessionOptions _options = new();
 
         public LlamaCppSession(LlamaCpp model, string name)
         {
@@ -19,24 +18,31 @@ namespace LlamaCppLib
 
         public string Name { get => _name; }
 
+        public LlamaCppSessionOptions Options { get; } = new();
+
         public List<LlamaToken> TokenizedContext => _contextVocabIds;
 
         public string Conversation => _model.Detokenize(_contextVocabIds);
 
-        public void Configure(Action<LlamaCppSessionOptions> configure) => configure(_options);
+        public void Configure(Action<LlamaCppSessionOptions> configure) => configure(this.Options);
 
         public void Reset() => _contextVocabIds.Clear();
 
         public async IAsyncEnumerable<string> Predict(string prompt, string? context = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             var start = !_contextVocabIds.Any();
+            var template = this.Options.Template;
 
-            if (_options.Template != null)
+            if (template != null)
             {
+                template = template
+                    .Replace("{prompt}", "{0}")
+                    .Replace("{context}", "{1}");
+
                 if (context != null)
-                    prompt = String.Format(_options.Template, prompt, context);
+                    prompt = String.Format(template, prompt, context);
                 else
-                    prompt = String.Format(_options.Template, prompt);
+                    prompt = String.Format(template, prompt);
             }
 
             var promptVocabIds = _model.Tokenize(prompt, start);
