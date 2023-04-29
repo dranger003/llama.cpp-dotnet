@@ -90,7 +90,7 @@ namespace LlamaCppLib
             }
         }
 
-        public void Configure(LlamaCppOptions options) =>  _options = options;
+        public void Configure(LlamaCppOptions options) => _options = options;
 
         public void Configure(Action<LlamaCppOptions> configure) =>
             configure(_options);
@@ -101,39 +101,45 @@ namespace LlamaCppLib
             [EnumeratorCancellation] CancellationToken cancellationToken = default
         )
         {
-            if (_model == nint.Zero)
-                throw new InvalidOperationException("You must load a model.");
+            // New sampling API not fully supported yet
+            // https://github.com/ggerganov/llama.cpp/commit/dd7eff57d8491792010b1002b8de6a4b54912e5c
 
-            if (!_options.IsConfigured)
-                throw new InvalidOperationException("You must configure the model.");
-
-            var sampledVocabIds = new List<int>();
-            sampledVocabIds.AddRange(promptVocabIds);
-
-            var endOfStream = false;
-            while (!endOfStream && !cancellationToken.IsCancellationRequested)
-            {
-                if (contextVocabIds.Count >= LlamaCppInterop.llama_n_ctx(_model))
-                    throw new NotImplementedException($"Context rotation not yet implemented (max context reached: {contextVocabIds.Count}).");
-
-                LlamaCppInterop.llama_eval(_model, sampledVocabIds, contextVocabIds.Count, _options.ThreadCount ?? 0);
-                contextVocabIds.AddRange(sampledVocabIds);
-
-                var id = LlamaCppInterop.llama_sample_top_p_top_k(
-                    _model,
-                    contextVocabIds,
-                    _options.TopK ?? 0,
-                    _options.TopP ?? 0,
-                    _options.Temperature ?? 0,
-                    _options.RepeatPenalty ?? 0
-                );
-
-                sampledVocabIds.ClearAdd(id);
-                yield return new(id, LlamaCppInterop.llama_token_to_str(_model, id));
-                endOfStream = id == LlamaCppInterop.llama_token_eos();
-            }
-
+            yield return new(0, String.Empty);
             await Task.CompletedTask;
+
+            throw new NotImplementedException();
+
+            //if (_model == nint.Zero)
+            //    throw new InvalidOperationException("You must load a model.");
+
+            //if (!_options.IsConfigured)
+            //    throw new InvalidOperationException("You must configure the model.");
+
+            //var sampledVocabIds = new List<int>();
+            //sampledVocabIds.AddRange(promptVocabIds);
+
+            //var endOfStream = false;
+            //while (!endOfStream && !cancellationToken.IsCancellationRequested)
+            //{
+            //    if (contextVocabIds.Count >= LlamaCppInterop.llama_n_ctx(_model))
+            //        throw new NotImplementedException($"Context rotation not yet implemented (max context reached: {contextVocabIds.Count}).");
+
+            //    LlamaCppInterop.llama_eval(_model, sampledVocabIds, contextVocabIds.Count, _options.ThreadCount ?? 0);
+            //    contextVocabIds.AddRange(sampledVocabIds);
+
+            //    var id = LlamaCppInterop.llama_sample_top_p_top_k(
+            //        _model,
+            //        contextVocabIds,
+            //        _options.TopK ?? 0,
+            //        _options.TopP ?? 0,
+            //        _options.Temperature ?? 0,
+            //        _options.RepeatPenalty ?? 0
+            //    );
+
+            //    sampledVocabIds.ClearAdd(id);
+            //    yield return new(id, LlamaCppInterop.llama_token_to_str(_model, id));
+            //    endOfStream = id == LlamaCppInterop.llama_token_eos();
+            //}
         }
     }
 }
