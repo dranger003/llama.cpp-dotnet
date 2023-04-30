@@ -16,10 +16,20 @@ namespace LlamaCppCli
         public static LlamaCppOptions Options = new()
         {
             ThreadCount = Environment.ProcessorCount / 2, // Assuming hyperthreading
-            TopK = 50,
+            TopK = 40,
             TopP = 0.95f,
             Temperature = 0.1f,
             RepeatPenalty = 1.1f,
+
+            // New sampling options
+            TfsZ = 1.0f,
+            TypicalP = 1.0f,
+            FrequencyPenalty = 0.0f,
+            PresencePenalty = 0.0f,
+            Mirostat = 0,           // 0 = Disabled, 1 = Mirostat, 2 = Mirostat 2.0
+            MirostatTAU = 5.0f,     // Target entropy
+            MirostatETA = 0.10f,    // Learning rate
+            PenalizeNewLine = true,
         };
 
         static string ModelName = "Model X";
@@ -27,7 +37,7 @@ namespace LlamaCppCli
 
         static string[] Prompts = new[]
         {
-            "Describe quantum physics in a very short sentence.",
+            "Describe quantum physics in a very short and brief sentence.",
         };
 
         // TODO: Adjust templates according to your model, this is crucial for reliable predictions (refer to your model description for template structure)
@@ -63,6 +73,12 @@ namespace LlamaCppCli
                 ### Response:
 
                 """,
+            ["StableVicuna"] = """
+                ### Human:
+                {0}
+
+                ### Assistant:
+                """,
         };
 
         static async Task Main(string[] args)
@@ -74,9 +90,9 @@ namespace LlamaCppCli
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
                 (nameof(RawInterfaceSample), RawInterfaceSample),
-                //(nameof(WrappedInterfaceSampleWithoutSession), WrappedInterfaceSampleWithoutSession),
-                //(nameof(WrappedInterfaceSampleWithSession), WrappedInterfaceSampleWithSession),
-                //(nameof(WrappedInterfaceSampleWithSessionInteractive), WrappedInterfaceSampleWithSessionInteractive),
+                (nameof(WrappedInterfaceSampleWithoutSession), WrappedInterfaceSampleWithoutSession),
+                (nameof(WrappedInterfaceSampleWithSession), WrappedInterfaceSampleWithSession),
+                (nameof(WrappedInterfaceSampleWithSessionInteractive), WrappedInterfaceSampleWithSessionInteractive),
                 (nameof(GetEmbeddings), GetEmbeddings),
                 //(nameof(ExampleMain), ExampleMain.Run),
             }
@@ -154,7 +170,10 @@ namespace LlamaCppCli
             var prompt = Prompts.First();
             Console.WriteLine(prompt);
 
-            var tokens = LlamaCppInterop.llama_tokenize(ctx, $" {prompt}", true);
+            if (args.Length > 1)
+                prompt = String.Format(Templates[args[1]], prompt);
+
+            var tokens = LlamaCppInterop.llama_tokenize(ctx, $"{prompt}", true);
 
             var sampled = new List<LlamaToken>(tokens);
             var context = new List<LlamaToken>();
@@ -254,123 +273,123 @@ namespace LlamaCppCli
             await Task.CompletedTask;
         }
 
-        //static async Task WrappedInterfaceSampleWithoutSession(string[] args)
-        //{
-        //    Console.WriteLine($"Running sample ({nameof(WrappedInterfaceSampleWithoutSession)})...");
+        static async Task WrappedInterfaceSampleWithoutSession(string[] args)
+        {
+            Console.WriteLine($"Running sample ({nameof(WrappedInterfaceSampleWithoutSession)})...");
 
-        //    using var cts = new CancellationTokenSource();
+            using var cts = new CancellationTokenSource();
 
-        //    Console.CancelKeyPress += (s, e) =>
-        //    {
-        //        e.Cancel = true;
-        //        cts.Cancel();
-        //    };
+            Console.CancelKeyPress += (s, e) =>
+            {
+                e.Cancel = true;
+                cts.Cancel();
+            };
 
-        //    using (var model = new LlamaCpp(ModelName))
-        //    {
-        //        model.Load(args[0], ContextSize, Seed);
-        //        model.Configure(Options);
+            using (var model = new LlamaCpp(ModelName))
+            {
+                model.Load(args[0], ContextSize, Seed);
+                model.Configure(Options);
 
-        //        var prompt = Prompts.First();
-        //        Console.WriteLine(prompt);
+                var prompt = Prompts.First();
+                Console.WriteLine(prompt);
 
-        //        if (args.Length > 1)
-        //            prompt = String.Format(Templates[args[1]], prompt);
+                if (args.Length > 1)
+                    prompt = String.Format(Templates[args[1]], prompt);
 
-        //        var promptTokens = model.Tokenize(prompt, true);
+                var promptTokens = model.Tokenize(prompt, true);
+                var conversation = new StringBuilder(prompt);
+                var contextTokens = new List<LlamaToken>();
 
-        //        var conversation = new StringBuilder(prompt);
+                await foreach (var token in model.Predict(contextTokens, promptTokens, cancellationToken: cts.Token))
+                {
+                    Console.Write(token.Value);
+                    conversation.Append(token.Value);
+                }
 
-        //        var contextTokens = new List<LlamaToken>();
-        //        await foreach (var token in model.Predict(contextTokens, promptTokens, cancellationToken: cts.Token))
-        //        {
-        //            Console.Write(token.Value);
-        //            conversation.Append(token.Value);
-        //        }
+                Console.WriteLine();
+                PrintTranscript(conversation.ToString());
+            }
+        }
 
-        //        Console.WriteLine();
-        //        PrintTranscript(conversation.ToString());
-        //    }
-        //}
+        static async Task WrappedInterfaceSampleWithSession(string[] args)
+        {
+            Console.WriteLine($"Running sample ({nameof(WrappedInterfaceSampleWithSession)})...");
 
-        //static async Task WrappedInterfaceSampleWithSession(string[] args)
-        //{
-        //    Console.WriteLine($"Running sample ({nameof(WrappedInterfaceSampleWithSession)})...");
+            using var cts = new CancellationTokenSource();
 
-        //    using var cts = new CancellationTokenSource();
+            Console.CancelKeyPress += (s, e) =>
+            {
+                e.Cancel = true;
+                cts.Cancel();
+            };
 
-        //    Console.CancelKeyPress += (s, e) =>
-        //    {
-        //        e.Cancel = true;
-        //        cts.Cancel();
-        //    };
+            using (var model = new LlamaCpp(ModelName))
+            {
+                model.Load(args[0]);
+                model.Configure(Options);
 
-        //    using (var model = new LlamaCpp(ModelName))
-        //    {
-        //        model.Load(args[0]);
-        //        model.Configure(Options);
+                var session = model.CreateSession(ConversationName);
 
-        //        var session = model.CreateSession(ConversationName);
+                foreach (var prompt in Prompts)
+                {
+                    Console.WriteLine(prompt);
 
-        //        foreach (var prompt in Prompts)
-        //        {
-        //            Console.WriteLine(prompt);
+                    var templatizedPrompt = prompt;
+                    if (args.Length > 1)
+                        templatizedPrompt = String.Format(Templates[args[1]], prompt);
 
-        //            var templatizedPrompt = prompt;
-        //            if (args.Length > 1)
-        //                templatizedPrompt = String.Format(Templates[args[1]], prompt);
+                    await foreach (var token in session.Predict(templatizedPrompt, cancellationToken: cts.Token))
+                        Console.Write(token);
+                }
 
-        //            await foreach (var token in session.Predict(templatizedPrompt, cancellationToken: cts.Token))
-        //                Console.Write(token);
-        //        }
+                Console.WriteLine();
+                PrintTranscript(session.Conversation);
+            }
+        }
 
-        //        PrintTranscript(session.Conversation);
-        //    }
-        //}
+        static async Task WrappedInterfaceSampleWithSessionInteractive(string[] args)
+        {
+            Console.WriteLine($"Running sample ({nameof(WrappedInterfaceSampleWithSessionInteractive)})...");
 
-        //static async Task WrappedInterfaceSampleWithSessionInteractive(string[] args)
-        //{
-        //    Console.WriteLine($"Running sample ({nameof(WrappedInterfaceSampleWithSessionInteractive)})...");
+            var cts = new CancellationTokenSource();
 
-        //    var cts = new CancellationTokenSource();
+            Console.CancelKeyPress += (s, e) =>
+            {
+                e.Cancel = true;
+                cts.Cancel();
+            };
 
-        //    Console.CancelKeyPress += (s, e) =>
-        //    {
-        //        e.Cancel = true;
-        //        cts.Cancel();
-        //    };
+            using (var model = new LlamaCpp(ModelName))
+            {
+                model.Load(args[0]);
+                model.Configure(Options);
 
-        //    using (var model = new LlamaCpp(ModelName))
-        //    {
-        //        model.Load(args[0]);
-        //        model.Configure(Options);
+                var session = model.CreateSession(ConversationName);
 
-        //        var session = model.CreateSession(ConversationName);
+                Console.WriteLine($"Entering interactive mode.");
+                Console.WriteLine($"Press <Ctrl+C> to interrupt a response.");
+                Console.WriteLine($"Press <Enter> on an emptpy prompt to quit.");
+                Console.WriteLine();
 
-        //        Console.WriteLine($"Entering interactive mode.");
-        //        Console.WriteLine($"Press <Ctrl+C> to interrupt a response.");
-        //        Console.WriteLine($"Press <Enter> on an emptpy prompt to quit.");
-        //        Console.WriteLine();
+                while (true)
+                {
+                    Console.Write("> ");
+                    var prompt = Console.ReadLine();
 
-        //        while (true)
-        //        {
-        //            Console.Write("> ");
-        //            var prompt = Console.ReadLine();
+                    if (String.IsNullOrWhiteSpace(prompt))
+                        break;
 
-        //            if (String.IsNullOrWhiteSpace(prompt))
-        //                break;
+                    if (args.Length > 1)
+                        prompt = String.Format(Templates[args[1]], prompt);
 
-        //            if (args.Length > 1)
-        //                prompt = String.Format(Templates[args[1]], prompt);
+                    await foreach (var token in session.Predict(prompt, cancellationToken: cts.Token))
+                        Console.Write(token);
 
-        //            await foreach (var token in session.Predict(prompt, cancellationToken: cts.Token))
-        //                Console.Write(token);
-
-        //            cts.Dispose();
-        //            cts = new();
-        //        }
-        //    }
-        //}
+                    cts.Dispose();
+                    cts = new();
+                }
+            }
+        }
 
         static async Task GetEmbeddings(string[] args)
         {
@@ -483,7 +502,7 @@ namespace LlamaCppCli
 
             model = args[0];
 
-            //use_mlock = true;
+            use_mlock = true;
 
             return false;
         }
