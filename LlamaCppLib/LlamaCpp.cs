@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 
 namespace LlamaCppLib
 {
@@ -11,6 +10,7 @@ namespace LlamaCppLib
         private LlamaContext _model;
         private string _modelName;
         private LlamaCppOptions _options = new();
+        private float? _mirostatMU;
 
         public LlamaCpp(string name) => _modelName = name;
 
@@ -40,7 +40,7 @@ namespace LlamaCppLib
                 .Aggregate((a, b) => $"{a}{b}") ?? String.Empty;
 
         /// <summary>
-        /// Load model, possibly include loading a LoRA adapter
+        /// Load a model and optionally load a LoRA adapter
         /// </summary>
         /// <param name="modelPath">Specify the path to the LLaMA model file</param>
         /// <param name="contextSize">The context option allows you to set the size of the prompt context used by the LLaMA models during text generation. A larger context size helps the model to better comprehend and generate responses for longer input or conversations. Set the size of the prompt context (default: 2048). The LLaMA models were built with a context of 2048, which will yield the best results on longer input/inference. However, increasing the context size beyond 2048 may lead to unpredictable results.</param>
@@ -52,7 +52,7 @@ namespace LlamaCppLib
         /// <exception cref="InvalidOperationException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="Exception"></exception>
-        public void Load(string modelPath, int contextSize = 2048, int seed = 0, bool keyValuesF16 = true, string? loraPath = null, string? loraBaseModelPath = null)
+        public void Load(string modelPath, int contextSize = 2048, int seed = 0, string? loraPath = null, string? loraBaseModelPath = null)
         {
             if (!File.Exists(modelPath))
                 throw new FileNotFoundException($"Model file not found \"{modelPath}\".");
@@ -67,9 +67,14 @@ namespace LlamaCppLib
 
             var cparams = LlamaCppInterop.llama_context_default_params();
             cparams.n_ctx = contextSize;
+            cparams.n_parts = -1;
             cparams.seed = seed;
-            cparams.f16_kv = keyValuesF16;
+            cparams.f16_kv = true;
+            cparams.logits_all = false;
+            cparams.vocab_only = false;
             cparams.use_mmap = useLora ? false : cparams.use_mmap; // Override to false for LoRA
+            cparams.use_mlock = true;
+            cparams.embedding = false;
 
             _model = LlamaCppInterop.llama_init_from_file(modelPath, cparams);
 
@@ -101,45 +106,109 @@ namespace LlamaCppLib
             [EnumeratorCancellation] CancellationToken cancellationToken = default
         )
         {
-            // New sampling API not fully supported yet
-            // https://github.com/ggerganov/llama.cpp/commit/dd7eff57d8491792010b1002b8de6a4b54912e5c
+            if (_model == nint.Zero)
+                throw new InvalidOperationException("You must load a model.");
 
-            yield return new(0, String.Empty);
+            if (!_options.IsConfigured)
+                throw new InvalidOperationException("You must configure the model.");
+
+            var sampledVocabIds = new List<int>();
+            sampledVocabIds.AddRange(promptVocabIds);
+
+            var endOfStream = false;
+            while (!endOfStream && !cancellationToken.IsCancellationRequested)
+            {
+                if (contextVocabIds.Count >= LlamaCppInterop.llama_n_ctx(_model))
+                    throw new NotImplementedException($"Context rotation not yet implemented (max context reached: {contextVocabIds.Count}).");
+
+                LlamaCppInterop.llama_eval(_model, sampledVocabIds, contextVocabIds.Count, _options.ThreadCount ?? 0);
+                contextVocabIds.AddRange(sampledVocabIds);
+
+                // New sampling
+                var id = Sample(contextVocabIds);
+
+                // Old sampling
+                //var id = LlamaCppInterop.llama_sample_top_p_top_k(
+                //    _model,
+                //    contextVocabIds,
+                //    _options.TopK ?? 0,
+                //    _options.TopP ?? 0,
+                //    _options.Temperature ?? 0,
+                //    _options.RepeatPenalty ?? 0
+                //);
+
+                sampledVocabIds.ClearAdd(id);
+                yield return new(id, LlamaCppInterop.llama_token_to_str(_model, id));
+                endOfStream = id == LlamaCppInterop.llama_token_eos();
+            }
+
             await Task.CompletedTask;
+        }
 
-            throw new NotImplementedException();
+        private LlamaToken Sample(List<LlamaToken> contextVocabIds)
+        {
+            if (_mirostatMU == null)
+                _mirostatMU = 2.0f * _options.MirostatTAU;
 
-            //if (_model == nint.Zero)
-            //    throw new InvalidOperationException("You must load a model.");
+            var logits = LlamaCppInterop.llama_get_logits(_model);
+            var vocabCount = LlamaCppInterop.llama_n_vocab(_model);
 
-            //if (!_options.IsConfigured)
-            //    throw new InvalidOperationException("You must configure the model.");
+            // Apply logit biases
+            foreach (var logit in _options.LogitBias)
+                logits[logit.Key] += logit.Value;
 
-            //var sampledVocabIds = new List<int>();
-            //sampledVocabIds.AddRange(promptVocabIds);
+            var candidates = new List<LlamaCppInterop.LlamaTokenData>();
+            for (LlamaToken tokenId = 0; tokenId < vocabCount; tokenId++)
+                candidates.Add(new LlamaCppInterop.LlamaTokenData { id = tokenId, logit = logits[tokenId], p = 0.0f });
 
-            //var endOfStream = false;
-            //while (!endOfStream && !cancellationToken.IsCancellationRequested)
-            //{
-            //    if (contextVocabIds.Count >= LlamaCppInterop.llama_n_ctx(_model))
-            //        throw new NotImplementedException($"Context rotation not yet implemented (max context reached: {contextVocabIds.Count}).");
+            var candidates_p = new LlamaCppInterop.LlamaTokenDataArrayManaged { data = candidates, sorted = false };
 
-            //    LlamaCppInterop.llama_eval(_model, sampledVocabIds, contextVocabIds.Count, _options.ThreadCount ?? 0);
-            //    contextVocabIds.AddRange(sampledVocabIds);
+            // Apply penalties
+            var nl_logit = logits[LlamaCppInterop.llama_token_nl()];
 
-            //    var id = LlamaCppInterop.llama_sample_top_p_top_k(
-            //        _model,
-            //        contextVocabIds,
-            //        _options.TopK ?? 0,
-            //        _options.TopP ?? 0,
-            //        _options.Temperature ?? 0,
-            //        _options.RepeatPenalty ?? 0
-            //    );
+            LlamaCppInterop.llama_sample_repetition_penalty(_model, candidates_p, contextVocabIds, _options.RepeatPenalty ?? 0);
+            LlamaCppInterop.llama_sample_frequency_and_presence_penalties(_model, candidates_p, contextVocabIds, _options.FrequencyPenalty ?? 0, _options.PresencePenalty ?? 0);
 
-            //    sampledVocabIds.ClearAdd(id);
-            //    yield return new(id, LlamaCppInterop.llama_token_to_str(_model, id));
-            //    endOfStream = id == LlamaCppInterop.llama_token_eos();
-            //}
+            if (!(_options.PenalizeNewLine ?? true))
+                logits[LlamaCppInterop.llama_token_nl()] = nl_logit;
+
+            var id = default(LlamaToken);
+
+            if ((_options.Temperature ?? 0) <= 0)
+            {
+                // Greedy sampling
+                id = LlamaCppInterop.llama_sample_token_greedy(_model, candidates_p);
+            }
+            else
+            {
+                var mirostatMU = _mirostatMU ?? 0;
+
+                if (_options.Mirostat == 1)
+                {
+                    var mirostat_m = 100;
+                    LlamaCppInterop.llama_sample_temperature(_model, candidates_p, _options.Temperature ?? 0);
+                    id = LlamaCppInterop.llama_sample_token_mirostat(_model, candidates_p, _options.MirostatTAU ?? 0, _options.MirostatETA ?? 0, mirostat_m, ref mirostatMU);
+                }
+                else if (_options.Mirostat == 2)
+                {
+                    LlamaCppInterop.llama_sample_temperature(_model, candidates_p, _options.Temperature ?? 0);
+                    id = LlamaCppInterop.llama_sample_token_mirostat_v2(_model, candidates_p, _options.MirostatTAU ?? 0, _options.MirostatETA ?? 0, ref mirostatMU);
+                }
+                else
+                {
+                    // Temperature sampling
+                    LlamaCppInterop.llama_sample_top_k(_model, candidates_p, _options.TopK ?? 0);
+                    LlamaCppInterop.llama_sample_tail_free(_model, candidates_p, _options.TfsZ ?? 0);
+                    LlamaCppInterop.llama_sample_typical(_model, candidates_p, _options.TypicalP ?? 0);
+                    LlamaCppInterop.llama_sample_top_p(_model, candidates_p, _options.TopP ?? 0);
+                    LlamaCppInterop.llama_sample_temperature(_model, candidates_p, _options.Temperature ?? 0);
+                    id = LlamaCppInterop.llama_sample_token(_model, candidates_p);
+                }
+
+                _mirostatMU = mirostatMU;
+            }
+
+            return id;
         }
     }
 }
