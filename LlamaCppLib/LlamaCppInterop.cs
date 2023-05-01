@@ -165,11 +165,18 @@ namespace LlamaCppLib
         /// <param name="n_token_count_out"></param>
         /// <returns></returns>
         [DllImport("llama", EntryPoint = "llama_load_session_file")]
-        private static extern int _llama_load_session_file(LlamaContext ctx, string path_session, nint tokens_out, int n_token_capacity, out int n_token_count_out);
+        private static extern bool _llama_load_session_file(LlamaContext ctx, string path_session, nint tokens_out, int n_token_capacity, out int n_token_count_out);
 
-        public static int llama_load_session_file(LlamaContext ctx, string path_session, List<LlamaToken> tokens_out)
+        public static bool llama_load_session_file(LlamaContext ctx, string path_session, out List<LlamaToken> tokens_out, int n_token_count)
         {
-            throw new NotImplementedException();
+            using var nmem = new NativeHGlobal(n_token_count * sizeof(LlamaToken));
+            var result = _llama_load_session_file(ctx, path_session, nmem.Ptr, n_token_count, out var n_token_count_out);
+
+            var res = new LlamaToken[n_token_count_out];
+            Marshal.Copy(nmem.Ptr, res, 0, res.Length);
+            tokens_out = new(res);
+
+            return result;
         }
 
         /// <summary>
@@ -181,11 +188,14 @@ namespace LlamaCppLib
         /// <param name="n_token_count"></param>
         /// <returns></returns>
         [DllImport("llama", EntryPoint = "llama_save_session_file")]
-        private static extern int _llama_save_session_file(LlamaContext ctx, string path_session, nint tokens, int n_token_count);
+        private static extern bool _llama_save_session_file(LlamaContext ctx, string path_session, nint tokens, int n_token_count);
 
-        public static int llama_save_session_file(LlamaContext ctx, string path_session, List<LlamaToken> tokens)
+        public static bool llama_save_session_file(LlamaContext ctx, string path_session, List<LlamaToken> tokens)
         {
-            throw new NotImplementedException();
+            using var nmem = new NativeHGlobal(tokens.Count * sizeof(LlamaToken));
+            Marshal.Copy(tokens.ToArray(), 0, nmem.Ptr, tokens.Count);
+            var result = _llama_save_session_file(ctx, path_session, nmem.Ptr, tokens.Count);
+            return result;
         }
 
         /// <summary>
