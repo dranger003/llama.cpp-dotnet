@@ -84,7 +84,7 @@ namespace LlamaCppCli
         static async Task Main(string[] args)
         {
 #if DEBUG
-            args = new[] { "0", @"D:\LLM_MODELS\lmsys\ggml-vicuna-13b-v1.1-q5_1.bin", "Vicuna v1.1" };
+            args = new[] { "2", @"D:\LLM_MODELS\lmsys\ggml-vicuna-13b-v1.1-q5_1.bin", "Vicuna v1.1" };
 #endif
 
             var samples = new (string Name, Func<string[], Task> Func)[]
@@ -298,9 +298,9 @@ namespace LlamaCppCli
 
                 var promptTokens = model.Tokenize(prompt, true);
                 var conversation = new StringBuilder(prompt);
-                var contextTokens = new List<LlamaToken>();
+                var predictOptions = new PredictOptions() { PromptVocabIds = promptTokens };
 
-                await foreach (var token in model.Predict(contextTokens, promptTokens, cancellationToken: cts.Token))
+                await foreach (var token in model.Predict(predictOptions, cancellationToken: cts.Token))
                 {
                     Console.Write(token.Value);
                     conversation.Append(token.Value);
@@ -330,15 +330,14 @@ namespace LlamaCppCli
 
                 var session = model.CreateSession(ConversationName);
 
+                if (args.Length > 1)
+                    session.Configure(options => options.Template = Templates[args[1]]);
+
                 foreach (var prompt in Prompts)
                 {
                     Console.WriteLine(prompt);
 
-                    var templatizedPrompt = prompt;
-                    if (args.Length > 1)
-                        templatizedPrompt = String.Format(Templates[args[1]], prompt);
-
-                    await foreach (var token in session.Predict(templatizedPrompt, cancellationToken: cts.Token))
+                    await foreach (var token in session.Predict(prompt, cancellationToken: cts.Token))
                         Console.Write(token);
                 }
 
@@ -366,6 +365,9 @@ namespace LlamaCppCli
 
                 var session = model.CreateSession(ConversationName);
 
+                if (args.Length > 1)
+                    session.Configure(options => options.Template = Templates[args[1]]);
+
                 Console.WriteLine($"Entering interactive mode.");
                 Console.WriteLine($"Press <Ctrl+C> to interrupt a response.");
                 Console.WriteLine($"Press <Enter> on an emptpy prompt to quit.");
@@ -379,15 +381,15 @@ namespace LlamaCppCli
                     if (String.IsNullOrWhiteSpace(prompt))
                         break;
 
-                    if (args.Length > 1)
-                        prompt = String.Format(Templates[args[1]], prompt);
-
                     await foreach (var token in session.Predict(prompt, cancellationToken: cts.Token))
                         Console.Write(token);
 
                     cts.Dispose();
                     cts = new();
                 }
+
+                Console.WriteLine();
+                PrintTranscript(session.Conversation);
             }
         }
 
@@ -479,7 +481,7 @@ namespace LlamaCppCli
         public bool penalize_nl = true; // consider newlines as a repeatable token
         public bool perplexity = false; // compute perplexity over the prompt
         public bool use_mmap = true; // use mmap for faster loads
-        public bool use_mlock = false; // use mlock to keep model in memory
+        public bool use_mlock = true; // use mlock to keep model in memory (default false)
         public bool mem_test = false; // compute maximum memory usage
         public bool verbose_prompt = false; // print prompt tokens before generation
 

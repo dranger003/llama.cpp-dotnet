@@ -10,7 +10,6 @@ namespace LlamaCppLib
         private LlamaContext _model;
         private string _modelName;
         private LlamaCppOptions _options = new();
-        private float? _mirostatMU;
 
         public LlamaCpp(string name) => _modelName = name;
 
@@ -30,7 +29,7 @@ namespace LlamaCppLib
         public LlamaCppSession CreateSession(string sessionName) =>
             new(this, sessionName);
 
-        public IEnumerable<LlamaToken> Tokenize(string text, bool addBos = false) =>
+        public List<LlamaToken> Tokenize(string text, bool addBos = false) =>
             LlamaCppInterop.llama_tokenize(_model, $"{(addBos ? " " : String.Empty)}{text}", addBos);
 
         public string Detokenize(IEnumerable<LlamaToken> vocabIds) =>
@@ -100,11 +99,7 @@ namespace LlamaCppLib
         public void Configure(Action<LlamaCppOptions> configure) =>
             configure(_options);
 
-        public async IAsyncEnumerable<KeyValuePair<LlamaToken, string>> Predict(
-            List<LlamaToken> contextVocabIds,
-            IEnumerable<LlamaToken> promptVocabIds,
-            [EnumeratorCancellation] CancellationToken cancellationToken = default
-        )
+        public async IAsyncEnumerable<KeyValuePair<LlamaToken, string>> Predict(PredictOptions options, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             if (_model == nint.Zero)
                 throw new InvalidOperationException("You must load a model.");
@@ -113,29 +108,20 @@ namespace LlamaCppLib
                 throw new InvalidOperationException("You must configure the model.");
 
             var sampledVocabIds = new List<int>();
-            sampledVocabIds.AddRange(promptVocabIds);
+            sampledVocabIds.AddRange(options.PromptVocabIds);
 
             var endOfStream = false;
             while (!endOfStream && !cancellationToken.IsCancellationRequested)
             {
-                if (contextVocabIds.Count >= LlamaCppInterop.llama_n_ctx(_model))
-                    throw new NotImplementedException($"Context rotation not yet implemented (max context reached: {contextVocabIds.Count}).");
+                if (options.ContextVocabIds.Count >= LlamaCppInterop.llama_n_ctx(_model))
+                    throw new NotImplementedException($"Context rotation not yet implemented (max context reached: {options.ContextVocabIds.Count}).");
 
-                LlamaCppInterop.llama_eval(_model, sampledVocabIds, contextVocabIds.Count, _options.ThreadCount ?? 0);
-                contextVocabIds.AddRange(sampledVocabIds);
+                LlamaCppInterop.llama_eval(_model, sampledVocabIds, options.ContextVocabIds.Count, _options.ThreadCount ?? 0);
+                options.ContextVocabIds.AddRange(sampledVocabIds);
 
-                // New sampling
-                var id = Sample(contextVocabIds);
-
-                // Old sampling
-                //var id = LlamaCppInterop.llama_sample_top_p_top_k(
-                //    _model,
-                //    contextVocabIds,
-                //    _options.TopK ?? 0,
-                //    _options.TopP ?? 0,
-                //    _options.Temperature ?? 0,
-                //    _options.RepeatPenalty ?? 0
-                //);
+                var mirostatMU = options.MirostatMU;
+                var id = Sample(options.ContextVocabIds, ref mirostatMU);
+                options.MirostatMU = mirostatMU;
 
                 sampledVocabIds.ClearAdd(id);
                 yield return new(id, LlamaCppInterop.llama_token_to_str(_model, id));
@@ -145,11 +131,8 @@ namespace LlamaCppLib
             await Task.CompletedTask;
         }
 
-        private LlamaToken Sample(List<LlamaToken> contextVocabIds)
+        private LlamaToken Sample(List<LlamaToken> contextVocabIds, ref float mirostatMU)
         {
-            if (_mirostatMU == null)
-                _mirostatMU = 2.0f * _options.MirostatTAU;
-
             var logits = LlamaCppInterop.llama_get_logits(_model);
             var vocabCount = LlamaCppInterop.llama_n_vocab(_model);
 
@@ -181,8 +164,6 @@ namespace LlamaCppLib
             }
             else
             {
-                var mirostatMU = _mirostatMU ?? 0;
-
                 if (_options.Mirostat == 1)
                 {
                     var mirostat_m = 100;
@@ -204,8 +185,6 @@ namespace LlamaCppLib
                     LlamaCppInterop.llama_sample_temperature(_model, candidates_p, _options.Temperature ?? 0);
                     id = LlamaCppInterop.llama_sample_token(_model, candidates_p);
                 }
-
-                _mirostatMU = mirostatMU;
             }
 
             return id;

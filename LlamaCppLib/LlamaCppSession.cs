@@ -8,31 +8,35 @@ namespace LlamaCppLib
     {
         private LlamaCpp _model;
         private string _name;
-        private List<int> _contextVocabIds = new();
+        private PredictOptions _predictOptions = new();
 
         public LlamaCppSession(LlamaCpp model, string name)
         {
             _model = model;
             _name = name;
+
+            Reset(); // Initialize mirostat
         }
 
         public string Name { get => _name; }
 
         public LlamaCppSessionOptions Options { get; } = new();
 
-        public List<LlamaToken> TokenizedContext => _contextVocabIds;
+        public List<LlamaToken> TokenizedContext => _predictOptions.ContextVocabIds;
 
-        public string Conversation => _model.Detokenize(_contextVocabIds);
+        public string Conversation => _model.Detokenize(_predictOptions.ContextVocabIds);
 
         public void Configure(Action<LlamaCppSessionOptions> configure) => configure(this.Options);
 
-        public void Reset() => _contextVocabIds.Clear();
+        public void Reset()
+        {
+            _predictOptions.ContextVocabIds.Clear();
+            _predictOptions.MirostatMU = 2.0f * _model.Options.MirostatTAU ?? 0.0f;
+        }
 
         public async IAsyncEnumerable<string> Predict(string prompt, string? context = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            var start = !_contextVocabIds.Any();
             var template = this.Options.Template;
-
             if (template != null)
             {
                 template = template
@@ -45,13 +49,12 @@ namespace LlamaCppLib
                     prompt = String.Format(template, prompt);
             }
 
-            var promptVocabIds = _model.Tokenize(prompt, start);
+            _predictOptions.PromptVocabIds = _model.Tokenize(prompt, !_predictOptions.ContextVocabIds.Any());
 
-            await foreach (var token in _model.Predict(_contextVocabIds, promptVocabIds, cancellationToken))
+            await foreach (var token in _model.Predict(_predictOptions, cancellationToken))
                 yield return token.Value;
 
-            // TODO
-            _contextVocabIds.AddRange(_model.Tokenize("\n\n"));
+            _predictOptions.ContextVocabIds.AddRange(_model.Tokenize("\n\n"));
             yield return "\n";
         }
     }
