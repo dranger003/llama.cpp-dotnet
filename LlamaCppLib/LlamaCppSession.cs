@@ -49,7 +49,7 @@ namespace LlamaCppLib
                     prompt = String.Format(template, prompt);
             }
 
-            _predictOptions.PromptVocabIds = _model.Tokenize(prompt, !_predictOptions.ContextVocabIds.Any());
+            _predictOptions.PromptVocabIds = _model.Tokenize(prompt, false); //!_predictOptions.ContextVocabIds.Any()
 
             await foreach (var token in _model.Predict(_predictOptions, cancellationToken))
                 yield return token.Value;

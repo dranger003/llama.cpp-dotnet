@@ -17,9 +17,9 @@ namespace LlamaCppCli
         {
             ThreadCount = Environment.ProcessorCount / 2, // Assuming hyperthreading
             TopK = 40,
-            TopP = 0.95f,
-            Temperature = 0.1f,
-            RepeatPenalty = 1.1f,
+            TopP = 1.0f,
+            Temperature = 1.0f,
+            RepeatPenalty = 1.0f,
 
             // New sampling options
             TfsZ = 1.0f,
@@ -74,9 +74,7 @@ namespace LlamaCppCli
 
                 """,
             ["StableVicuna"] = """
-                ### Human:
-                {0}
-
+                ### Human: {0}
                 ### Assistant:
                 """,
         };
