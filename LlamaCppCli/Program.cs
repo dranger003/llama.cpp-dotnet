@@ -26,7 +26,7 @@ namespace LlamaCppCli
             TypicalP = 1.0f,
             FrequencyPenalty = 0.0f,
             PresencePenalty = 0.0f,
-            Mirostat = 0,           // 0 = Disabled, 1 = Mirostat, 2 = Mirostat 2.0
+            Mirostat = 1,           // 0 = Disabled, 1 = Mirostat, 2 = Mirostat 2.0
             MirostatTAU = 5.0f,     // Target entropy
             MirostatETA = 0.10f,    // Learning rate
             PenalizeNewLine = true,
@@ -38,45 +38,6 @@ namespace LlamaCppCli
         static string[] Prompts = new[]
         {
             "Describe quantum physics in a very short and brief sentence.",
-        };
-
-        // TODO: Adjust templates according to your model, this is crucial for reliable predictions (refer to your model description for template structure)
-        static Dictionary<string, string> Templates = new Dictionary<string, string>
-        {
-            ["Vicuna v1.1"] = """
-                USER:
-                {0}
-
-                ASSISTANT:
-
-                """,
-            ["Alpaca (no input)"] = """
-                ### Instruction:
-                {0}
-
-                ### Response:
-                
-                """,
-            ["Alpaca (input)"] = """
-                ### Instruction:
-                {0}
-
-                ### Input:
-                {1}
-
-                ### Response:
-                
-                """,
-            ["WizardLM"] = """
-                {0}
-
-                ### Response:
-
-                """,
-            ["StableVicuna"] = """
-                ### Human: {0}
-                ### Assistant:
-                """,
         };
 
         static async Task Main(string[] args)
@@ -92,7 +53,6 @@ namespace LlamaCppCli
                 (nameof(WrappedInterfaceSampleWithSession), WrappedInterfaceSampleWithSession),
                 (nameof(WrappedInterfaceSampleWithSessionInteractive), WrappedInterfaceSampleWithSessionInteractive),
                 (nameof(GetEmbeddings), GetEmbeddings),
-                //(nameof(ExampleMain), ExampleMain.Run),
             }
                 .Select((sample, index) => (sample, index))
                 .ToDictionary(k => k.sample.Name, v => (Index: v.index, v.sample.Func));
@@ -104,32 +64,29 @@ namespace LlamaCppCli
                     Console.WriteLine($"    [{sample.Value.Index}] = {sample.Key}");
             };
 
-            var PrintAvailableTempaltes = () =>
-            {
-                Console.WriteLine($"TEMPLATES:");
-                foreach (var template in Templates)
-                    Console.WriteLine($"    \"{template.Key}\"");
-            };
-
             if (args.Length < 2)
             {
                 Console.WriteLine($"USAGE:");
-                Console.WriteLine($"    {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} <SampleIndex> <ModelPath> [TemplateName]");
+                Console.WriteLine($"    {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} <SampleIndex> <ModelPath> [TemplatePath]");
                 PrintAvailableSamples();
-                PrintAvailableTempaltes();
+                return;
+            }
+
+            if (!Path.Exists(args[1]))
+            {
+                Console.WriteLine($"ERROR: Model not found ({args[1]}).");
+                return;
+            }
+
+            if (args.Length > 2 && !Path.Exists(args[2]))
+            {
+                Console.WriteLine($"ERROR: Template not found ({args[2]}).");
                 return;
             }
 
             var sampleIndex = Int32.Parse(args[0]);
-            var modelPath = args[1];
+            var sampleName = samples.SingleOrDefault(sample => sample.Value.Index == sampleIndex).Key;
 
-            if (!Path.Exists(modelPath))
-            {
-                Console.WriteLine($"ERROR: Model not found ({modelPath}).");
-                return;
-            }
-
-            var sampleName = samples.FirstOrDefault(sample => sample.Value.Index == sampleIndex).Key;
             if (sampleName == default)
             {
                 Console.WriteLine($"ERROR: Sample not found ({sampleIndex}).");
@@ -140,11 +97,13 @@ namespace LlamaCppCli
             await samples[sampleName].Func(args.Skip(1).ToArray());
         }
 
+        static string LoadTemplate(string path) => File.ReadAllText(path).Replace("{prompt}", "{0}").Replace("{context}", "{1}");
+
         static async Task RawInterfaceSample(string[] args)
         {
             Console.WriteLine($"Running sample ({nameof(RawInterfaceSample)})...");
 
-            var aparams = new gpt_params();
+            var aparams = new GptParams();
             aparams.parse(args);
 
             var cparams = LlamaCppInterop.llama_context_default_params();
@@ -169,7 +128,7 @@ namespace LlamaCppCli
             Console.WriteLine(prompt);
 
             if (args.Length > 1)
-                prompt = String.Format(Templates[args[1]], prompt);
+                prompt = String.Format(LoadTemplate(args[1]), prompt);
 
             var tokens = LlamaCppInterop.llama_tokenize(ctx, $"{prompt}", true);
 
@@ -292,7 +251,7 @@ namespace LlamaCppCli
                 Console.WriteLine(prompt);
 
                 if (args.Length > 1)
-                    prompt = String.Format(Templates[args[1]], prompt);
+                    prompt = String.Format(LoadTemplate(args[1]), prompt);
 
                 var promptTokens = model.Tokenize(prompt, true);
                 var conversation = new StringBuilder(prompt);
@@ -329,7 +288,7 @@ namespace LlamaCppCli
                 var session = model.CreateSession(ConversationName);
 
                 if (args.Length > 1)
-                    session.Configure(options => options.Template = Templates[args[1]]);
+                    session.Configure(options => options.Template = File.ReadAllText(args[1]));
 
                 foreach (var prompt in Prompts)
                 {
@@ -364,7 +323,7 @@ namespace LlamaCppCli
                 var session = model.CreateSession(ConversationName);
 
                 if (args.Length > 1)
-                    session.Configure(options => options.Template = Templates[args[1]]);
+                    session.Configure(options => options.Template = File.ReadAllText(args[1]));
 
                 Console.WriteLine($"Entering interactive mode.");
                 Console.WriteLine($"Press <Ctrl+C> to interrupt a response.");
@@ -430,81 +389,6 @@ namespace LlamaCppCli
             Console.WriteLine($"| Transcript                                                                                       |");
             Console.WriteLine($" --------------------------------------------------------------------------------------------------");
             Console.Write(conversation.Trim());
-        }
-    }
-
-    internal struct gpt_params
-    {
-        public int seed = -1; // RNG seed
-        public int n_threads = Math.Min(4, Environment.ProcessorCount / 2);
-        public int n_predict = -1; // new tokens to predict
-        public int n_parts = -1; // amount of model parts (-1 = determine from model dimensions)
-        public int n_ctx = 512; // context size
-        public int n_batch = 512; // batch size for prompt processing (must be >=32 to use BLAS)
-        public int n_keep = 0; // number of tokens to keep from initial prompt
-
-        // sampling parameters
-        public Dictionary<LlamaToken, float> logit_bias = new(); // logit bias for specific tokens
-        public int top_k = 40; // <= 0 to use vocab size
-        public float top_p = 0.95f; // 1.0 = disabled
-        public float tfs_z = 1.00f; // 1.0 = disabled
-        public float typical_p = 1.00f; // 1.0 = disabled
-        public float temp = 0.80f; // 1.0 = disabled
-        public float repeat_penalty = 1.10f; // 1.0 = disabled
-        public int repeat_last_n = 64; // last n tokens to penalize (0 = disable penalty, -1 = context size)
-        public float frequency_penalty = 0.00f; // 0.0 = disabled
-        public float presence_penalty = 0.00f; // 0.0 = disabled
-        public int mirostat = 0; // 0 = disabled, 1 = mirostat, 2 = mirostat 2.0
-        public float mirostat_tau = 5.00f; // target entropy
-        public float mirostat_eta = 0.10f; // learning rate
-
-        public string model = "models/lamma-7B/ggml-model.bin"; // model path
-        public string prompt = "";
-        public string path_session = ""; // path to file for saving/loading model eval state
-        public string input_prefix = ""; // string to prefix user inputs with
-        public List<string> antiprompt = new(); // string upon seeing which more user input is prompted
-
-        public string? lora_adapter = default; // lora adapter path
-        public string? lora_base = default; // base model path for the lora adapter
-
-        public bool memory_f16 = true; // use f16 instead of f32 for memory kv
-        public bool random_prompt = false; // do not randomize prompt if none provided
-        public bool use_color = false; // use color to distinguish generations and inputs
-        public bool interactive = false; // interactive mode
-
-        public bool embedding = false; // get only sentence embedding
-        public bool interactive_first = false; // wait for user input immediately
-
-        public bool instruct = false; // instruction mode (used for Alpaca models)
-        public bool penalize_nl = true; // consider newlines as a repeatable token
-        public bool perplexity = false; // compute perplexity over the prompt
-        public bool use_mmap = true; // use mmap for faster loads
-        public bool use_mlock = true; // use mlock to keep model in memory (default false)
-        public bool mem_test = false; // compute maximum memory usage
-        public bool verbose_prompt = false; // print prompt tokens before generation
-
-        public gpt_params()
-        { }
-
-        public bool parse(string[] args)
-        {
-            // Typically here we would map command line arguments to each field
-            // For now we use the internal program values from the code
-
-            seed = Program.Seed;
-            n_threads = Program.Options.ThreadCount ?? n_threads;
-            n_ctx = Program.ContextSize;
-
-            top_k = Program.Options.TopK ?? top_k;
-            top_p = Program.Options.TopP ?? top_p;
-            temp = Program.Options.Temperature ?? temp;
-            repeat_penalty = Program.Options.RepeatPenalty ?? repeat_penalty;
-
-            model = args[0];
-
-            use_mlock = true;
-
-            return false;
         }
     }
 }

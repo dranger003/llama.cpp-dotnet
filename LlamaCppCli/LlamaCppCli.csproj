@@ -13,10 +13,6 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <Compile Remove="ExampleMain.cs" />
-	</ItemGroup>
-
-	<ItemGroup>
 		<ProjectReference Include="..\LlamaCppLib\LlamaCppLib.csproj" />
 	</ItemGroup>
 
