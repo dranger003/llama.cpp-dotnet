@@ -140,17 +140,17 @@ namespace LlamaCppLib
             foreach (var logit in _options.LogitBias)
                 logits[logit.Key] += logit.Value;
 
-            var candidates = new List<LlamaCppInterop.LlamaTokenData>();
+            var candidates = new List<LlamaCppInterop.llama_token_data>();
             for (LlamaToken tokenId = 0; tokenId < vocabCount; tokenId++)
-                candidates.Add(new LlamaCppInterop.LlamaTokenData { id = tokenId, logit = logits[tokenId], p = 0.0f });
+                candidates.Add(new LlamaCppInterop.llama_token_data { id = tokenId, logit = logits[tokenId], p = 0.0f });
 
-            var candidates_p = new LlamaCppInterop.LlamaTokenDataArrayManaged { data = candidates, sorted = false };
+            var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates, sorted = false };
 
             // Apply penalties
             var nl_logit = logits[LlamaCppInterop.llama_token_nl()];
 
-            LlamaCppInterop.llama_sample_repetition_penalty(_model, candidates_p, contextVocabIds, _options.RepeatPenalty ?? 0);
-            LlamaCppInterop.llama_sample_frequency_and_presence_penalties(_model, candidates_p, contextVocabIds, _options.FrequencyPenalty ?? 0, _options.PresencePenalty ?? 0);
+            LlamaCppInterop.llama_sample_repetition_penalty(_model, ref candidates_p, contextVocabIds, _options.RepeatPenalty ?? 0);
+            LlamaCppInterop.llama_sample_frequency_and_presence_penalties(_model, ref candidates_p, contextVocabIds, _options.FrequencyPenalty ?? 0, _options.PresencePenalty ?? 0);
 
             if (!(_options.PenalizeNewLine ?? true))
                 logits[LlamaCppInterop.llama_token_nl()] = nl_logit;
@@ -160,30 +160,30 @@ namespace LlamaCppLib
             if ((_options.Temperature ?? 0) <= 0)
             {
                 // Greedy sampling
-                id = LlamaCppInterop.llama_sample_token_greedy(_model, candidates_p);
+                id = LlamaCppInterop.llama_sample_token_greedy(_model, ref candidates_p);
             }
             else
             {
                 if (_options.Mirostat == 1)
                 {
                     var mirostat_m = 100;
-                    LlamaCppInterop.llama_sample_temperature(_model, candidates_p, _options.Temperature ?? 0);
-                    id = LlamaCppInterop.llama_sample_token_mirostat(_model, candidates_p, _options.MirostatTAU ?? 0, _options.MirostatETA ?? 0, mirostat_m, ref mirostatMU);
+                    LlamaCppInterop.llama_sample_temperature(_model, ref candidates_p, _options.Temperature ?? 0);
+                    id = LlamaCppInterop.llama_sample_token_mirostat(_model, ref candidates_p, _options.MirostatTAU ?? 0, _options.MirostatETA ?? 0, mirostat_m, ref mirostatMU);
                 }
                 else if (_options.Mirostat == 2)
                 {
-                    LlamaCppInterop.llama_sample_temperature(_model, candidates_p, _options.Temperature ?? 0);
-                    id = LlamaCppInterop.llama_sample_token_mirostat_v2(_model, candidates_p, _options.MirostatTAU ?? 0, _options.MirostatETA ?? 0, ref mirostatMU);
+                    LlamaCppInterop.llama_sample_temperature(_model, ref candidates_p, _options.Temperature ?? 0);
+                    id = LlamaCppInterop.llama_sample_token_mirostat_v2(_model, ref candidates_p, _options.MirostatTAU ?? 0, _options.MirostatETA ?? 0, ref mirostatMU);
                 }
                 else
                 {
                     // Temperature sampling
-                    LlamaCppInterop.llama_sample_top_k(_model, candidates_p, _options.TopK ?? 0);
-                    LlamaCppInterop.llama_sample_tail_free(_model, candidates_p, _options.TfsZ ?? 0);
-                    LlamaCppInterop.llama_sample_typical(_model, candidates_p, _options.TypicalP ?? 0);
-                    LlamaCppInterop.llama_sample_top_p(_model, candidates_p, _options.TopP ?? 0);
-                    LlamaCppInterop.llama_sample_temperature(_model, candidates_p, _options.Temperature ?? 0);
-                    id = LlamaCppInterop.llama_sample_token(_model, candidates_p);
+                    LlamaCppInterop.llama_sample_top_k(_model, ref candidates_p, _options.TopK ?? 0);
+                    LlamaCppInterop.llama_sample_tail_free(_model, ref candidates_p, _options.TfsZ ?? 0);
+                    LlamaCppInterop.llama_sample_typical(_model, ref candidates_p, _options.TypicalP ?? 0);
+                    LlamaCppInterop.llama_sample_top_p(_model, ref candidates_p, _options.TopP ?? 0);
+                    LlamaCppInterop.llama_sample_temperature(_model, ref candidates_p, _options.Temperature ?? 0);
+                    id = LlamaCppInterop.llama_sample_token(_model, ref candidates_p);
                 }
             }
 
