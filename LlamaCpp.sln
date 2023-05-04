@@ -15,8 +15,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		template_alpaca-without-input.txt = template_alpaca-without-input.txt
 		template_stable-vicuna.txt = template_stable-vicuna.txt
 		template_vicuna-v1.1.txt = template_vicuna-v1.1.txt
-		template_wizard-vicuna.txt = template_wizard-vicuna.txt
 		template_wizardlm.txt = template_wizardlm.txt
+		template_wizardvicunalm.txt = template_wizardvicunalm.txt
 	EndProjectSection
 EndProject
 Global
