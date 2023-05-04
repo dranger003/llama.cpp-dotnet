@@ -333,6 +333,47 @@ namespace LlamaCppLib
         [DllImport("llama")]
         public static extern llama_token llama_token_nl();
 
+        // Boilerplate stuff for handling new sampling API - not ideal, will revist later to improve
+        private delegate R FuncRef<T, R>(ref T item);
+        private delegate void ActionRef<T>(ref T item);
+
+        private static T llama_token_data_array_wrapper<T>(ref llama_token_data_array candidates, FuncRef<_llama_token_data_array, T> call)
+        {
+            var unit_size = Marshal.SizeOf<llama_token_data>();
+            var total_size = unit_size * candidates.data.Count;
+
+            using var native_ptr = new NativeHGlobal(total_size);
+            var _candidates = new _llama_token_data_array
+            {
+                data = native_ptr.Ptr,
+                size = candidates.data.Count,
+                sorted = candidates.sorted,
+            };
+
+            for (var i = 0; i < candidates.data.Count; i++)
+                Marshal.StructureToPtr(candidates.data[i], _candidates.data + i * unit_size, false);
+
+            var result = call(ref _candidates);
+
+            candidates.data.Clear();
+            for (var i = 0; i < _candidates.size; i++)
+                candidates.data.Add(Marshal.PtrToStructure<llama_token_data>(_candidates.data + i * unit_size));
+
+            return result;
+        }
+
+        private static void llama_token_data_array_wrapper(ref llama_token_data_array candidates, ActionRef<_llama_token_data_array> call)
+        {
+            _ = llama_token_data_array_wrapper(
+                ref candidates,
+                (ref _llama_token_data_array _candidates) =>
+                {
+                    call(ref _candidates);
+                    return 0;
+                }
+            );
+        }
+
         /// <summary>
         /// Repetition penalty described in CTRL academic paper https://arxiv.org/abs/1909.05858, with negative logit fix.
         /// </summary>
@@ -346,28 +387,16 @@ namespace LlamaCppLib
 
         public static void llama_sample_repetition_penalty(llama_context ctx, ref llama_token_data_array candidates, List<llama_token> last_tokens, float penalty)
         {
-            var usize = Marshal.SizeOf<llama_token_data>();
-            var tsize = usize * candidates.data.Count;
+            llama_token_data_array_wrapper(
+                ref candidates,
+                (ref _llama_token_data_array _candidates) =>
+                {
+                    using var native_ptr = new NativeHGlobal(last_tokens.Count * sizeof(llama_token));
+                    Marshal.Copy(last_tokens.ToArray(), 0, native_ptr.Ptr, last_tokens.Count);
 
-            using var nmem1 = new NativeHGlobal(tsize);
-            var _candidates = new _llama_token_data_array
-            {
-                data = nmem1.Ptr,
-                size = candidates.data.Count,
-                sorted = candidates.sorted,
-            };
-
-            for (var i = 0; i < candidates.data.Count; i++)
-                Marshal.StructureToPtr(candidates.data[i], _candidates.data + i * usize, false);
-
-            using var nmem2 = new NativeHGlobal(last_tokens.Count * sizeof(llama_token));
-            Marshal.Copy(last_tokens.ToArray(), 0, nmem2.Ptr, last_tokens.Count);
-
-            _llama_sample_repetition_penalty(ctx, ref _candidates, nmem2.Ptr, last_tokens.Count, penalty);
-
-            candidates.data.Clear();
-            for (var i = 0; i < _candidates.size; i++)
-                candidates.data.Add(Marshal.PtrToStructure<llama_token_data>(_candidates.data + i * usize));
+                    _llama_sample_repetition_penalty(ctx, ref _candidates, native_ptr.Ptr, last_tokens.Count, penalty);
+                }
+            );
         }
 
         /// <summary>
@@ -384,28 +413,16 @@ namespace LlamaCppLib
 
         public static void llama_sample_frequency_and_presence_penalties(llama_context ctx, ref llama_token_data_array candidates, List<llama_token> last_tokens, float alpha_frequency, float alpha_presence)
         {
-            var usize = Marshal.SizeOf<llama_token_data>();
-            var tsize = usize * candidates.data.Count;
+            llama_token_data_array_wrapper(
+                ref candidates,
+                (ref _llama_token_data_array _candidates) =>
+                {
+                    using var nmem2 = new NativeHGlobal(last_tokens.Count * sizeof(llama_token));
+                    Marshal.Copy(last_tokens.ToArray(), 0, nmem2.Ptr, last_tokens.Count);
 
-            using var nmem1 = new NativeHGlobal(tsize);
-            var _candidates = new _llama_token_data_array
-            {
-                data = nmem1.Ptr,
-                size = candidates.data.Count,
-                sorted = candidates.sorted,
-            };
-
-            for (var i = 0; i < candidates.data.Count; i++)
-                Marshal.StructureToPtr(candidates.data[i], _candidates.data + i * usize, false);
-
-            using var nmem2 = new NativeHGlobal(last_tokens.Count * sizeof(llama_token));
-            Marshal.Copy(last_tokens.ToArray(), 0, nmem2.Ptr, last_tokens.Count);
-
-            _llama_sample_frequency_and_presence_penalties(ctx, ref _candidates, nmem2.Ptr, last_tokens.Count, alpha_frequency, alpha_presence);
-
-            candidates.data.Clear();
-            for (var i = 0; i < _candidates.size; i++)
-                candidates.data.Add(Marshal.PtrToStructure<llama_token_data>(_candidates.data + i * usize));
+                    _llama_sample_frequency_and_presence_penalties(ctx, ref _candidates, nmem2.Ptr, last_tokens.Count, alpha_frequency, alpha_presence);
+                }
+            );
         }
 
         /// <summary>
@@ -418,22 +435,13 @@ namespace LlamaCppLib
 
         public static void llama_sample_softmax(llama_context ctx, llama_token_data_array candidates)
         {
-            var usize = Marshal.SizeOf<llama_token_data>();
-            var tsize = usize * candidates.data.Count;
-
-            using var nmem = new NativeHGlobal(tsize);
-
-            for (var i = 0; i < candidates.data.Count; i++)
-                Marshal.StructureToPtr(candidates.data[i], nmem.Ptr + i * usize, false);
-
-            var _candidates = new _llama_token_data_array
-            {
-                data = nmem.Ptr,
-                size = candidates.data.Count,
-                sorted = candidates.sorted,
-            };
-
-            _llama_sample_softmax(ctx, ref _candidates);
+            llama_token_data_array_wrapper(
+                ref candidates,
+                (ref _llama_token_data_array _candidates) =>
+                {
+                    _llama_sample_softmax(ctx, ref _candidates);
+                }
+            );
         }
 
         /// <summary>
@@ -448,25 +456,13 @@ namespace LlamaCppLib
 
         public static void llama_sample_top_k(llama_context ctx, ref llama_token_data_array candidates, int k, int min_keep = 1)
         {
-            var usize = Marshal.SizeOf<llama_token_data>();
-            var tsize = usize * candidates.data.Count;
-
-            using var nmem = new NativeHGlobal(tsize);
-            var _candidates = new _llama_token_data_array
-            {
-                data = nmem.Ptr,
-                size = candidates.data.Count,
-                sorted = candidates.sorted,
-            };
-
-            for (var i = 0; i < candidates.data.Count; i++)
-                Marshal.StructureToPtr(candidates.data[i], _candidates.data + i * usize, false);
-
-            _llama_sample_top_k(ctx, ref _candidates, k, min_keep);
-
-            candidates.data.Clear();
-            for (var i = 0; i < _candidates.size; i++)
-                candidates.data.Add(Marshal.PtrToStructure<llama_token_data>(_candidates.data + i * usize));
+            llama_token_data_array_wrapper(
+                ref candidates,
+                (ref _llama_token_data_array _candidates) =>
+                {
+                    _llama_sample_top_k(ctx, ref _candidates, k, min_keep);
+                }
+            );
         }
 
         /// <summary>
@@ -481,25 +477,13 @@ namespace LlamaCppLib
 
         public static void llama_sample_top_p(llama_context ctx, ref llama_token_data_array candidates, float p, int min_keep = 1)
         {
-            var usize = Marshal.SizeOf<llama_token_data>();
-            var tsize = usize * candidates.data.Count;
-
-            using var nmem = new NativeHGlobal(tsize);
-            var _candidates = new _llama_token_data_array
-            {
-                data = nmem.Ptr,
-                size = candidates.data.Count,
-                sorted = candidates.sorted,
-            };
-
-            for (var i = 0; i < candidates.data.Count; i++)
-                Marshal.StructureToPtr(candidates.data[i], _candidates.data + i * usize, false);
-
-            _llama_sample_top_p(ctx, ref _candidates, p, min_keep);
-
-            candidates.data.Clear();
-            for (var i = 0; i < _candidates.size; i++)
-                candidates.data.Add(Marshal.PtrToStructure<llama_token_data>(_candidates.data + i * usize));
+            llama_token_data_array_wrapper(
+                ref candidates,
+                (ref _llama_token_data_array _candidates) =>
+                {
+                    _llama_sample_top_p(ctx, ref _candidates, p, min_keep);
+                }
+            );
         }
 
         /// <summary>
@@ -514,25 +498,13 @@ namespace LlamaCppLib
 
         public static void llama_sample_tail_free(llama_context ctx, ref llama_token_data_array candidates, float z, int min_keep = 1)
         {
-            var usize = Marshal.SizeOf<llama_token_data>();
-            var tsize = usize * candidates.data.Count;
-
-            using var nmem = new NativeHGlobal(tsize);
-            var _candidates = new _llama_token_data_array
-            {
-                data = nmem.Ptr,
-                size = candidates.data.Count,
-                sorted = candidates.sorted,
-            };
-
-            for (var i = 0; i < candidates.data.Count; i++)
-                Marshal.StructureToPtr(candidates.data[i], _candidates.data + i * usize, false);
-
-            _llama_sample_tail_free(ctx, ref _candidates, z, min_keep);
-
-            candidates.data.Clear();
-            for (var i = 0; i < _candidates.size; i++)
-                candidates.data.Add(Marshal.PtrToStructure<llama_token_data>(_candidates.data + i * usize));
+            llama_token_data_array_wrapper(
+                ref candidates,
+                (ref _llama_token_data_array _candidates) =>
+                {
+                    _llama_sample_tail_free(ctx, ref _candidates, z, min_keep);
+                }
+            );
         }
 
         /// <summary>
@@ -547,25 +519,13 @@ namespace LlamaCppLib
 
         public static void llama_sample_typical(llama_context ctx, ref llama_token_data_array candidates, float p, int min_keep = 1)
         {
-            var usize = Marshal.SizeOf<llama_token_data>();
-            var tsize = usize * candidates.data.Count;
-
-            using var nmem = new NativeHGlobal(tsize);
-            var _candidates = new _llama_token_data_array
-            {
-                data = nmem.Ptr,
-                size = candidates.data.Count,
-                sorted = candidates.sorted,
-            };
-
-            for (var i = 0; i < candidates.data.Count; i++)
-                Marshal.StructureToPtr(candidates.data[i], _candidates.data + i * usize, false);
-
-            _llama_sample_typical(ctx, ref _candidates, p, min_keep);
-
-            candidates.data.Clear();
-            for (var i = 0; i < _candidates.size; i++)
-                candidates.data.Add(Marshal.PtrToStructure<llama_token_data>(_candidates.data + i * usize));
+            llama_token_data_array_wrapper(
+                ref candidates,
+                (ref _llama_token_data_array _candidates) =>
+                {
+                    _llama_sample_typical(ctx, ref _candidates, p, min_keep);
+                }
+            );
         }
 
         [DllImport("llama", EntryPoint = "llama_sample_temperature")]
@@ -573,25 +533,13 @@ namespace LlamaCppLib
 
         public static void llama_sample_temperature(llama_context ctx, ref llama_token_data_array candidates, float temp)
         {
-            var usize = Marshal.SizeOf<llama_token_data>();
-            var tsize = usize * candidates.data.Count;
-
-            using var nmem = new NativeHGlobal(tsize);
-            var _candidates = new _llama_token_data_array
-            {
-                data = nmem.Ptr,
-                size = candidates.data.Count,
-                sorted = candidates.sorted,
-            };
-
-            for (var i = 0; i < candidates.data.Count; i++)
-                Marshal.StructureToPtr(candidates.data[i], _candidates.data + i * usize, false);
-
-            _llama_sample_temperature(ctx, ref _candidates, temp);
-
-            candidates.data.Clear();
-            for (var i = 0; i < _candidates.size; i++)
-                candidates.data.Add(Marshal.PtrToStructure<llama_token_data>(_candidates.data + i * usize));
+            llama_token_data_array_wrapper(
+                ref candidates,
+                (ref _llama_token_data_array _candidates) =>
+                {
+                    _llama_sample_temperature(ctx, ref _candidates, temp);
+                }
+            );
         }
 
         /// <summary>
@@ -609,26 +557,18 @@ namespace LlamaCppLib
 
         public static llama_token llama_sample_token_mirostat(llama_context ctx, ref llama_token_data_array candidates, float tau, float eta, int m, ref float mu)
         {
-            var usize = Marshal.SizeOf<llama_token_data>();
-            var tsize = usize * candidates.data.Count;
+            var _mu = mu;
 
-            using var nmem = new NativeHGlobal(tsize);
-            var _candidates = new _llama_token_data_array
-            {
-                data = nmem.Ptr,
-                size = candidates.data.Count,
-                sorted = candidates.sorted,
-            };
+            var id = llama_token_data_array_wrapper(
+                ref candidates,
+                (ref _llama_token_data_array _candidates) =>
+                {
+                    var id = _llama_sample_token_mirostat(ctx, ref _candidates, tau, eta, m, ref _mu);
+                    return id;
+                }
+            );
 
-            for (var i = 0; i < candidates.data.Count; i++)
-                Marshal.StructureToPtr(candidates.data[i], _candidates.data + i * usize, false);
-
-            var id = _llama_sample_token_mirostat(ctx, ref _candidates, tau, eta, m, ref mu);
-
-            candidates.data.Clear();
-            for (var i = 0; i < _candidates.size; i++)
-                candidates.data.Add(Marshal.PtrToStructure<llama_token_data>(_candidates.data + i * usize));
-
+            mu = _mu;
             return id;
         }
 
@@ -646,26 +586,18 @@ namespace LlamaCppLib
 
         public static llama_token llama_sample_token_mirostat_v2(llama_context ctx, ref llama_token_data_array candidates, float tau, float eta, ref float mu)
         {
-            var usize = Marshal.SizeOf<llama_token_data>();
-            var tsize = usize * candidates.data.Count;
+            var _mu = mu;
 
-            using var nmem = new NativeHGlobal(tsize);
-            var _candidates = new _llama_token_data_array
-            {
-                data = nmem.Ptr,
-                size = candidates.data.Count,
-                sorted = candidates.sorted,
-            };
+            var id = llama_token_data_array_wrapper(
+                ref candidates,
+                (ref _llama_token_data_array _candidates) =>
+                {
+                    var id = _llama_sample_token_mirostat_v2(ctx, ref _candidates, tau, eta, ref _mu);
+                    return id;
+                }
+            );
 
-            for (var i = 0; i < candidates.data.Count; i++)
-                Marshal.StructureToPtr(candidates.data[i], _candidates.data + i * usize, false);
-
-            var id = _llama_sample_token_mirostat_v2(ctx, ref _candidates, tau, eta, ref mu);
-
-            candidates.data.Clear();
-            for (var i = 0; i < _candidates.size; i++)
-                candidates.data.Add(Marshal.PtrToStructure<llama_token_data>(_candidates.data + i * usize));
-
+            mu = _mu;
             return id;
         }
 
@@ -680,27 +612,13 @@ namespace LlamaCppLib
 
         public static llama_token llama_sample_token_greedy(llama_context ctx, ref llama_token_data_array candidates)
         {
-            var usize = Marshal.SizeOf<llama_token_data>();
-            var tsize = usize * candidates.data.Count;
-
-            using var nmem = new NativeHGlobal(tsize);
-            var _candidates = new _llama_token_data_array
-            {
-                data = nmem.Ptr,
-                size = candidates.data.Count,
-                sorted = candidates.sorted,
-            };
-
-            for (var i = 0; i < candidates.data.Count; i++)
-                Marshal.StructureToPtr(candidates.data[i], _candidates.data + i * usize, false);
-
-            var id = _llama_sample_token_greedy(ctx, ref _candidates);
-
-            candidates.data.Clear();
-            for (var i = 0; i < _candidates.size; i++)
-                candidates.data.Add(Marshal.PtrToStructure<llama_token_data>(_candidates.data + i * usize));
-
-            return id;
+            return llama_token_data_array_wrapper(
+                ref candidates,
+                (ref _llama_token_data_array _candidates) =>
+                {
+                    return _llama_sample_token_greedy(ctx, ref _candidates);
+                }
+            );
         }
 
         /// <summary>
