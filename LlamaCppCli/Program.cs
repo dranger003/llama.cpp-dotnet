@@ -17,16 +17,16 @@ namespace LlamaCppCli
         {
             ThreadCount = Environment.ProcessorCount / 2, // Assuming hyperthreading
             TopK = 40,
-            TopP = 1.0f,
-            Temperature = 1.0f,
-            RepeatPenalty = 1.0f,
+            TopP = 0.95f,
+            Temperature = 0.8f,
+            RepeatPenalty = 1.1f,
 
-            // New sampling options
+            // Mirostat sampling options
             TfsZ = 1.0f,
-            TypicalP = 1.0f,
+            TypicalP = 0.95f,
             FrequencyPenalty = 0.0f,
             PresencePenalty = 0.0f,
-            Mirostat = 1,           // 0 = Disabled, 1 = Mirostat, 2 = Mirostat 2.0
+            Mirostat = 2,           // 0 = Disabled, 1 = Mirostat, 2 = Mirostat 2.0
             MirostatTAU = 5.0f,     // Target entropy
             MirostatETA = 0.10f,    // Learning rate
             PenalizeNewLine = true,
@@ -43,9 +43,8 @@ namespace LlamaCppCli
         static async Task Main(string[] args)
         {
 #if DEBUG
-            args = new[] { "2", @"D:\LLM_MODELS\lmsys\ggml-vicuna-13b-v1.1-q5_1.bin", "Vicuna v1.1" };
+            args = new[] { "0", @"D:\LLM_MODELS\lmsys\ggml-vicuna-13b-v1.1-q5_1.bin", @"..\..\template_vicuna-v1.1.txt" };
 #endif
-
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
                 (nameof(RawInterfaceSample), RawInterfaceSample),
@@ -74,13 +73,13 @@ namespace LlamaCppCli
 
             if (!Path.Exists(args[1]))
             {
-                Console.WriteLine($"ERROR: Model not found ({args[1]}).");
+                Console.WriteLine($"ERROR: Model not found ({Path.GetFullPath(args[1])}).");
                 return;
             }
 
             if (args.Length > 2 && !Path.Exists(args[2]))
             {
-                Console.WriteLine($"ERROR: Template not found ({args[2]}).");
+                Console.WriteLine($"ERROR: Template not found ({Path.GetFullPath(args[2])}).");
                 return;
             }
 
@@ -104,7 +103,12 @@ namespace LlamaCppCli
             Console.WriteLine($"Running sample ({nameof(RawInterfaceSample)})...");
 
             var aparams = new GptParams();
-            aparams.parse(args);
+            aparams.Parse(args);
+            {
+                aparams.use_mmap = false;
+                aparams.use_mlock = false;
+                aparams.mirostat = 2;
+            }
 
             var cparams = LlamaCppInterop.llama_context_default_params();
             cparams.n_ctx = aparams.n_ctx;
@@ -124,19 +128,24 @@ namespace LlamaCppCli
 
             Console.WriteLine(LlamaCppInterop.llama_print_system_info());
 
+            Console.WriteLine(
+                $"sampling: " +
+                $"repeat_last_n = {aparams.repeat_last_n}, repeat_penalty = {aparams.repeat_penalty}, presence_penalty = {aparams.presence_penalty}, frequency_penalty = {aparams.frequency_penalty}, " +
+                $"top_k = {aparams.top_k}, tfs_z = {aparams.tfs_z}, top_p = {aparams.top_p}, typical_p = {aparams.typical_p}, temp = {aparams.temp}, mirostat = {aparams.mirostat}, " +
+                $"mirostat_lr = {aparams.mirostat_eta}, mirostat_ent = {aparams.mirostat_tau}"
+            );
+
             var prompt = Prompts.First();
             Console.WriteLine(prompt);
 
             if (args.Length > 1)
                 prompt = String.Format(LoadTemplate(args[1]), prompt);
 
-            var tokens = LlamaCppInterop.llama_tokenize(ctx, $"{prompt}", true);
-
-            var sampled = new List<LlamaToken>(tokens);
-            var context = new List<LlamaToken>();
+            var embd_inp = new List<LlamaToken>(LlamaCppInterop.llama_tokenize(ctx, $"{prompt}", true));
+            var last_n_tokens = new List<LlamaToken>(Enumerable.Repeat(0, aparams.n_ctx));
+            var embd = new List<LlamaToken>();
 
             var conversation = new StringBuilder(prompt);
-
             var done = false;
 
             Console.CancelKeyPress += (s, e) =>
@@ -146,80 +155,105 @@ namespace LlamaCppCli
             };
 
             var mirostat_mu = 2.0f * aparams.mirostat_tau;
+            var mirostat_m = 100;
+
+            var n_past = 0;
+            var n_consumed = 0;
 
             while (!done)
             {
-                // TODO: Context management
-
-                LlamaCppInterop.llama_eval(ctx, sampled, context.Count, Options.ThreadCount ?? 0);
-                context.AddRange(sampled);
-
-                //var id = LlamaCppInterop.llama_sample_top_p_top_k(model, context, Options.TopK ?? 0, Options.TopP ?? 0, Options.Temperature ?? 0, Options.RepeatPenalty ?? 0);
-                var id = default(LlamaToken);
+                if (embd.Any())
                 {
-                    var logits = LlamaCppInterop.llama_get_logits(ctx);
-                    var vocabCount = LlamaCppInterop.llama_n_vocab(ctx);
+                    LlamaCppInterop.llama_eval(ctx, embd, n_past, Options.ThreadCount ?? 1);
+                    n_past += embd.Count;
+                }
 
-                    // Apply logit biases
-                    foreach (var logit in aparams.logit_bias)
-                        logits[logit.Key] += logit.Value;
+                embd.Clear();
 
-                    var candidates = new List<LlamaCppInterop.LlamaTokenData>();
-                    for (LlamaToken tokenId = 0; tokenId < vocabCount; tokenId++)
-                        candidates.Add(new LlamaCppInterop.LlamaTokenData { id = tokenId, logit = logits[tokenId], p = 0.0f });
-
-                    var candidates_p = new LlamaCppInterop.LlamaTokenDataArrayManaged { data = candidates, sorted = false };
-
-                    // Apply penalties
-                    var nl_logit = logits[LlamaCppInterop.llama_token_nl()];
-                    //var last_n_repeat = Math.Min(Math.Min(context.Count, aparams.repeat_last_n), cparams.n_ctx);
-
-                    LlamaCppInterop.llama_sample_repetition_penalty(ctx, candidates_p, context, aparams.repeat_penalty);
-                    LlamaCppInterop.llama_sample_frequency_and_presence_penalties(ctx, candidates_p, context, aparams.frequency_penalty, aparams.presence_penalty);
-
-                    if (!aparams.penalize_nl)
-                        logits[LlamaCppInterop.llama_token_nl()] = nl_logit;
-
-                    if (aparams.temp <= 0)
+                if (embd_inp.Count <= n_consumed)
+                {
+                    var id = default(LlamaToken);
                     {
-                        // Greedy sampling
-                        id = LlamaCppInterop.llama_sample_token_greedy(ctx, candidates_p);
-                    }
-                    else
-                    {
-                        if (aparams.mirostat == 1)
+                        var logits = LlamaCppInterop.llama_get_logits(ctx);
+                        var n_vocab = LlamaCppInterop.llama_n_vocab(ctx);
+
+                        // Apply logit biases
+                        foreach (var logit in aparams.logit_bias)
+                            logits[logit.Key] += logit.Value;
+
+                        var candidates = new List<LlamaCppInterop.llama_token_data>(n_vocab);
+                        for (LlamaToken tokenId = 0; tokenId < n_vocab; tokenId++)
+                            candidates.Add(new LlamaCppInterop.llama_token_data { id = tokenId, logit = logits[tokenId], p = 0.0f });
+
+                        var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates, sorted = false };
+
+                        // Apply penalties
+                        var last_repeat = last_n_tokens
+                            .TakeLast(Math.Min(Math.Min(last_n_tokens.Count, aparams.repeat_last_n), aparams.n_ctx))
+                            .ToList();
+
+                        LlamaCppInterop.llama_sample_repetition_penalty(ctx, ref candidates_p, last_repeat, aparams.repeat_penalty);
+                        LlamaCppInterop.llama_sample_frequency_and_presence_penalties(ctx, ref candidates_p, last_repeat, aparams.frequency_penalty, aparams.presence_penalty);
+
+                        if (!aparams.penalize_nl)
+                            logits[LlamaCppInterop.llama_token_nl()] = logits[LlamaCppInterop.llama_token_nl()];
+
+                        if (aparams.temp <= 0)
                         {
-                            var mirostat_m = 100;
-                            LlamaCppInterop.llama_sample_temperature(ctx, candidates_p, aparams.temp);
-                            id = LlamaCppInterop.llama_sample_token_mirostat(ctx, candidates_p, aparams.mirostat_tau, aparams.mirostat_eta, mirostat_m, ref mirostat_mu);
-                        }
-                        else if (aparams.mirostat == 2)
-                        {
-                            LlamaCppInterop.llama_sample_temperature(ctx, candidates_p, aparams.temp);
-                            id = LlamaCppInterop.llama_sample_token_mirostat_v2(ctx, candidates_p, aparams.mirostat_tau, aparams.mirostat_eta, ref mirostat_mu);
+                            // Greedy sampling
+                            id = LlamaCppInterop.llama_sample_token_greedy(ctx, ref candidates_p);
                         }
                         else
                         {
-                            // Temperature sampling
-                            LlamaCppInterop.llama_sample_top_k(ctx, candidates_p, aparams.top_k);
-                            LlamaCppInterop.llama_sample_tail_free(ctx, candidates_p, aparams.tfs_z);
-                            LlamaCppInterop.llama_sample_typical(ctx, candidates_p, aparams.typical_p);
-                            LlamaCppInterop.llama_sample_top_p(ctx, candidates_p, aparams.top_p);
-                            LlamaCppInterop.llama_sample_temperature(ctx, candidates_p, aparams.temp);
-                            id = LlamaCppInterop.llama_sample_token(ctx, candidates_p);
+                            if (aparams.mirostat == 1)
+                            {
+                                LlamaCppInterop.llama_sample_temperature(ctx, ref candidates_p, aparams.temp);
+                                id = LlamaCppInterop.llama_sample_token_mirostat(ctx, ref candidates_p, aparams.mirostat_tau, aparams.mirostat_eta, mirostat_m, ref mirostat_mu);
+                            }
+                            else if (aparams.mirostat == 2)
+                            {
+                                LlamaCppInterop.llama_sample_temperature(ctx, ref candidates_p, aparams.temp);
+                                id = LlamaCppInterop.llama_sample_token_mirostat_v2(ctx, ref candidates_p, aparams.mirostat_tau, aparams.mirostat_eta, ref mirostat_mu);
+                            }
+                            else
+                            {
+                                // Temperature sampling
+                                LlamaCppInterop.llama_sample_top_k(ctx, ref candidates_p, aparams.top_k);
+                                LlamaCppInterop.llama_sample_tail_free(ctx, ref candidates_p, aparams.tfs_z);
+                                LlamaCppInterop.llama_sample_typical(ctx, ref candidates_p, aparams.typical_p);
+                                LlamaCppInterop.llama_sample_top_p(ctx, ref candidates_p, aparams.top_p);
+                                LlamaCppInterop.llama_sample_temperature(ctx, ref candidates_p, aparams.temp);
+                                id = LlamaCppInterop.llama_sample_token(ctx, ref candidates_p);
+                            }
                         }
+
+                        last_n_tokens.RemoveAt(0);
+                        last_n_tokens.Add(id);
+                    }
+
+                    embd.Add(id);
+                }
+                else
+                {
+                    while (embd_inp.Count > n_consumed)
+                    {
+                        embd.Add(embd_inp[n_consumed]);
+                        last_n_tokens.RemoveAt(0);
+                        last_n_tokens.Add(embd_inp[n_consumed]);
+                        ++n_consumed;
                     }
                 }
 
-                sampled.ClearAdd(id);
+                foreach (var id in embd)
+                {
+                    var str = LlamaCppInterop.llama_token_to_str(ctx, id);
+                    conversation.Append(str);
 
-                var str = LlamaCppInterop.llama_token_to_str(ctx, id);
-                conversation.Append(str);
+                    Console.Write(str);
 
-                Console.Write(str);
-
-                if (id == LlamaCppInterop.llama_token_eos())
-                    done = true;
+                    if (id == LlamaCppInterop.llama_token_eos())
+                        done = true;
+                }
             }
 
             LlamaCppInterop.llama_print_timings(ctx);
