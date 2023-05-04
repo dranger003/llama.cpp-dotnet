@@ -55,7 +55,7 @@
         public GptParams()
         { }
 
-        public bool parse(string[] args)
+        public bool Parse(string[] args)
         {
             // Typically here we would map command line arguments to each field
             // For now we use the internal program values from the code
