@@ -4,7 +4,7 @@
 
 ### Description
 
-C# bindings for llama.cpp including a .NET core library and sample projects (cli & web).
+C# bindings for llama.cpp including a .NET core library and sample projects (CLI & Web).
 
 ![demo-web](https://user-images.githubusercontent.com/1760549/233868319-59dda027-4279-462f-9233-2825856cded9.gif)
 
@@ -22,30 +22,25 @@ dotnet build -c Release
 Windows:
 ```
 cd x64\Release
-LlamaCppCli.exe 4 ggml-vicuna-13b-1.1-q4_0.bin
+LlamaCppCli.exe 3 ggml-vicuna-13b-1.1-q8_0.bin
 ```
 
 Linux:
 ```
 cd x64/Release
-./LlamaCppCli 4 ggml-vicuna-13b-1.1-q4_0.bin
+./LlamaCppCli 3 ggml-vicuna-13b-1.1-q8_0.bin
 ```
 
 ## Usage
 ```
 USAGE:
-    LlamaCppCli <SampleIndex> <ModelPath> [TemplateName]
+    LlamaCppCli.dll <SampleIndex> <ModelPath> [TemplatePath]
 SAMPLES:
-    [1] = RawInterfaceSample
-    [2] = WrappedInterfaceSampleWithoutSession
-    [3] = WrappedInterfaceSampleWithSession
-    [4] = WrappedInterfaceSampleWithSessionInteractive
-    [5] = GetEmbeddings
-TEMPLATES:
-    "Vicuna v1.1"
-    "Alpaca (no input)"
-    "Alpaca (input)"
-    "WizardLM"
+    [0] = RawInterfaceSample
+    [1] = WrappedInterfaceSampleWithoutSession
+    [2] = WrappedInterfaceSampleWithSession
+    [3] = WrappedInterfaceSampleWithSessionInteractive
+    [4] = GetEmbeddings
 ```
 
 ## Models
