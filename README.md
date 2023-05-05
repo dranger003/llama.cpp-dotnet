@@ -59,44 +59,44 @@ Some models can be found below.
 - [TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g-GGML](https://huggingface.co/TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g-GGML/tree/main)
 - [TheBloke/wizardLM-7B-GGML](https://huggingface.co/TheBloke/wizardLM-7B-GGML)
 
-### Sample Code (CLI)
+### Sample Code (interactive CLI)
 ```
 using LlamaCppLib;
 
-using (var model = new LlamaCpp("Model X"))
+// Configure some model options
+var options = new LlamaCppOptions
 {
-    // Load model
-    model.Load("ggml-vicuna-13b-v1.1-q4_0.bin");
+    ThreadCount = 4,
+    TopK = 40,
+    TopP = 0.95f,
+    Temperature = 0.8f,
+    RepeatPenalty = 1.1f,
+    Mirostat = Mirostat.Mirostat2,
+};
 
-    // Configure model
-    model.Configure(options =>
-    {
-        options.ThreadCount = 4;
-        options.TopK = 50;
-        options.TopP = 0.95f;
-        options.Temperature = 0.1f;
-        options.RepeatPenalty = 1.1f;
-    });
+// Create new named model with options
+using var model = new LlamaCpp("Vicuna v1.1", options);
 
-    // Create a new conversation session
-    var session = model.CreateSession("Conversation X");
+// Load model file
+model.Load(@"ggml-vicuna-13b-v1.1-q8_0.bin");
 
-    while (true)
-    {
-        // Get a prompt
-        Console.Write("> ");
-        var prompt = Console.ReadLine();
+// Create new conversation session and configure prompt template
+var session = model.CreateSession(ConversationName);
+session.Configure(options => options.Template = File.ReadAllText(@"template_vicuna-v1.1.txt"));
 
-        // Quit on blank prompt
-        if (String.IsNullOrWhiteSpace(prompt))
-            break;
+while (true)
+{
+    // Get a prompt
+    Console.Write("> ");
+    var prompt = Console.ReadLine();
 
-        // If your model needs a template, here you would format it
+    // Quit on blank prompt
+    if (String.IsNullOrWhiteSpace(prompt))
+        break;
 
-        // Run the predictions
-        await foreach (var token in session.Predict(prompt))
-            Console.Write(token);
-    }
+    // Run the predictions
+    await foreach (var token in session.Predict(prompt))
+        Console.Write(token);
 }
 ```
 
