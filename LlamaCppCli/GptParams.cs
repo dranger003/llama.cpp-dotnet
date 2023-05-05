@@ -60,18 +60,16 @@
             // Typically here we would map command line arguments to each field
             // For now we use the internal program values from the code
 
-            seed = Program.Seed;
+            seed = Program.Options.Seed ?? 0;
             n_threads = Program.Options.ThreadCount ?? n_threads;
-            n_ctx = Program.ContextSize;
-
+            n_ctx = Program.Options.ContextSize ?? 512;
             top_k = Program.Options.TopK ?? top_k;
             top_p = Program.Options.TopP ?? top_p;
             temp = Program.Options.Temperature ?? temp;
             repeat_penalty = Program.Options.RepeatPenalty ?? repeat_penalty;
 
             model = args[0];
-
-            use_mlock = true;
+            use_mlock = false;
 
             return false;
         }

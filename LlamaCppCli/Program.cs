@@ -10,11 +10,17 @@ namespace LlamaCppCli
     internal class Program
     {
         // TODO: Change these to suit your needs
-        public static int ContextSize = 2048;
-        public static int Seed = 0;
-
         public static LlamaCppOptions Options = new()
         {
+            Seed = 0,
+            PredictCount = -1,
+            ContextSize = 2048,
+            LastTokenCountPenalty = 64,
+            UseHalf = false,
+            NewLinePenalty = false,
+            UseMemoryMapping = false,
+            UseMemoryLocking = false,
+
             ThreadCount = Environment.ProcessorCount / 2, // Assuming hyperthreading
             TopK = 40,
             TopP = 0.95f,
@@ -26,7 +32,7 @@ namespace LlamaCppCli
             TypicalP = 0.95f,
             FrequencyPenalty = 0.0f,
             PresencePenalty = 0.0f,
-            Mirostat = 2,           // 0 = Disabled, 1 = Mirostat, 2 = Mirostat 2.0
+            Mirostat = Mirostat.Mirostat2,
             MirostatTAU = 5.0f,     // Target entropy
             MirostatETA = 0.10f,    // Learning rate
             PenalizeNewLine = true,
@@ -105,9 +111,26 @@ namespace LlamaCppCli
             var aparams = new GptParams();
             aparams.Parse(args);
             {
-                aparams.use_mmap = false;
-                aparams.use_mlock = false;
-                aparams.mirostat = 2;
+                aparams.seed = Options.Seed ?? 0;
+                aparams.n_threads = Options.ThreadCount ?? 1;
+                aparams.n_predict = Options.PredictCount ?? -1;
+                aparams.n_ctx = Options.ContextSize ?? 512;
+                aparams.top_k = Options.TopK ?? 40;
+                aparams.top_p = Options.TopP ?? 0.95f;
+                aparams.tfs_z = Options.TfsZ ?? 1.0f;
+                aparams.typical_p = Options.TypicalP ?? 1.0f;
+                aparams.temp = Options.Temperature ?? 0.8f;
+                aparams.repeat_penalty = Options.RepeatPenalty ?? 1.1f;
+                aparams.repeat_last_n = Options.LastTokenCountPenalty ?? 64;
+                aparams.frequency_penalty = Options.FrequencyPenalty ?? 0.0f;
+                aparams.presence_penalty = Options.PresencePenalty ?? 0.0f;
+                aparams.mirostat = (int)(Options.Mirostat ?? 0);
+                aparams.mirostat_tau = Options.MirostatTAU ?? 5.0f;
+                aparams.mirostat_eta = Options.MirostatETA ?? 0.1f;
+                aparams.memory_f16 = Options.UseHalf ?? true;
+                aparams.penalize_nl = Options.NewLinePenalty ?? true;
+                aparams.use_mmap = Options.UseMemoryMapping ?? false;
+                aparams.use_mlock = Options.UseMemoryLocking ?? false;
             }
 
             var cparams = LlamaCppInterop.llama_context_default_params();
@@ -127,16 +150,9 @@ namespace LlamaCppCli
                 LlamaCppInterop.llama_apply_lora_from_file(ctx, aparams.lora_adapter, aparams.lora_base, aparams.n_threads);
 
             Console.WriteLine(LlamaCppInterop.llama_print_system_info());
-
-            Console.WriteLine(
-                $"sampling: " +
-                $"repeat_last_n = {aparams.repeat_last_n}, repeat_penalty = {aparams.repeat_penalty}, presence_penalty = {aparams.presence_penalty}, frequency_penalty = {aparams.frequency_penalty}, " +
-                $"top_k = {aparams.top_k}, tfs_z = {aparams.tfs_z}, top_p = {aparams.top_p}, typical_p = {aparams.typical_p}, temp = {aparams.temp}, mirostat = {aparams.mirostat}, " +
-                $"mirostat_lr = {aparams.mirostat_eta}, mirostat_ent = {aparams.mirostat_tau}"
-            );
+            PrintParams(aparams);
 
             var prompt = Prompts.First();
-            Console.WriteLine(prompt);
 
             if (args.Length > 1)
                 prompt = String.Format(LoadTemplate(args[1]), prompt);
@@ -276,10 +292,9 @@ namespace LlamaCppCli
                 cts.Cancel();
             };
 
-            using (var model = new LlamaCpp(ModelName))
+            using (var model = new LlamaCpp(ModelName, Options))
             {
-                model.Load(args[0], ContextSize, Seed);
-                model.Configure(Options);
+                model.Load(args[0]);
 
                 var prompt = Prompts.First();
                 Console.WriteLine(prompt);
@@ -314,10 +329,9 @@ namespace LlamaCppCli
                 cts.Cancel();
             };
 
-            using (var model = new LlamaCpp(ModelName))
+            using (var model = new LlamaCpp(ModelName, Options))
             {
                 model.Load(args[0]);
-                model.Configure(Options);
 
                 var session = model.CreateSession(ConversationName);
 
@@ -349,17 +363,16 @@ namespace LlamaCppCli
                 cts.Cancel();
             };
 
-            using (var model = new LlamaCpp(ModelName))
+            using (var model = new LlamaCpp(ModelName, Options))
             {
                 model.Load(args[0]);
-                model.Configure(Options);
 
                 var session = model.CreateSession(ConversationName);
 
                 if (args.Length > 1)
                     session.Configure(options => options.Template = File.ReadAllText(args[1]));
 
-                Console.WriteLine($"Entering interactive mode.");
+                Console.WriteLine($"\nEntering interactive mode.");
                 Console.WriteLine($"Press <Ctrl+C> to interrupt a response.");
                 Console.WriteLine($"Press <Enter> on an emptpy prompt to quit.");
                 Console.WriteLine();
@@ -384,21 +397,62 @@ namespace LlamaCppCli
             }
         }
 
+        // Unused, besides making sure the github sample compiles fine
+        static async Task GithubReadmeSample()
+        {
+            // Configure some model options
+            var options = new LlamaCppOptions
+            {
+                ThreadCount = 4,
+                TopK = 40,
+                TopP = 0.95f,
+                Temperature = 0.8f,
+                RepeatPenalty = 1.1f,
+                Mirostat = Mirostat.Mirostat2,
+            };
+
+            // Create new named model with options
+            using var model = new LlamaCpp("Vicuna v1.1", options);
+
+            // Load model file
+            model.Load(@"ggml-vicuna-13b-v1.1-q8_0.bin");
+
+            // Create new conversation session and configure prompt template
+            var session = model.CreateSession(ConversationName);
+            session.Configure(options => options.Template = File.ReadAllText(@"template_vicuna-v1.1.txt"));
+
+            while (true)
+            {
+                // Get a prompt
+                Console.Write("> ");
+                var prompt = Console.ReadLine();
+
+                // Quit on blank prompt
+                if (String.IsNullOrWhiteSpace(prompt))
+                    break;
+
+                // Run the predictions
+                await foreach (var token in session.Predict(prompt))
+                    Console.Write(token);
+            }
+        }
+
         static async Task GetEmbeddings(string[] args)
         {
             Console.WriteLine($"Running sample ({nameof(GetEmbeddings)})...");
 
-            var n_threads = Options.ThreadCount ?? 0;
+            var n_threads = Options.ThreadCount ?? 1;
             var n_past = 0;
 
             var cparams = LlamaCppInterop.llama_context_default_params();
-            cparams.n_ctx = ContextSize;
+            cparams.n_ctx = Options.ContextSize ?? 512;
             cparams.embedding = true;
 
             var handle = LlamaCppInterop.llama_init_from_file(args[0], cparams);
             Console.WriteLine(LlamaCppInterop.llama_print_system_info());
 
             var embd_inp = LlamaCppInterop.llama_tokenize(handle, Prompts.First(), true);
+
             if (embd_inp.Count > 0)
             {
                 LlamaCppInterop.llama_eval(handle, embd_inp, n_past, n_threads);
@@ -423,6 +477,16 @@ namespace LlamaCppCli
             Console.WriteLine($"| Transcript                                                                                       |");
             Console.WriteLine($" --------------------------------------------------------------------------------------------------");
             Console.Write(conversation.Trim());
+        }
+
+        static void PrintParams(GptParams aparams)
+        {
+            Console.WriteLine(
+                $"sampling: " +
+                $"repeat_last_n = {aparams.repeat_last_n}, repeat_penalty = {aparams.repeat_penalty}, presence_penalty = {aparams.presence_penalty}, frequency_penalty = {aparams.frequency_penalty}, " +
+                $"top_k = {aparams.top_k}, tfs_z = {aparams.tfs_z}, top_p = {aparams.top_p}, typical_p = {aparams.typical_p}, temp = {aparams.temp}, mirostat = {aparams.mirostat}, " +
+                $"mirostat_lr = {aparams.mirostat_eta}, mirostat_ent = {aparams.mirostat_tau}"
+            );
         }
     }
 }

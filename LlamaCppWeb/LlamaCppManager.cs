@@ -39,21 +39,20 @@ namespace LlamaCppLib
             if (_model == null)
             {
                 var modelPath = _configuration.Models[modelIndex].Path ?? String.Empty;
-
-                _model = new LlamaCpp(modelName);
-                _model.Load(modelPath);
-
                 var modelOptions = _configuration.Models[modelIndex].Options;
 
                 // Use model options, with fallback on global options
-                _model.Configure(configure =>
+                var options = new LlamaCppOptions
                 {
-                    configure.ThreadCount = modelOptions.ThreadCount ?? _configuration.ThreadCount;
-                    configure.TopK = modelOptions.TopK ?? _configuration.TopK;
-                    configure.TopP = modelOptions.TopP ?? _configuration.TopP;
-                    configure.Temperature = modelOptions.Temperature ?? _configuration.Temperature;
-                    configure.RepeatPenalty = modelOptions.RepeatPenalty ?? _configuration.RepeatPenalty;
-                });
+                    ThreadCount = modelOptions.ThreadCount ?? _configuration.ThreadCount,
+                    TopK = modelOptions.TopK ?? _configuration.TopK,
+                    TopP = modelOptions.TopP ?? _configuration.TopP,
+                    Temperature = modelOptions.Temperature ?? _configuration.Temperature,
+                    RepeatPenalty = modelOptions.RepeatPenalty ?? _configuration.RepeatPenalty,
+                };
+
+                _model = new LlamaCpp(modelName, options);
+                _model.Load(modelPath);
             }
         }
 

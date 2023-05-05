@@ -11,7 +11,11 @@ namespace LlamaCppLib
         private string _modelName;
         private LlamaCppOptions _options = new();
 
-        public LlamaCpp(string name) => _modelName = name;
+        public LlamaCpp(string name, LlamaCppOptions options)
+        {
+            _modelName = name;
+            _options = options;
+        }
 
         public void Dispose()
         {
@@ -44,14 +48,13 @@ namespace LlamaCppLib
         /// <param name="modelPath">Specify the path to the LLaMA model file</param>
         /// <param name="contextSize">The context option allows you to set the size of the prompt context used by the LLaMA models during text generation. A larger context size helps the model to better comprehend and generate responses for longer input or conversations. Set the size of the prompt context (default: 2048). The LLaMA models were built with a context of 2048, which will yield the best results on longer input/inference. However, increasing the context size beyond 2048 may lead to unpredictable results.</param>
         /// <param name="seed">The RNG seed is used to initialize the random number generator that influences the text generation process. By setting a specific seed value, you can obtain consistent and reproducible results across multiple runs with the same input and settings. This can be helpful for testing, debugging, or comparing the effects of different options on the generated text to see when they diverge. If the seed is set to a value less than or equal to 0, a random seed will be used, which will result in different outputs on each run.</param>
-        /// <param name="keyValuesF16">Use 32 bit floats instead of 16 bit floats for memory key+value, allowing higher quality inference at the cost of memory.</param>
         /// <param name="loraPath">Apply a LoRA (Low-Rank Adaptation) adapter to the model (will override use_mmap=false). This allows you to adapt the pretrained model to specific tasks or domains.</param>
         /// <param name="loraBaseModelPath">Optional model to use as a base for the layers modified by the LoRA adapter. This flag is used in conjunction with the lora model path, and specifies the base model for the adaptation.</param>
         /// <exception cref="FileNotFoundException"></exception>
         /// <exception cref="InvalidOperationException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="Exception"></exception>
-        public void Load(string modelPath, int contextSize = 2048, int seed = 0, string? loraPath = null, string? loraBaseModelPath = null)
+        public void Load(string modelPath, string? loraPath = null, string? loraBaseModelPath = null)
         {
             if (!File.Exists(modelPath))
                 throw new FileNotFoundException($"Model file not found \"{modelPath}\".");
@@ -65,14 +68,14 @@ namespace LlamaCppLib
                 throw new FileNotFoundException($"LoRA adapter file not found \"{loraPath}\".");
 
             var cparams = LlamaCppInterop.llama_context_default_params();
-            cparams.n_ctx = contextSize;
+            cparams.n_ctx = _options.ContextSize ?? 512;
             cparams.n_parts = -1;
-            cparams.seed = seed;
-            cparams.f16_kv = true;
+            cparams.seed = _options.Seed ?? 0;
+            cparams.f16_kv = _options.UseHalf ?? true;
             cparams.logits_all = false;
             cparams.vocab_only = false;
-            cparams.use_mmap = useLora ? false : cparams.use_mmap; // Override to false for LoRA
-            cparams.use_mlock = true;
+            cparams.use_mmap = useLora ? false : (_options.UseMemoryMapping ?? cparams.use_mmap);
+            cparams.use_mlock = _options.UseMemoryLocking ?? false;
             cparams.embedding = false;
 
             _model = LlamaCppInterop.llama_init_from_file(modelPath, cparams);
@@ -164,13 +167,13 @@ namespace LlamaCppLib
             }
             else
             {
-                if (_options.Mirostat == 1)
+                if (_options.Mirostat == Mirostat.Mirostat)
                 {
                     var mirostat_m = 100;
                     LlamaCppInterop.llama_sample_temperature(_model, ref candidates_p, _options.Temperature ?? 0);
                     id = LlamaCppInterop.llama_sample_token_mirostat(_model, ref candidates_p, _options.MirostatTAU ?? 0, _options.MirostatETA ?? 0, mirostat_m, ref mirostatMU);
                 }
-                else if (_options.Mirostat == 2)
+                else if (_options.Mirostat == Mirostat.Mirostat2)
                 {
                     LlamaCppInterop.llama_sample_temperature(_model, ref candidates_p, _options.Temperature ?? 0);
                     id = LlamaCppInterop.llama_sample_token_mirostat_v2(_model, ref candidates_p, _options.MirostatTAU ?? 0, _options.MirostatETA ?? 0, ref mirostatMU);
