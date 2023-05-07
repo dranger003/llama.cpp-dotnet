@@ -173,11 +173,11 @@ namespace LlamaCppLib
         /// <returns></returns>
         public static bool llama_load_session_file(llama_context ctx, string path_session, out List<llama_token> tokens_out, int n_token_count)
         {
-            using var native_ptr = new NativeHGlobal(n_token_count * sizeof(llama_token));
-            var result = _llama_load_session_file(ctx, path_session, native_ptr.Ptr, n_token_count, out var n_token_count_out);
+            using var native_mem = new NativeHGlobal(n_token_count * sizeof(llama_token));
+            var result = _llama_load_session_file(ctx, path_session, native_mem.Ptr, n_token_count, out var n_token_count_out);
 
             var tokens = new llama_token[n_token_count_out];
-            Marshal.Copy(native_ptr.Ptr, tokens, 0, tokens.Length);
+            Marshal.Copy(native_mem.Ptr, tokens, 0, tokens.Length);
             tokens_out = new(tokens);
 
             return result;
@@ -196,9 +196,9 @@ namespace LlamaCppLib
         /// <returns></returns>
         public static bool llama_save_session_file(llama_context ctx, string path_session, List<llama_token> tokens)
         {
-            using var native_ptr = new NativeHGlobal(tokens.Count * sizeof(llama_token));
-            Marshal.Copy(tokens.ToArray(), 0, native_ptr.Ptr, tokens.Count);
-            var result = _llama_save_session_file(ctx, path_session, native_ptr.Ptr, tokens.Count);
+            using var native_mem = new NativeHGlobal(tokens.Count * sizeof(llama_token));
+            Marshal.Copy(tokens.ToArray(), 0, native_mem.Ptr, tokens.Count);
+            var result = _llama_save_session_file(ctx, path_session, native_mem.Ptr, tokens.Count);
 
             return result;
         }
@@ -218,9 +218,9 @@ namespace LlamaCppLib
         public static int llama_eval(llama_context ctx, List<llama_token> tokens, int n_past, int n_threads)
         {
             var count = tokens.Count;
-            using var native_ptr = new NativeHGlobal(count * sizeof(llama_token));
-            Marshal.Copy(tokens.ToArray(), 0, native_ptr.Ptr, count);
-            var res = _llama_eval(ctx, native_ptr.Ptr, count, n_past, n_threads);
+            using var native_mem = new NativeHGlobal(count * sizeof(llama_token));
+            Marshal.Copy(tokens.ToArray(), 0, native_mem.Ptr, count);
+            var res = _llama_eval(ctx, native_mem.Ptr, count, n_past, n_threads);
 
             return res;
         }
@@ -242,14 +242,14 @@ namespace LlamaCppLib
         public static List<llama_token> llama_tokenize(llama_context ctx, string text, bool add_bos = false)
         {
             var count = text.Length + (add_bos ? 1 : 0);
-            using var native_ptr = new NativeHGlobal(count * sizeof(llama_token));
-            var result = _llama_tokenize(ctx, text, native_ptr.Ptr, count, add_bos);
+            using var native_mem = new NativeHGlobal(count * sizeof(llama_token));
+            var result = _llama_tokenize(ctx, text, native_mem.Ptr, count, add_bos);
 
             if (result == 0)
                 return new();
 
             var tokens = new llama_token[result];
-            Marshal.Copy(native_ptr.Ptr, tokens, 0, tokens.Length);
+            Marshal.Copy(native_mem.Ptr, tokens, 0, tokens.Length);
 
             return new(tokens);
         }
@@ -278,9 +278,9 @@ namespace LlamaCppLib
         public static List<float> llama_get_logits(llama_context ctx)
         {
             var count = llama_n_vocab(ctx);
-            var native_ptr = _llama_get_logits(ctx);
+            var native_mem = _llama_get_logits(ctx);
             var logits = new float[count];
-            Marshal.Copy(native_ptr, logits, 0, count);
+            Marshal.Copy(native_mem, logits, 0, count);
 
             return new(logits);
         }
@@ -297,13 +297,13 @@ namespace LlamaCppLib
         public static List<float> llama_get_embeddings(llama_context ctx)
         {
             var count = llama_n_embd(ctx);
-            var native_ptr = _llama_get_embeddings(ctx);
+            var native_mem = _llama_get_embeddings(ctx);
 
-            if (native_ptr == nint.Zero)
+            if (native_mem == nint.Zero)
                 return new();
 
             var embeddings = new float[count];
-            Marshal.Copy(native_ptr, embeddings, 0, count);
+            Marshal.Copy(native_mem, embeddings, 0, count);
 
             return new(embeddings);
         }
@@ -352,10 +352,10 @@ namespace LlamaCppLib
             var unit_size = Marshal.SizeOf<llama_token_data>();
             var total_size = unit_size * candidates.data.Count;
 
-            using var native_ptr = new NativeHGlobal(total_size);
+            using var native_mem = new NativeHGlobal(total_size);
             var _candidates = new _llama_token_data_array
             {
-                data = native_ptr.Ptr,
+                data = native_mem.Ptr,
                 size = candidates.data.Count,
                 sorted = candidates.sorted,
             };
@@ -412,10 +412,10 @@ namespace LlamaCppLib
                 ref candidates,
                 (ref _llama_token_data_array _candidates) =>
                 {
-                    using var native_ptr = new NativeHGlobal(last_tokens.Count * sizeof(llama_token));
-                    Marshal.Copy(last_tokens.ToArray(), 0, native_ptr.Ptr, last_tokens.Count);
+                    using var native_mem = new NativeHGlobal(last_tokens.Count * sizeof(llama_token));
+                    Marshal.Copy(last_tokens.ToArray(), 0, native_mem.Ptr, last_tokens.Count);
 
-                    _llama_sample_repetition_penalty(ctx, ref _candidates, native_ptr.Ptr, last_tokens.Count, penalty);
+                    _llama_sample_repetition_penalty(ctx, ref _candidates, native_mem.Ptr, last_tokens.Count, penalty);
                 }
             );
         }
@@ -451,10 +451,10 @@ namespace LlamaCppLib
                 ref candidates,
                 (ref _llama_token_data_array _candidates) =>
                 {
-                    using var nmem2 = new NativeHGlobal(last_tokens.Count * sizeof(llama_token));
-                    Marshal.Copy(last_tokens.ToArray(), 0, nmem2.Ptr, last_tokens.Count);
+                    using var native_mem = new NativeHGlobal(last_tokens.Count * sizeof(llama_token));
+                    Marshal.Copy(last_tokens.ToArray(), 0, native_mem.Ptr, last_tokens.Count);
 
-                    _llama_sample_frequency_and_presence_penalties(ctx, ref _candidates, nmem2.Ptr, last_tokens.Count, alpha_frequency, alpha_presence);
+                    _llama_sample_frequency_and_presence_penalties(ctx, ref _candidates, native_mem.Ptr, last_tokens.Count, alpha_frequency, alpha_presence);
                 }
             );
         }
@@ -669,10 +669,10 @@ namespace LlamaCppLib
             var usize = Marshal.SizeOf<llama_token_data>();
             var tsize = usize * candidates.data.Count;
 
-            using var nmem = new NativeHGlobal(tsize);
+            using var native_mem = new NativeHGlobal(tsize);
             var _candidates = new _llama_token_data_array
             {
-                data = nmem.Ptr,
+                data = native_mem.Ptr,
                 size = candidates.data.Count,
                 sorted = candidates.sorted,
             };
