@@ -12,7 +12,7 @@ C# bindings for llama.cpp including a .NET core library and sample projects (CLI
 
 ### Quick Start
 
-Build (on Windows use the VS2022 x64 command prompt, on Linux make sure to [install dotnet](https://learn.microsoft.com/en-us/dotnet/core/install/linux)):
+Build (on Windows use the VS2022 x64 command prompt, on Linux make sure to install cmake and [dotnet](https://learn.microsoft.com/en-us/dotnet/core/install/linux)):
 ```
 git clone --recursive https://github.com/dranger003/llama.cpp-dotnet.git
 cd llama.cpp-dotnet
