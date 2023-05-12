@@ -50,9 +50,7 @@ If you have a lot of RAM (i.e. 48GB+) you could try a 65B version though it is m
 
 Some models can be found below.
 
-- [eachadea/ggml-vicuna-13b-1.1](https://huggingface.co/eachadea/ggml-vicuna-13b-1.1/tree/main)
-- [TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g-GGML](https://huggingface.co/TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g-GGML/tree/main)
-- [TheBloke/wizardLM-7B-GGML](https://huggingface.co/TheBloke/wizardLM-7B-GGML)
+- [TheBloke on Hugging Face](https://huggingface.co/TheBloke)
 
 ### Sample Code (interactive CLI)
 ```
