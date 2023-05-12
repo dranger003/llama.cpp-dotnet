@@ -16,7 +16,7 @@ namespace LlamaCppCli
             PredictCount = -1,
             ContextSize = 2048,
             LastTokenCountPenalty = 64,
-            UseHalf = false,
+            UseHalf = true,
             NewLinePenalty = false,
             UseMemoryMapping = false,
             UseMemoryLocking = false,
@@ -43,13 +43,14 @@ namespace LlamaCppCli
 
         static string[] Prompts = new[]
         {
-            "Describe quantum physics in a very short and brief sentence.",
+            "Describe quantum physics in a very concise and brief sentence.",
         };
 
         static async Task Main(string[] args)
         {
 #if DEBUG
-            args = new[] { "0", @"D:\LLM_MODELS\lmsys\ggml-vicuna-13b-v1.1-q5_1.bin", @"..\..\template_vicuna-v1.1.txt" };
+            //args = new[] { "0", @"C:\LLM_MODELS\lmsys\ggml-vicuna-13b-v1.1-q4_0.bin", @"..\..\context.txt" };
+            args = new[] { "1", @"C:\LLM_MODELS\lmsys\ggml-vicuna-13b-v1.1-q5_1.bin", @"..\..\template_vicuna-v1.1.txt" };
 #endif
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
@@ -58,6 +59,7 @@ namespace LlamaCppCli
                 (nameof(WrappedInterfaceSampleWithSession), WrappedInterfaceSampleWithSession),
                 (nameof(WrappedInterfaceSampleWithSessionInteractive), WrappedInterfaceSampleWithSessionInteractive),
                 (nameof(GetEmbeddings), GetEmbeddings),
+                //(nameof(GithubReadmeSample), GithubReadmeSample),
             }
                 .Select((sample, index) => (sample, index))
                 .ToDictionary(k => k.sample.Name, v => (Index: v.index, v.sample.Func));
@@ -68,6 +70,12 @@ namespace LlamaCppCli
                 foreach (var sample in samples)
                     Console.WriteLine($"    [{sample.Value.Index}] = {sample.Key}");
             };
+
+            //if (args.Length > 0 && Int32.Parse(args[0]) == samples.Select((x, i) => (x, i)).Single(x => x.x.Key == nameof(GithubReadmeSample)).i)
+            //{
+            //    await samples[nameof(GithubReadmeSample)].Func(args);
+            //    return;
+            //}
 
             if (args.Length < 2)
             {
@@ -144,6 +152,9 @@ namespace LlamaCppCli
             cparams.use_mlock = aparams.use_mlock;
             cparams.embedding = aparams.embedding;
 
+            if (!File.Exists(aparams.model))
+                throw new FileNotFoundException(aparams.model);
+
             var ctx = LlamaCppInterop.llama_init_from_file(aparams.model, cparams);
 
             if (aparams.lora_adapter != null)
@@ -155,13 +166,24 @@ namespace LlamaCppCli
             var prompt = Prompts.First();
 
             if (args.Length > 1)
-                prompt = String.Format(LoadTemplate(args[1]), prompt);
+            {
+                var template = LoadTemplate(args[1]);
+                template = template.Remove(template.Length - 2);
 
-            var embd_inp = new List<LlamaToken>(LlamaCppInterop.llama_tokenize(ctx, $"{prompt}", true));
+                //prompt = String.Format(template, prompt);
+                prompt = template;
+            }
+
+            var tokens = new LlamaToken[cparams.n_ctx];
+            var count = LlamaCppInterop.llama_tokenize(ctx, prompt, tokens, tokens.Length, true);
+
+            var embd_inp = new List<LlamaToken>(tokens.Take(count));
             var last_n_tokens = new List<LlamaToken>(Enumerable.Repeat(0, aparams.n_ctx));
             var embd = new List<LlamaToken>();
 
-            var conversation = new StringBuilder(prompt);
+            Console.WriteLine($"embd_input: {embd_inp.Count} token(s).");
+
+            var conversation = new StringBuilder();
             var done = false;
 
             Console.CancelKeyPress += (s, e) =>
@@ -180,7 +202,7 @@ namespace LlamaCppCli
             {
                 if (embd.Any())
                 {
-                    LlamaCppInterop.llama_eval(ctx, embd, n_past, Options.ThreadCount ?? 1);
+                    LlamaCppInterop.llama_eval(ctx, embd.ToArray(), embd.Count, n_past, aparams.n_threads);
                     n_past += embd.Count;
                 }
 
@@ -201,15 +223,20 @@ namespace LlamaCppCli
                         for (LlamaToken tokenId = 0; tokenId < n_vocab; tokenId++)
                             candidates.Add(new LlamaCppInterop.llama_token_data { id = tokenId, logit = logits[tokenId], p = 0.0f });
 
-                        var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates, sorted = false };
+                        var candidates_p = new LlamaCppInterop.llama_token_data_array
+                        {
+                            data = candidates.ToArray(),
+                            size = (ulong)candidates.Count,
+                            sorted = false
+                        };
 
                         // Apply penalties
                         var last_repeat = last_n_tokens
                             .TakeLast(Math.Min(Math.Min(last_n_tokens.Count, aparams.repeat_last_n), aparams.n_ctx))
                             .ToList();
 
-                        LlamaCppInterop.llama_sample_repetition_penalty(ctx, ref candidates_p, last_repeat, aparams.repeat_penalty);
-                        LlamaCppInterop.llama_sample_frequency_and_presence_penalties(ctx, ref candidates_p, last_repeat, aparams.frequency_penalty, aparams.presence_penalty);
+                        LlamaCppInterop.llama_sample_repetition_penalty(ctx, candidates_p, last_repeat, aparams.repeat_penalty);
+                        LlamaCppInterop.llama_sample_frequency_and_presence_penalties(ctx, candidates_p, last_repeat, aparams.frequency_penalty, aparams.presence_penalty);
 
                         if (!aparams.penalize_nl)
                             logits[LlamaCppInterop.llama_token_nl()] = logits[LlamaCppInterop.llama_token_nl()];
@@ -217,29 +244,29 @@ namespace LlamaCppCli
                         if (aparams.temp <= 0)
                         {
                             // Greedy sampling
-                            id = LlamaCppInterop.llama_sample_token_greedy(ctx, ref candidates_p);
+                            id = LlamaCppInterop.llama_sample_token_greedy(ctx, candidates_p);
                         }
                         else
                         {
                             if (aparams.mirostat == 1)
                             {
-                                LlamaCppInterop.llama_sample_temperature(ctx, ref candidates_p, aparams.temp);
-                                id = LlamaCppInterop.llama_sample_token_mirostat(ctx, ref candidates_p, aparams.mirostat_tau, aparams.mirostat_eta, mirostat_m, ref mirostat_mu);
+                                LlamaCppInterop.llama_sample_temperature(ctx, candidates_p, aparams.temp);
+                                id = LlamaCppInterop.llama_sample_token_mirostat(ctx, candidates_p, aparams.mirostat_tau, aparams.mirostat_eta, mirostat_m, ref mirostat_mu);
                             }
                             else if (aparams.mirostat == 2)
                             {
-                                LlamaCppInterop.llama_sample_temperature(ctx, ref candidates_p, aparams.temp);
-                                id = LlamaCppInterop.llama_sample_token_mirostat_v2(ctx, ref candidates_p, aparams.mirostat_tau, aparams.mirostat_eta, ref mirostat_mu);
+                                LlamaCppInterop.llama_sample_temperature(ctx, candidates_p, aparams.temp);
+                                id = LlamaCppInterop.llama_sample_token_mirostat_v2(ctx, candidates_p, aparams.mirostat_tau, aparams.mirostat_eta, ref mirostat_mu);
                             }
                             else
                             {
                                 // Temperature sampling
-                                LlamaCppInterop.llama_sample_top_k(ctx, ref candidates_p, aparams.top_k);
-                                LlamaCppInterop.llama_sample_tail_free(ctx, ref candidates_p, aparams.tfs_z);
-                                LlamaCppInterop.llama_sample_typical(ctx, ref candidates_p, aparams.typical_p);
-                                LlamaCppInterop.llama_sample_top_p(ctx, ref candidates_p, aparams.top_p);
-                                LlamaCppInterop.llama_sample_temperature(ctx, ref candidates_p, aparams.temp);
-                                id = LlamaCppInterop.llama_sample_token(ctx, ref candidates_p);
+                                LlamaCppInterop.llama_sample_top_k(ctx, candidates_p, aparams.top_k);
+                                LlamaCppInterop.llama_sample_tail_free(ctx, candidates_p, aparams.tfs_z);
+                                LlamaCppInterop.llama_sample_typical(ctx, candidates_p, aparams.typical_p);
+                                LlamaCppInterop.llama_sample_top_p(ctx, candidates_p, aparams.top_p);
+                                LlamaCppInterop.llama_sample_temperature(ctx, candidates_p, aparams.temp);
+                                id = LlamaCppInterop.llama_sample_token(ctx, candidates_p);
                             }
                         }
 
@@ -398,7 +425,7 @@ namespace LlamaCppCli
         }
 
         // Unused, besides making sure the github sample compiles fine
-        static async Task GithubReadmeSample()
+        static async Task GithubReadmeSample(string[] args)
         {
             // Configure some model options
             var options = new LlamaCppOptions
@@ -412,14 +439,14 @@ namespace LlamaCppCli
             };
 
             // Create new named model with options
-            using var model = new LlamaCpp("Vicuna v1.1", options);
+            using var model = new LlamaCpp("WizardVicunaLM", options);
 
             // Load model file
-            model.Load(@"ggml-vicuna-13b-v1.1-q8_0.bin");
+            model.Load(@"C:\LLM_MODELS\junelee\ggml-wizard-vicuna-13b-q8_0.bin");
 
             // Create new conversation session and configure prompt template
             var session = model.CreateSession(ConversationName);
-            session.Configure(options => options.Template = File.ReadAllText(@"template_vicuna-v1.1.txt"));
+            session.Configure(options => options.Template = File.ReadAllText(@"..\..\template_wizardvicunalm.txt"));
 
             while (true)
             {
@@ -451,11 +478,13 @@ namespace LlamaCppCli
             var handle = LlamaCppInterop.llama_init_from_file(args[0], cparams);
             Console.WriteLine(LlamaCppInterop.llama_print_system_info());
 
-            var embd_inp = LlamaCppInterop.llama_tokenize(handle, Prompts.First(), true);
+            var tokens = new LlamaToken[cparams.n_ctx];
+            LlamaCppInterop.llama_tokenize(handle, Prompts.First(), tokens, tokens.Length, true);
+            var embd_inp = tokens.ToList();
 
             if (embd_inp.Count > 0)
             {
-                LlamaCppInterop.llama_eval(handle, embd_inp, n_past, n_threads);
+                LlamaCppInterop.llama_eval(handle, embd_inp.ToArray(), embd_inp.Count, n_past, n_threads);
                 var embeddings = LlamaCppInterop.llama_get_embeddings(handle);
 
                 Console.WriteLine(
@@ -482,6 +511,7 @@ namespace LlamaCppCli
         static void PrintParams(GptParams aparams)
         {
             Console.WriteLine(
+                $"params: n_threads = {aparams.n_threads}, memory_f16 = {aparams.memory_f16}\n" +
                 $"sampling: " +
                 $"repeat_last_n = {aparams.repeat_last_n}, repeat_penalty = {aparams.repeat_penalty}, presence_penalty = {aparams.presence_penalty}, frequency_penalty = {aparams.frequency_penalty}, " +
                 $"top_k = {aparams.top_k}, tfs_z = {aparams.tfs_z}, top_p = {aparams.top_p}, typical_p = {aparams.typical_p}, temp = {aparams.temp}, mirostat = {aparams.mirostat}, " +
