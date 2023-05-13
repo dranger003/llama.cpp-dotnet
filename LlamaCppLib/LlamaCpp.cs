@@ -36,7 +36,7 @@ namespace LlamaCppLib
         public List<LlamaToken> Tokenize(string text, bool addBos = false)
         {
             var tokens = new LlamaToken[_options.ContextSize ?? 1];
-            var count = LlamaCppInterop.llama_tokenize(_model, $"{(addBos ? " " : String.Empty)}{text}", tokens, tokens.Length, addBos);
+            var count = LlamaCppInterop.llama_tokenize(_model, text, tokens, tokens.Length, addBos);
             return new(tokens.Take(count));
         }
 
