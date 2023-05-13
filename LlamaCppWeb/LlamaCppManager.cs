@@ -52,6 +52,7 @@ namespace LlamaCppLib
                     NewLinePenalty = modelOptions.NewLinePenalty ?? _configuration.NewLinePenalty,
                     UseMemoryMapping = modelOptions.UseMemoryMapping ?? _configuration.UseMemoryMapping,
                     UseMemoryLocking = modelOptions.UseMemoryLocking ?? _configuration.UseMemoryLocking,
+                    GpuLayers = modelOptions.GpuLayers ?? _configuration.GpuLayers,
                     ThreadCount = modelOptions.ThreadCount ?? _configuration.ThreadCount,
                     TopK = modelOptions.TopK ?? _configuration.TopK,
                     TopP = modelOptions.TopP ?? _configuration.TopP,

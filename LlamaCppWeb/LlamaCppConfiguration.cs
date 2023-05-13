@@ -13,6 +13,8 @@
             public bool? NewLinePenalty { get; set; }
             public bool? UseMemoryMapping { get; set; }
             public bool? UseMemoryLocking { get; set; }
+            public int? GpuLayers { get; set; }
+
             public int? ThreadCount { get; set; }
             public int? TopK { get; set; }
             public float? TopP { get; set; }
@@ -36,6 +38,8 @@
         public bool? NewLinePenalty { get; set; }
         public bool? UseMemoryMapping { get; set; }
         public bool? UseMemoryLocking { get; set; }
+        public int? GpuLayers { get; set; }
+
         public int? ThreadCount { get; set; }
         public int? TopK { get; set; }
         public float? TopP { get; set; }

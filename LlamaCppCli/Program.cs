@@ -9,7 +9,8 @@ namespace LlamaCppCli
 
     internal class Program
     {
-        // TODO: Change these to suit your needs
+        // TODO: Change these to suit your needs (especially GpuLayers)
+        // As a reference for GpuLayers, a value of 20-30 seems to work with 8GB VRAM using Vicuna-13B q4_0
         public static LlamaCppOptions Options = new()
         {
             Seed = 0,
@@ -20,6 +21,7 @@ namespace LlamaCppCli
             NewLinePenalty = false,
             UseMemoryMapping = false,
             UseMemoryLocking = false,
+            //GpuLayers = 0,
 
             ThreadCount = Environment.ProcessorCount / 2, // Assuming hyperthreading
             TopK = 40,
@@ -123,6 +125,7 @@ namespace LlamaCppCli
                 aparams.n_threads = Options.ThreadCount ?? 1;
                 aparams.n_predict = Options.PredictCount ?? -1;
                 aparams.n_ctx = Options.ContextSize ?? 512;
+                aparams.n_gpu_layers = Options.GpuLayers ?? (args.Length > 2 ? Int32.Parse(args[2]) : 0);
                 aparams.top_k = Options.TopK ?? 40;
                 aparams.top_p = Options.TopP ?? 0.95f;
                 aparams.tfs_z = Options.TfsZ ?? 1.0f;
@@ -144,6 +147,7 @@ namespace LlamaCppCli
             var cparams = LlamaCppInterop.llama_context_default_params();
             cparams.n_ctx = aparams.n_ctx;
             cparams.n_parts = aparams.n_parts;
+            cparams.n_gpu_layers = aparams.n_gpu_layers;
             cparams.seed = aparams.seed;
             cparams.f16_kv = aparams.memory_f16;
             cparams.logits_all = false;

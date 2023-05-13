@@ -38,19 +38,16 @@ namespace LlamaCppLib
         {
             public int n_ctx;
             public int n_parts;
+            public int n_gpu_layers;
             public int seed;
-            [MarshalAs(UnmanagedType.I1)]
-            public bool f16_kv;
-            [MarshalAs(UnmanagedType.I1)]
-            public bool logits_all;
-            [MarshalAs(UnmanagedType.I1)]
-            public bool vocab_only;
-            [MarshalAs(UnmanagedType.I1)]
-            public bool use_mmap;
-            [MarshalAs(UnmanagedType.I1)]
-            public bool use_mlock;
-            [MarshalAs(UnmanagedType.I1)]
-            public bool embedding;
+
+            [MarshalAs(UnmanagedType.I1)] public bool f16_kv;
+            [MarshalAs(UnmanagedType.I1)] public bool logits_all;
+            [MarshalAs(UnmanagedType.I1)] public bool vocab_only;
+            [MarshalAs(UnmanagedType.I1)] public bool use_mmap;
+            [MarshalAs(UnmanagedType.I1)] public bool use_mlock;
+            [MarshalAs(UnmanagedType.I1)] public bool embedding;
+
             public llama_progress_callback progress_callback;
             public nint progress_callback_user_data;
         }
@@ -58,15 +55,15 @@ namespace LlamaCppLib
         public enum LLAMA_FTYPE
         {
             ALL_F32 = 0,
-            MOSTLY_F16 = 1,  // except 1d tensors
-            MOSTLY_Q4_0 = 2,  // except 1d tensors
-            MOSTLY_Q4_1 = 3,  // except 1d tensors
-            MOSTLY_Q4_1_SOME_F16 = 4, // tok_embeddings.weight and output.weight are F16
-            MOSTLY_Q4_2 = 5,  // except 1d tensors
-            // MOSTLY_Q4_3 (6) support has been removed
-            MOSTLY_Q8_0 = 7,  // except 1d tensors
-            MOSTLY_Q5_0 = 8,  // except 1d tensors
-            MOSTLY_Q5_1 = 9,  // except 1d tensors
+            MOSTLY_F16 = 1,             // except 1d tensors
+            MOSTLY_Q4_0 = 2,            // except 1d tensors
+            MOSTLY_Q4_1 = 3,            // except 1d tensors
+            MOSTLY_Q4_1_SOME_F16 = 4,   // tok_embeddings.weight and output.weight are F16
+            // MOSTLY_Q4_2 = 5,         // support has been removed
+            // MOSTLY_Q4_3 (6)          // support has been removed
+            MOSTLY_Q8_0 = 7,            // except 1d tensors
+            MOSTLY_Q5_0 = 8,            // except 1d tensors
+            MOSTLY_Q5_1 = 9,            // except 1d tensors
         }
 
         [DllImport("llama")]
