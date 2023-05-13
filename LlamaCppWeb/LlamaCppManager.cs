@@ -44,6 +44,14 @@ namespace LlamaCppLib
                 // Use model options, with fallback on global options
                 var options = new LlamaCppOptions
                 {
+                    Seed = modelOptions.Seed ?? _configuration.Seed,
+                    PredictCount = modelOptions.PredictCount ?? _configuration.PredictCount,
+                    ContextSize = modelOptions.ContextSize ?? _configuration.ContextSize,
+                    LastTokenCountPenalty = modelOptions.LastTokenCountPenalty ?? _configuration.LastTokenCountPenalty,
+                    UseHalf = modelOptions.UseHalf ?? _configuration.UseHalf,
+                    NewLinePenalty = modelOptions.NewLinePenalty ?? _configuration.NewLinePenalty,
+                    UseMemoryMapping = modelOptions.UseMemoryMapping ?? _configuration.UseMemoryMapping,
+                    UseMemoryLocking = modelOptions.UseMemoryLocking ?? _configuration.UseMemoryLocking,
                     ThreadCount = modelOptions.ThreadCount ?? _configuration.ThreadCount,
                     TopK = modelOptions.TopK ?? _configuration.TopK,
                     TopP = modelOptions.TopP ?? _configuration.TopP,
