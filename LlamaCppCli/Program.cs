@@ -19,7 +19,7 @@ namespace LlamaCppCli
             LastTokenCountPenalty = 64,
             UseHalf = true,
             NewLinePenalty = false,
-            UseMemoryMapping = false,
+            UseMemoryMapping = true,
             UseMemoryLocking = false,
             //GpuLayers = 0,
 
@@ -82,7 +82,7 @@ namespace LlamaCppCli
             if (args.Length < 2)
             {
                 Console.WriteLine($"USAGE:");
-                Console.WriteLine($"    {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} <SampleIndex> <ModelPath> [TemplatePath]");
+                Console.WriteLine($"    {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} <SampleIndex> <ModelPath> [TemplatePath] [GpuLayers]");
                 PrintAvailableSamples();
                 return;
             }
@@ -323,6 +323,8 @@ namespace LlamaCppCli
                 cts.Cancel();
             };
 
+            Options.GpuLayers = args.Length > 2 ? Int32.Parse(args[2]) : 0;
+
             using (var model = new LlamaCpp(ModelName, Options))
             {
                 model.Load(args[0]);
@@ -360,6 +362,8 @@ namespace LlamaCppCli
                 cts.Cancel();
             };
 
+            Options.GpuLayers = args.Length > 2 ? Int32.Parse(args[2]) : 0;
+
             using (var model = new LlamaCpp(ModelName, Options))
             {
                 model.Load(args[0]);
@@ -393,6 +397,8 @@ namespace LlamaCppCli
                 e.Cancel = true;
                 cts.Cancel();
             };
+
+            Options.GpuLayers = args.Length > 2 ? Int32.Parse(args[2]) : 0;
 
             using (var model = new LlamaCpp(ModelName, Options))
             {
@@ -440,6 +446,7 @@ namespace LlamaCppCli
                 Temperature = 0.8f,
                 RepeatPenalty = 1.1f,
                 Mirostat = Mirostat.Mirostat2,
+                GpuLayers = 20,
             };
 
             // Create new named model with options

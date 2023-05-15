@@ -102,11 +102,6 @@ namespace LlamaCppLib
             }
         }
 
-        public void Configure(LlamaCppOptions options) => _options = options;
-
-        public void Configure(Action<LlamaCppOptions> configure) =>
-            configure(_options);
-
         public async IAsyncEnumerable<KeyValuePair<LlamaToken, string>> Predict(PredictOptions options, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             if (_model == nint.Zero)
