@@ -187,6 +187,10 @@ namespace LlamaCppCli
 
             Console.WriteLine($"embd_input: {embd_inp.Count} token(s).");
 
+            var n_ctx = LlamaCppInterop.llama_n_ctx(ctx);
+            if (embd_inp.Count > n_ctx)
+                throw new InsufficientMemoryException($"Token count exceeds context size ({embd_inp.Count} > {n_ctx}).");
+
             var conversation = new StringBuilder();
             var done = false;
 
@@ -206,8 +210,25 @@ namespace LlamaCppCli
             {
                 if (embd.Any())
                 {
-                    LlamaCppInterop.llama_eval(ctx, embd.ToArray(), embd.Count, n_past, aparams.n_threads);
-                    n_past += embd.Count;
+                    if (n_past + embd.Count > n_ctx)
+                    {
+                        var n_left = n_past - aparams.n_keep;
+                        n_past = Math.Max(1, aparams.n_keep);
+
+                        embd.InsertRange(0, last_n_tokens.GetRange(n_ctx - n_left / 2 - embd.Count, last_n_tokens.Count - embd.Count));
+                    }
+
+                    for (var i = 0; i < embd.Count; i += aparams.n_batch)
+                    {
+                        var n_eval = embd.Count - i;
+                        if (n_eval > aparams.n_batch)
+                        {
+                            n_eval = aparams.n_batch;
+                        }
+
+                        LlamaCppInterop.llama_eval(ctx, embd.Skip(i).ToArray(), n_eval, n_past, aparams.n_threads);
+                        n_past += n_eval;
+                    }
                 }
 
                 embd.Clear();
@@ -288,6 +309,9 @@ namespace LlamaCppCli
                         last_n_tokens.RemoveAt(0);
                         last_n_tokens.Add(embd_inp[n_consumed]);
                         ++n_consumed;
+
+                        if (embd.Count > aparams.n_batch)
+                            break;
                     }
                 }
 
@@ -306,7 +330,7 @@ namespace LlamaCppCli
             LlamaCppInterop.llama_print_timings(ctx);
             LlamaCppInterop.llama_free(ctx);
 
-            PrintTranscript(conversation.ToString());
+            //PrintTranscript(conversation.ToString());
 
             await Task.CompletedTask;
         }
@@ -430,7 +454,7 @@ namespace LlamaCppCli
                 }
 
                 Console.WriteLine();
-                PrintTranscript(session.Conversation);
+                //PrintTranscript(session.Conversation);
             }
         }
 
