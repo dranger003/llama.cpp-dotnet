@@ -21,7 +21,7 @@ namespace LlamaCppCli
             NewLinePenalty = false,
             UseMemoryMapping = true,
             UseMemoryLocking = false,
-            //GpuLayers = 0,
+            GpuLayers = 0,
 
             ThreadCount = Environment.ProcessorCount / 2, // Assuming hyperthreading
             TopK = 40,
@@ -146,7 +146,6 @@ namespace LlamaCppCli
 
             var cparams = LlamaCppInterop.llama_context_default_params();
             cparams.n_ctx = aparams.n_ctx;
-            cparams.n_parts = aparams.n_parts;
             cparams.n_gpu_layers = aparams.n_gpu_layers;
             cparams.seed = aparams.seed;
             cparams.f16_kv = aparams.memory_f16;

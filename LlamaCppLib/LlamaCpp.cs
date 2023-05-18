@@ -73,7 +73,6 @@ namespace LlamaCppLib
 
             var cparams = LlamaCppInterop.llama_context_default_params();
             cparams.n_ctx = _options.ContextSize ?? 512;
-            cparams.n_parts = -1;
             cparams.n_gpu_layers = _options.GpuLayers ?? 0;
             cparams.seed = _options.Seed ?? 0;
             cparams.f16_kv = _options.UseHalf ?? true;

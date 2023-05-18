@@ -7,7 +7,6 @@
         public int seed = -1;                                                   // RNG seed
         public int n_threads = Math.Min(4, Environment.ProcessorCount / 2);
         public int n_predict = -1;                                              // new tokens to predict
-        public int n_parts = -1;                                                // amount of model parts (-1 = determine from model dimensions)
         public int n_ctx = 512;                                                 // context size
         public int n_batch = 512;                                               // batch size for prompt processing (must be >=32 to use BLAS)
         public int n_keep = 0;                                                  // number of tokens to keep from initial prompt

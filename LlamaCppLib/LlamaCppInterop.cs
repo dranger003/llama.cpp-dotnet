@@ -37,7 +37,6 @@ namespace LlamaCppLib
         public struct llama_context_params
         {
             public int n_ctx;
-            public int n_parts;
             public int n_gpu_layers;
             public int seed;
 
