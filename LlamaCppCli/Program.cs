@@ -21,7 +21,7 @@ namespace LlamaCppCli
             NewLinePenalty = false,
             UseMemoryMapping = true,
             UseMemoryLocking = false,
-            GpuLayers = 0,
+            GpuLayers = null,
 
             ThreadCount = Environment.ProcessorCount / 2, // Assuming hyperthreading
             TopK = 40,
