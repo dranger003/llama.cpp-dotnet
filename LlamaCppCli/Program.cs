@@ -5,6 +5,7 @@ using LlamaCppLib;
 
 namespace LlamaCppCli
 {
+    using LlamaContext = System.IntPtr;
     using LlamaToken = System.Int32;
 
     internal class Program
@@ -144,24 +145,12 @@ namespace LlamaCppCli
                 aparams.use_mlock = Options.UseMemoryLocking ?? false;
             }
 
-            var cparams = LlamaCppInterop.llama_context_default_params();
-            cparams.n_ctx = aparams.n_ctx;
-            cparams.n_gpu_layers = aparams.n_gpu_layers;
-            cparams.seed = aparams.seed;
-            cparams.f16_kv = aparams.memory_f16;
-            cparams.logits_all = false;
-            cparams.vocab_only = false;
-            cparams.use_mmap = aparams.use_mmap;
-            cparams.use_mlock = aparams.use_mlock;
-            cparams.embedding = aparams.embedding;
-
             if (!File.Exists(aparams.model))
                 throw new FileNotFoundException(aparams.model);
 
-            var ctx = LlamaCppInterop.llama_init_from_file(aparams.model, cparams);
+            LlamaCppInterop.llama_init_backend();
 
-            if (aparams.lora_adapter != null)
-                LlamaCppInterop.llama_apply_lora_from_file(ctx, aparams.lora_adapter, aparams.lora_base, aparams.n_threads);
+            var ctx = llama_init_from_gpt_params(aparams);
 
             Console.WriteLine(LlamaCppInterop.llama_print_system_info());
             PrintParams(aparams);
@@ -177,16 +166,17 @@ namespace LlamaCppCli
                 prompt = template;
             }
 
-            var tokens = new LlamaToken[cparams.n_ctx];
+            var n_ctx = LlamaCppInterop.llama_n_ctx(ctx);
+
+            var tokens = new LlamaToken[n_ctx];
             var count = LlamaCppInterop.llama_tokenize(ctx, prompt, tokens, tokens.Length, true);
 
             var embd_inp = new List<LlamaToken>(tokens.Take(count));
-            var last_n_tokens = new List<LlamaToken>(Enumerable.Repeat(0, aparams.n_ctx));
+            var last_n_tokens = new List<LlamaToken>(Enumerable.Repeat(0, n_ctx));
             var embd = new List<LlamaToken>();
 
             Console.WriteLine($"embd_input: {embd_inp.Count} token(s).");
 
-            var n_ctx = LlamaCppInterop.llama_n_ctx(ctx);
             if (embd_inp.Count > n_ctx)
                 throw new InsufficientMemoryException($"Token count exceeds context size ({embd_inp.Count} > {n_ctx}).");
 
@@ -551,6 +541,27 @@ namespace LlamaCppCli
                 $"top_k = {aparams.top_k}, tfs_z = {aparams.tfs_z}, top_p = {aparams.top_p}, typical_p = {aparams.typical_p}, temp = {aparams.temp}, mirostat = {aparams.mirostat}, " +
                 $"mirostat_lr = {aparams.mirostat_eta}, mirostat_ent = {aparams.mirostat_tau}"
             );
+        }
+
+        public static LlamaContext llama_init_from_gpt_params(GptParams aparams)
+        {
+            var lparams = LlamaCppInterop.llama_context_default_params();
+
+            lparams.n_ctx = aparams.n_ctx;
+            lparams.n_gpu_layers = aparams.n_gpu_layers;
+            lparams.seed = aparams.seed;
+            lparams.f16_kv = aparams.memory_f16;
+            lparams.use_mmap = aparams.use_mmap;
+            lparams.use_mlock = aparams.use_mlock;
+            lparams.logits_all = aparams.perplexity;
+            lparams.embedding = aparams.embedding;
+
+            var lctx = LlamaCppInterop.llama_init_from_file(aparams.model, lparams);
+
+            if (aparams.lora_adapter != null)
+                LlamaCppInterop.llama_apply_lora_from_file(lctx, aparams.lora_adapter, aparams.lora_base, aparams.n_threads);
+
+            return lctx;
         }
     }
 }
