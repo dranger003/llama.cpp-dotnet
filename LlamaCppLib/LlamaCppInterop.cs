@@ -74,6 +74,12 @@ namespace LlamaCppLib
         [DllImport("llama")]
         public static extern bool llama_mlock_supported();
 
+        [DllImport("llama")]
+        public static extern void llama_init_backend();
+
+        [DllImport("llama")]
+        public static extern long llama_time_us();
+
         /// <summary>
         /// Various functions for loading a ggml llama model.
         /// Allocate (almost) all memory needed for the model.
