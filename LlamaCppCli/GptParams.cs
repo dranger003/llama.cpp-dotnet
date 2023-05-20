@@ -5,7 +5,7 @@
     internal class GptParams
     {
         public int seed = -1;                                                   // RNG seed
-        public int n_threads = Math.Min(4, Environment.ProcessorCount / 2);
+        public int n_threads = Math.Min(4, Environment.ProcessorCount / 2);     // assumes hyperthreading (i.e. divide by 2)
         public int n_predict = -1;                                              // new tokens to predict
         public int n_ctx = 512;                                                 // context size
         public int n_batch = 512;                                               // batch size for prompt processing (must be >=32 to use BLAS)
@@ -27,11 +27,11 @@
         public float mirostat_tau = 5.00f;                                      // target entropy
         public float mirostat_eta = 0.10f;                                      // learning rate
 
-        public string model = "models/llama-7B/ggml-model.bin";                 // model path
-        public string prompt = "";
-        public string path_prompt_cache = "";                                   // path to file for saving/loading prompt eval state
-        public string input_prefix = "";                                        // string to prefix user inputs with
-        public string input_suffix = "";                                        // string to suffix user inputs with
+        public string model = "models/7B/ggml-model.bin";                       // model path
+        public string prompt = String.Empty;
+        public string path_prompt_cache = String.Empty;                         // path to file for saving/loading prompt eval state
+        public string input_prefix = String.Empty;                              // string to prefix user inputs with
+        public string input_suffix = String.Empty;                              // string to suffix user inputs with
         public List<string> antiprompt = new();                                 // string upon seeing which more user input is prompted
 
         public string? lora_adapter = default;                                  // lora adapter path
@@ -60,6 +60,7 @@
 
         public bool Parse(string[] args)
         {
+            // TODO
             // Typically here we would map command line arguments to each field
             // For now we use the internal program values from the code
 
