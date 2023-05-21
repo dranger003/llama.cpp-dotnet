@@ -128,17 +128,54 @@ namespace LlamaCppCli
 
             if (BertCppInterop.bert_params_parse(args, out var bparams))
             {
+                var documents = new[]
+                {
+                    "Carson City is the capital city of the American state of Nevada. At the  2010 United States Census, Carson City had a population of 55,274.",
+                    "The Commonwealth of the Northern Mariana Islands is a group of islands in the Pacific Ocean that are a political division controlled by the United States. Its capital is Saipan.",
+                    "Charlotte Amalie is the capital and largest city of the United States Virgin Islands. It has about 20,000 people. The city is on the island of Saint Thomas.",
+                    "Washington, D.C. (also known as simply Washington or D.C., and officially as the District of Columbia) is the capital of the United States. It is a federal district.",
+                    "Capital punishment (the death penalty) has existed in the United States since before the United States was a country. As of 2017, capital punishment is legal in 30 of the 50 states.",
+                    "North Dakota is a state in the United States. 672,591 people lived in North Dakota in the year 2010. The capital and seat of government is Bismarck.",
+                };
+
+                var query = "What is the capital of the United States?";
+
                 var ctx = BertCppInterop.bert_load_from_file(bparams.model);
 
-                var tokens = BertCppInterop.bert_tokenize(ctx, bparams.prompt);
-                var embeddings = BertCppInterop.bert_eval(ctx, bparams.n_threads, tokens);
+                var documentsEmbeddings = documents
+                    .Select(x => BertCppInterop.bert_tokenize(ctx, x))
+                    .Select(x => BertCppInterop.bert_eval(ctx, bparams.n_threads, x))
+                    .ToList();
+
+                var queryEmbeddings = BertCppInterop.bert_eval(
+                    ctx,
+                    bparams.n_threads,
+                    BertCppInterop.bert_tokenize(ctx, query)
+                );
+
+                var cosineSimilarities = documentsEmbeddings
+                    .Select(document => CosineSimilarity(queryEmbeddings, document))
+                    .ToList();
+
+                var levenshteinDistances = documents
+                    .Select(document => LevenshteinDistance(query, document))
+                    .ToList();
+
+                var results = documents
+                    .Zip(cosineSimilarities, (x, similarity) => new { Document = x, CosineSimilarity = similarity })
+                    .Zip(levenshteinDistances, (x, levenshtein) => new { x.Document, x.CosineSimilarity, LevenshteinDistance = levenshtein })
+                    .OrderByDescending(x => x.CosineSimilarity)
+                    .ThenBy(x => x.LevenshteinDistance)
+                    .ToList();
+
+                Console.WriteLine($"[{query}]");
+                results.ForEach(x => Console.WriteLine($"[{x.CosineSimilarity}][{x.LevenshteinDistance}][{x.Document}]"));
 
                 BertCppInterop.bert_free(ctx);
                 ctx = IntPtr.Zero;
-
-                await Console.Out.WriteLineAsync($"prompt = [{prompt}]");
-                await Console.Out.WriteLineAsync($"embeddings = [ {embeddings.Select(x => $"{x}").Aggregate((a, b) => $"{a}, {b}")} ]");
             }
+
+            await Task.CompletedTask;
         }
 
         static async Task RawInterfaceSample(string[] args)
@@ -569,7 +606,7 @@ namespace LlamaCppCli
             );
         }
 
-        public static LlamaContext llama_init_from_gpt_params(GptParams aparams)
+        static LlamaContext llama_init_from_gpt_params(GptParams aparams)
         {
             var lparams = LlamaCppInterop.llama_context_default_params();
 
@@ -588,6 +625,46 @@ namespace LlamaCppCli
                 LlamaCppInterop.llama_apply_lora_from_file(lctx, aparams.lora_adapter, aparams.lora_base, aparams.n_threads);
 
             return lctx;
+        }
+
+        static float LevenshteinDistance(string s1, string s2)
+        {
+            var len1 = s1.Length;
+            var len2 = s2.Length;
+
+            var matrix = new int[len1 + 1, len2 + 1];
+
+            for (var i = 0; i <= len1; i++)
+                matrix[i, 0] = i;
+
+            for (var j = 0; j <= len2; j++)
+                matrix[0, j] = j;
+
+            for (var i = 1; i <= len1; i++)
+            {
+                for (var j = 1; j <= len2; j++)
+                {
+                    var cost = (s1[i - 1] == s2[j - 1]) ? 0 : 1;
+                    matrix[i, j] = Math.Min(Math.Min(matrix[i - 1, j] + 1, matrix[i, j - 1] + 1), matrix[i - 1, j - 1] + cost);
+                }
+            }
+
+            return 1.0f - matrix[len1, len2] / (float)Math.Max(len1, len2);
+        }
+
+        static float CosineSimilarity(float[] vec1, float[] vec2)
+        {
+            if (vec1.Length != vec2.Length)
+                throw new ArgumentException("Vectors must be of the same size.");
+
+            var dotProduct = vec1.Zip(vec2, (a, b) => a * b).Sum();
+            var normA = Math.Sqrt(vec1.Sum(a => Math.Pow(a, 2)));
+            var normB = Math.Sqrt(vec2.Sum(b => Math.Pow(b, 2)));
+
+            if (normA == 0.0 || normB == 0.0)
+                throw new ArgumentException("Vectors must not be zero vectors.");
+
+            return (float)(dotProduct / (normA * normB));
         }
     }
 }
