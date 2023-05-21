@@ -19,6 +19,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		template_wizardvicunalm.txt = template_wizardvicunalm.txt
 	EndProjectSection
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BertCppLib", "BertCppLib\BertCppLib.csproj", "{CBF41703-ACA6-402F-BDB1-374861E1DD27}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -37,6 +39,10 @@ Global
 		{9C1B4C2E-F84D-421E-B924-C5C394288AC5}.Debug|x64.Build.0 = Debug|x64
 		{9C1B4C2E-F84D-421E-B924-C5C394288AC5}.Release|x64.ActiveCfg = Release|x64
 		{9C1B4C2E-F84D-421E-B924-C5C394288AC5}.Release|x64.Build.0 = Release|x64
+		{CBF41703-ACA6-402F-BDB1-374861E1DD27}.Debug|x64.ActiveCfg = Debug|x64
+		{CBF41703-ACA6-402F-BDB1-374861E1DD27}.Debug|x64.Build.0 = Debug|x64
+		{CBF41703-ACA6-402F-BDB1-374861E1DD27}.Release|x64.ActiveCfg = Release|x64
+		{CBF41703-ACA6-402F-BDB1-374861E1DD27}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

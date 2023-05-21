@@ -2,11 +2,14 @@
 using System.Text;
 
 using LlamaCppLib;
+using BertCppLib;
 
 namespace LlamaCppCli
 {
     using LlamaContext = System.IntPtr;
     using LlamaToken = System.Int32;
+
+    using bert_vocab_id = System.Int32;
 
     internal class Program
     {
@@ -57,6 +60,7 @@ namespace LlamaCppCli
 #endif
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
+                (nameof(RawBertInterfaceSample), RawBertInterfaceSample),
                 (nameof(RawInterfaceSample), RawInterfaceSample),
                 (nameof(WrappedInterfaceSampleWithoutSession), WrappedInterfaceSampleWithoutSession),
                 (nameof(WrappedInterfaceSampleWithSession), WrappedInterfaceSampleWithSession),
@@ -94,11 +98,11 @@ namespace LlamaCppCli
                 return;
             }
 
-            if (args.Length > 2 && !Path.Exists(args[2]))
-            {
-                Console.WriteLine($"ERROR: Template not found ({Path.GetFullPath(args[2])}).");
-                return;
-            }
+            //if (args.Length > 2 && !Path.Exists(args[2]))
+            //{
+            //    Console.WriteLine($"ERROR: Template not found ({Path.GetFullPath(args[2])}).");
+            //    return;
+            //}
 
             var sampleIndex = Int32.Parse(args[0]);
             var sampleName = samples.SingleOrDefault(sample => sample.Value.Index == sampleIndex).Key;
@@ -114,6 +118,28 @@ namespace LlamaCppCli
         }
 
         static string LoadTemplate(string path) => File.ReadAllText(path).Replace("{prompt}", "{0}").Replace("{context}", "{1}");
+
+        static async Task RawBertInterfaceSample(string[] args)
+        {
+            var path = args.Length > 0 ? args[0] : @"D:\LLM_MODELS\sentence-transformers\ggml-all-MiniLM-L12-v2-f32.bin";
+            var prompt = args.Length > 1 ? args[1] : "Hello World!";
+
+            args = new[] { "-t", $"{Options.ThreadCount}", "-p", prompt, "-m", path };
+
+            if (BertCppInterop.bert_params_parse(args, out var bparams))
+            {
+                var ctx = BertCppInterop.bert_load_from_file(bparams.model);
+
+                var tokens = BertCppInterop.bert_tokenize(ctx, bparams.prompt);
+                var embeddings = BertCppInterop.bert_eval(ctx, bparams.n_threads, tokens);
+
+                BertCppInterop.bert_free(ctx);
+                ctx = IntPtr.Zero;
+
+                await Console.Out.WriteLineAsync($"prompt = [{prompt}]");
+                await Console.Out.WriteLineAsync($"embeddings = [ {embeddings.Select(x => $"{x}").Aggregate((a, b) => $"{a}, {b}")} ]");
+            }
+        }
 
         static async Task RawInterfaceSample(string[] args)
         {
