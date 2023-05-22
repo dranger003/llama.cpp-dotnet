@@ -4,7 +4,7 @@
 
 ### Description
 
-C# bindings for llama.cpp including a .NET core library and sample projects (CLI & Web).
+C# bindings for llama.cpp & bert.cpp, including a .NET core library and sample projects (CLI & Web).
 
 ![demo-web](https://user-images.githubusercontent.com/1760549/233868319-59dda027-4279-462f-9233-2825856cded9.gif)
 
@@ -117,6 +117,7 @@ GET /session/predict?sessionName={sessionName}&prompt={prompt}
 - [X] Expose minimal API
 - [X] Session/conversation support
 - [X] Support Windows/Linux
+- [X] Add bert.cpp bindings
 - [ ] Add basic web app (WIP)
 
 ### Acknowledgments
