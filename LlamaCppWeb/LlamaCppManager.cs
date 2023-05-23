@@ -7,12 +7,14 @@ namespace LlamaCppLib
     public class LlamaCppManager
     {
         private LlamaCppConfiguration _configuration;
+        private ILogger<LlamaCppManager> _logger;
         private LlamaCpp? _model;
         private List<LlamaCppSession> _sessions = new();
 
-        public LlamaCppManager(IConfiguration configuration)
+        public LlamaCppManager(IConfiguration configuration, ILogger<LlamaCppManager> logger)
         {
             _configuration = new LlamaCppConfiguration(configuration);
+            _logger = logger;
             _configuration.Load();
         }
 
@@ -58,6 +60,14 @@ namespace LlamaCppLib
                     TopP = modelOptions.TopP ?? _configuration.TopP,
                     Temperature = modelOptions.Temperature ?? _configuration.Temperature,
                     RepeatPenalty = modelOptions.RepeatPenalty ?? _configuration.RepeatPenalty,
+                    TfsZ = modelOptions.TfsZ ?? _configuration.TfsZ,
+                    TypicalP = modelOptions.TypicalP ?? _configuration.TypicalP,
+                    FrequencyPenalty = modelOptions.FrequencyPenalty ?? _configuration.FrequencyPenalty,
+                    PresencePenalty = modelOptions.PresencePenalty ?? _configuration.PresencePenalty,
+                    Mirostat = modelOptions.Mirostat ?? _configuration.Mirostat,
+                    MirostatTAU = modelOptions.MirostatTAU ?? _configuration.MirostatTAU,
+                    MirostatETA = modelOptions.MirostatETA ?? _configuration.MirostatETA,
+                    PenalizeNewLine = modelOptions.PenalizeNewLine ?? _configuration.PenalizeNewLine,
                 };
 
                 _model = new LlamaCpp(modelName, options);
