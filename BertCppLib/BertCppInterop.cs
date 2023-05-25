@@ -9,7 +9,7 @@ namespace BertCppLib
     public static class BertCppInterop
     {
         [StructLayout(LayoutKind.Sequential)]
-        public struct _bert_params
+        private struct _bert_params
         {
             public int n_threads;
             public int port;
