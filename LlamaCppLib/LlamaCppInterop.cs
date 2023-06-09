@@ -37,7 +37,11 @@ namespace LlamaCppLib
         public struct llama_context_params
         {
             public int n_ctx;
+            public int n_batch;
             public int n_gpu_layers;
+            public int main_gpu;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+            public float[] tensor_split;
             public int seed;
 
             [MarshalAs(UnmanagedType.I1)] public bool f16_kv;
@@ -59,10 +63,19 @@ namespace LlamaCppLib
             MOSTLY_Q4_1 = 3,            // except 1d tensors
             MOSTLY_Q4_1_SOME_F16 = 4,   // tok_embeddings.weight and output.weight are F16
             // MOSTLY_Q4_2 = 5,         // support has been removed
-            // MOSTLY_Q4_3 (6)          // support has been removed
+            // MOSTLY_Q4_3 = 6,         // support has been removed
             MOSTLY_Q8_0 = 7,            // except 1d tensors
             MOSTLY_Q5_0 = 8,            // except 1d tensors
             MOSTLY_Q5_1 = 9,            // except 1d tensors
+            MOSTLY_Q2_K = 10,           // except 1d tensors
+            MOSTLY_Q3_K_S = 11,         // except 1d tensors
+            MOSTLY_Q3_K_M = 12,         // except 1d tensors
+            MOSTLY_Q3_K_L = 13,         // except 1d tensors
+            MOSTLY_Q4_K_S = 14,         // except 1d tensors
+            MOSTLY_Q4_K_M = 15,         // except 1d tensors
+            MOSTLY_Q5_K_S = 16,         // except 1d tensors
+            MOSTLY_Q5_K_M = 17,         // except 1d tensors
+            MOSTLY_Q6_K = 18,           // except 1d tensors
         }
 
         [DllImport("llama")]
