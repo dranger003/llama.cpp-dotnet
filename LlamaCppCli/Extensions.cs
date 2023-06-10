@@ -11,5 +11,7 @@ namespace LlamaCppCli
         }
 
         public static bool EndsWith(this StringBuilder sb, string value) => sb.Length >= value.Length && sb.ToString(sb.Length - value.Length, value.Length) == value;
+
+        public static string ToJsonArray<T>(this IEnumerable<T> value) => $"[{value.Select(x => $"{x}").Aggregate((a, b) => $"{a},{b}")}]";
     }
 }
