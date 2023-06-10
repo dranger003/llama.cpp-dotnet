@@ -11,6 +11,8 @@
         public int n_batch = 512;                                               // batch size for prompt processing (must be >=32 to use BLAS)
         public int n_keep = 0;                                                  // number of tokens to keep from initial prompt
         public int n_gpu_layers = 0;                                            // number of layers to store in VRAM
+        public int main_gpu = 0;                                                // the GPU that is used for scratch and small tensors
+        public float[] tensor_split = new float[16];                            // how split tensors should be distributed across GPUs
 
         // sampling parameters
         public Dictionary<LlamaToken, float> logit_bias = new();                // logit bias for specific tokens
@@ -28,6 +30,7 @@
         public float mirostat_eta = 0.10f;                                      // learning rate
 
         public string model = "models/7B/ggml-model.bin";                       // model path
+        public string model_alias = "unknown";                                  // model alias
         public string prompt = String.Empty;
         public string path_prompt_cache = String.Empty;                         // path to file for saving/loading prompt eval state
         public string input_prefix = String.Empty;                              // string to prefix user inputs with
@@ -42,6 +45,7 @@
         public bool use_color = false;                                          // use color to distinguish generations and inputs
         public bool interactive = false;                                        // interactive mode
         public bool prompt_cache_all = false;                                   // save user input and generations to prompt cache
+        public bool prompt_cache_ro = false;                                    // open the prompt cache read-only and do not update it
 
         public bool embedding = false;                                          // get only sentence embedding
         public bool interactive_first = false;                                  // wait for user input immediately
@@ -53,6 +57,7 @@
         public bool use_mmap = true;                                            // use mmap for faster loads
         public bool use_mlock = true;                                           // use mlock to keep model in memory (default false)
         public bool mem_test = false;                                           // compute maximum memory usage
+        public bool export_cgraph = false;                                      // export the computation graph
         public bool verbose_prompt = false;                                     // print prompt tokens before generation
 
         public GptParams()
