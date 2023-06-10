@@ -189,7 +189,10 @@ namespace LlamaCppCli
                 aparams.n_threads = Options.ThreadCount ?? 1;
                 aparams.n_predict = Options.PredictCount ?? -1;
                 aparams.n_ctx = Options.ContextSize ?? 512;
+                aparams.n_batch = 512;
+                aparams.n_keep = 0;
                 aparams.n_gpu_layers = Options.GpuLayers ?? (args.Length > 2 ? Int32.Parse(args[2]) : 0);
+                aparams.main_gpu = 0;
                 aparams.top_k = Options.TopK ?? 40;
                 aparams.top_p = Options.TopP ?? 0.95f;
                 aparams.tfs_z = Options.TfsZ ?? 1.0f;
@@ -606,12 +609,15 @@ namespace LlamaCppCli
             );
         }
 
-        static LlamaContext llama_init_from_gpt_params(GptParams aparams)
+        public static LlamaContext llama_init_from_gpt_params(GptParams aparams)
         {
             var lparams = LlamaCppInterop.llama_context_default_params();
 
             lparams.n_ctx = aparams.n_ctx;
+            lparams.n_batch = aparams.n_batch;
             lparams.n_gpu_layers = aparams.n_gpu_layers;
+            lparams.main_gpu = aparams.main_gpu;
+            Array.Copy(aparams.tensor_split, lparams.tensor_split, lparams.tensor_split.Length);
             lparams.seed = aparams.seed;
             lparams.f16_kv = aparams.memory_f16;
             lparams.use_mmap = aparams.use_mmap;
