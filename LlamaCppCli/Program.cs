@@ -1,8 +1,13 @@
 ﻿using System.Reflection;
 using System.Text;
 
+using Microsoft.Data.SqlClient;
+
 using LlamaCppLib;
 using BertCppLib;
+
+using Dapper;
+using System.Data;
 
 namespace LlamaCppCli
 {
@@ -41,7 +46,7 @@ namespace LlamaCppCli
             Mirostat = Mirostat.Mirostat2,
             MirostatTAU = 5.0f,     // Target entropy
             MirostatETA = 0.10f,    // Learning rate
-            PenalizeNewLine = true,
+            PenalizeNewLine = false,
         };
 
         static string ModelName = "Model X";
@@ -121,6 +126,21 @@ namespace LlamaCppCli
 
         static async Task RawBertInterfaceSample(string[] args)
         {
+            //{
+            //    var names = Enumerable.Range(0, 384).Select(x => $"[e{x:000}]").ToList();
+            //    var columns = String.Join(", ", names);
+            //    //Console.WriteLine(columns);
+            //    for (var i = 1; i < names.Count + 1; i++)
+            //    {
+            //        Console.Write(names[i - 1]);
+            //        if ((i % 16) == 0)
+            //            Console.WriteLine(", ");
+            //        else
+            //            Console.Write(", ");
+            //    }
+            //    Console.WriteLine();
+            //}
+
             var path = args.Length > 0 ? args[0] : @"D:\LLM_MODELS\sentence-transformers\ggml-all-MiniLM-L12-v2-f32.bin";
             var prompt = args.Length > 1 ? args[1] : "Hello World!";
 
@@ -128,24 +148,33 @@ namespace LlamaCppCli
 
             if (BertCppInterop.bert_params_parse(args, out var bparams))
             {
-                var documents = new[]
-                {
-                    "Carson City is the capital city of the American state of Nevada. At the  2010 United States Census, Carson City had a population of 55,274.",
-                    "The Commonwealth of the Northern Mariana Islands is a group of islands in the Pacific Ocean that are a political division controlled by the United States. Its capital is Saipan.",
-                    "Charlotte Amalie is the capital and largest city of the United States Virgin Islands. It has about 20,000 people. The city is on the island of Saint Thomas.",
-                    "Washington, D.C. (also known as simply Washington or D.C., and officially as the District of Columbia) is the capital of the United States. It is a federal district.",
-                    "Capital punishment (the death penalty) has existed in the United States since before the United States was a country. As of 2017, capital punishment is legal in 30 of the 50 states.",
-                    "North Dakota is a state in the United States. 672,591 people lived in North Dakota in the year 2010. The capital and seat of government is Bismarck.",
-                };
+                var documents = new List<string>();
+                //documents.AddRange(
+                //    new[]
+                //    {
+                //        //"Carson City is the capital city of the American state of Nevada. At the  2010 United States Census, Carson City had a population of 55,274.",
+                //        //"The Commonwealth of the Northern Mariana Islands is a group of islands in the Pacific Ocean that are a political division controlled by the United States. Its capital is Saipan.",
+                //        //"Charlotte Amalie is the capital and largest city of the United States Virgin Islands. It has about 20,000 people. The city is on the island of Saint Thomas.",
+                //        //"Washington, D.C. (also known as simply Washington or D.C., and officially as the District of Columbia) is the capital of the United States. It is a federal district.",
+                //        //"Capital punishment (the death penalty) has existed in the United States since before the United States was a country. As of 2017, capital punishment is legal in 30 of the 50 states.",
+                //        //"North Dakota is a state in the United States. 672,591 people lived in North Dakota in the year 2010. The capital and seat of government is Bismarck.",
+                //        //"Johnny walked through the rain and snow to school.",
+                //        //"Johnny likes apples.",
+                //        //"Johnny rides horses.",
+                //        //"Johnny can do a backflip",
+                //        //"A policy prohibiting any form of bribery, ensuring all transactions are conducted legally and ethically.",
+                //        //"A policy that discourages and prevents any forms of corruption within the business, promoting fair business practices.",
+                //        //"A policy establishing the standards of ethical conduct expected in the organization's operations and decision-making.",
+                //        //"A policy ensuring decisions and actions are not influenced by personal interests or relationships, maintaining objectivity.",
+                //        "A policy aiming to prevent and detect the practice of generating illegal income and making it appear legitimate.",
+                //    }
+                //);
 
-                var query = "What is the capital of the United States?";
+                //var query = "What is the capital of the United States?";
+                //var query = "What was the weather like today for Johnny?";
+                var query = prompt;
 
                 var ctx = BertCppInterop.bert_load_from_file(bparams.model);
-
-                var documentsEmbeddings = documents
-                    .Select(x => BertCppInterop.bert_tokenize(ctx, x))
-                    .Select(x => BertCppInterop.bert_eval(ctx, bparams.n_threads, x))
-                    .ToList();
 
                 var queryEmbeddings = BertCppInterop.bert_eval(
                     ctx,
@@ -153,23 +182,91 @@ namespace LlamaCppCli
                     BertCppInterop.bert_tokenize(ctx, query)
                 );
 
-                var cosineSimilarities = documentsEmbeddings
-                    .Select(document => CosineSimilarity(queryEmbeddings, document))
+                //Console.WriteLine(queryEmbeddings.ToJsonArray());
+
+                var documentsEmbeddings = documents
+                    .Select(x => (Text: x, Tokens: BertCppInterop.bert_tokenize(ctx, x)))
+                    .Select(x => (x.Text, Embeddings: BertCppInterop.bert_eval(ctx, bparams.n_threads, x.Tokens)))
                     .ToList();
 
-                var levenshteinDistances = documents
-                    .Select(document => LevenshteinDistance(query, document))
-                    .ToList();
+                var colunmNames = Enumerable.Range(0, 384).Select(x => $"e{x:000}").ToList();
+                //Console.WriteLine(String.Join("\n", colunmNames.Select(x => $"public double {x} {{ get; set; }} = 0.0d;")));
+                //SqlMapper.AddTypeHandler(new SqlMapperEmbeddingsTypeHandler(colunmNames));
+                using (var db = new SqlConnection(@"Server=(LocalDB)\ProjectModels;Database=Db1;Integrated Security=true"))
+                {
+                    if (documentsEmbeddings.Any())
+                    {
+                        await db.ExecuteAsync(
+                            $"""
+                            INSERT INTO     [Embeddings_2] ([Text], [Magnitude], {String.Join(", ", colunmNames.Select(x => $"[{x}]"))})
+                            VALUES          (@Text, @Magnitude, {String.Join(", ", colunmNames.Select(x => $"@{x}"))})
+                            """,
+                            documentsEmbeddings.Select(
+                                x =>
+                                {
+                                    var parameters = new DynamicParameters();
+                                    parameters.Add("Text", x.Text);
+                                    parameters.Add("Magnitude", Math.Sqrt(x.Embeddings.Sum(e => Math.Pow(e, 2))));
 
-                var results = documents
-                    .Zip(cosineSimilarities, (x, similarity) => new { Document = x, CosineSimilarity = similarity })
-                    .Zip(levenshteinDistances, (x, levenshtein) => new { x.Document, x.CosineSimilarity, LevenshteinDistance = levenshtein })
-                    .OrderByDescending(x => x.CosineSimilarity)
-                    .ThenBy(x => x.LevenshteinDistance)
-                    .ToList();
+                                    for (var i = 0; i < x.Embeddings.Length; i++)
+                                        parameters.Add($"e{i:000}", x.Embeddings[i]);
 
-                Console.WriteLine($"[{query}]");
-                results.ForEach(x => Console.WriteLine($"[{x.CosineSimilarity}][{x.LevenshteinDistance}][{x.Document}]"));
+                                    return parameters;
+                                }
+                            )
+                        );
+                    }
+
+                    //var embeddings = await db.QueryAsync<DocumentEmbeddings>($"SELECT [a].* FROM [Embeddings_2] [a]");
+                    //Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(embeddings.First(), new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+
+                    var results = await db.QueryAsync<DocumentEmbeddingsResults>(
+                        $"""
+                        WITH			[Embeddings] AS (
+                        					SELECT			CONVERT([int], SUBSTRING([u].[ColumnName], 2, 3)) [key]
+                        									,[u].[Id]
+                        									,[u].[Text]
+                        									,[u].[Magnitude]
+                        									,[u].[Embedding]
+                        					FROM			[Embeddings_2]
+                        									UNPIVOT (
+                        										[Embedding] FOR [ColumnName] IN ({String.Join(", ", colunmNames.Select(x => $"[{x}]"))})
+                        									) as [u]
+                        				)
+                        SELECT			[a].[Text]
+                        				,SUM([a].[Embedding] * [b].[value]) / ([a].[Magnitude] * @QueryMagnitude) [CosineSimilarity]
+                        FROM			[Embeddings] [a]
+                        				JOIN OPENJSON (@QueryEmbeddings) [b] ON [b].[key] = [a].[key]
+                        GROUP BY		[a].[Id]
+                        				,[a].[Text]
+                        				,[a].[Magnitude]
+                        ORDER BY		[CosineSimilarity] DESC
+                        """,
+                        new { QueryEmbeddings = String.Join(",", queryEmbeddings.ToJsonArray()), QueryMagnitude = Math.Sqrt(queryEmbeddings.Sum(e => Math.Pow(e, 2))) }
+                    );
+
+                    Console.WriteLine($"[{query}]");
+                    foreach (var result in results)
+                        Console.WriteLine($"[{result.CosineSimilarity}][{result.Text}]");
+                }
+
+                //var cosineSimilarities = documentsEmbeddings
+                //    .Select(document => CosineSimilarity(queryEmbeddings, document.Embeddings))
+                //    .ToList();
+
+                //var levenshteinDistances = documents
+                //    .Select(document => LevenshteinDistance(query, document))
+                //    .ToList();
+
+                //var results = documents
+                //    .Zip(cosineSimilarities, (x, similarity) => new { Document = x, CosineSimilarity = similarity })
+                //    .Zip(levenshteinDistances, (x, levenshtein) => new { x.Document, x.CosineSimilarity, LevenshteinDistance = levenshtein })
+                //    .OrderByDescending(x => x.CosineSimilarity)
+                //    .ThenBy(x => x.LevenshteinDistance)
+                //    .ToList();
+
+                //Console.WriteLine($"[{query}]");
+                //results.ForEach(x => Console.WriteLine($"[{x.CosineSimilarity}][{x.LevenshteinDistance}][{x.Document}]"));
 
                 BertCppInterop.bert_free(ctx);
                 ctx = IntPtr.Zero;
@@ -257,6 +354,8 @@ namespace LlamaCppCli
 
             var n_past = 0;
             var n_consumed = 0;
+
+            Console.WriteLine($"----------------------------------------------------------------------------------------------------");
 
             while (!done)
             {
@@ -378,6 +477,8 @@ namespace LlamaCppCli
                         done = true;
                 }
             }
+
+            Console.WriteLine($"\n----------------------------------------------------------------------------------------------------");
 
             LlamaCppInterop.llama_print_timings(ctx);
             LlamaCppInterop.llama_free(ctx);
