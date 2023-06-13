@@ -1,5 +1,11 @@
-using LlamaCppLib;
 using System.Net;
+using System.Text;
+using System.Text.Json;
+
+using LlamaCppLib;
+using LlamaCppWeb;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -104,11 +110,115 @@ app.MapGet("/session/predict", async (HttpContext httpContext, string sessionNam
     }
 });
 
+// curl http://localhost:5021/v1/chat/completions -H "Content-Type: application/json" -H "Authorization: Bearer $API_KEY" -d "{ \"model\": \"tulu-7b\", \"messages\": [{\"role\": \"user\", \"content\": \"Hello?\"}] }"
+app.MapPost("/v1/chat/completions", async (HttpContext httpContext, CreateChatCompletion createChatCompletion) =>
+{
+    //Console.WriteLine(JsonSerializer.Serialize(createChatCompletion, new JsonSerializerOptions { WriteIndented = true }));
+
+    var lifetime = httpContext.RequestServices.GetRequiredService<IHostApplicationLifetime>();
+    using var cts = CancellationTokenSource.CreateLinkedTokenSource(httpContext.RequestAborted, lifetime.ApplicationStopping);
+
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    if (manager.Status == LlamaCppModelStatus.Unloaded || manager.ModelName != createChatCompletion.Model)
+    {
+        manager.LoadModel(createChatCompletion.Model ?? String.Empty);
+        manager.ConfigureModel(options =>
+        {
+            options.TopP = createChatCompletion.TopP;
+            options.Temperature = createChatCompletion.Temperature;
+            options.RepeatPenalty = createChatCompletion.PresencePenalty;
+        });
+    }
+
+    var sessionName = $"{httpContext.Request.Headers.Authorization}";
+    if (manager.Sessions.SingleOrDefault(name => name == sessionName) == null)
+    {
+        manager.CreateSession(sessionName);
+        // TODO: Set prompting template according to loaded model
+        manager.GetSession(sessionName).Configure(session => session.Template = "You are a helpful assistant.\n\nUSER:\n{prompt}\n\nASSISTANT:\n");
+    }
+
+    var session = manager.GetSession(sessionName);
+
+    if (!createChatCompletion.Stream)
+    {
+        var output = new StringBuilder();
+        await foreach (var token in session.Predict(createChatCompletion.Messages[0].Content ?? String.Empty, cancellationToken: cts.Token))
+        {
+            Console.Write(token);
+            output.Append(token);
+        }
+        Console.WriteLine();
+
+        await httpContext.Response.WriteAsync(output.ToString());
+    }
+    else
+    {
+        httpContext.Response.ContentType = "text/event-stream";
+
+        await foreach (var token in session.Predict(createChatCompletion.Messages[0].Content ?? String.Empty, cancellationToken: cts.Token))
+        {
+            await httpContext.Response.WriteAsync(token);
+            await httpContext.Response.Body.FlushAsync();
+        }
+    }
+});
+
+app.MapGet("/debug/load", async (HttpContext httpContext) =>
+{
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    //var modelName = "vicuna-13b-v1.1-q5_1";
+    var modelName = "wizard-vicuna-13b-q5_1";
+    var sessionName = "Conversation #1";
+    manager.LoadModel(modelName);
+    var session = manager.CreateSession(sessionName);
+    session.Configure(options => options.Template = "USER:\n{prompt}\n\nASSISTANT:\n");
+    await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
+});
+
+app.MapGet("/debug/run", async (HttpContext httpContext, string prompt) =>
+{
+    var lifetime = httpContext.RequestServices.GetRequiredService<IHostApplicationLifetime>();
+    using var cts = CancellationTokenSource.CreateLinkedTokenSource(httpContext.RequestAborted, lifetime.ApplicationStopping);
+
+    var sessionName = "Conversation #1";
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    var session = manager.GetSession(sessionName);
+    session.Reset();
+
+    httpContext.Response.ContentType = "text/event-stream";
+
+    await httpContext.Response.Body.WriteAsync(Encoding.UTF8.GetBytes($"data: <|BOS|>\n\n"));
+    await httpContext.Response.Body.FlushAsync();
+
+    try
+    {
+        await foreach (var token in session.Predict(prompt, cancellationToken: cts.Token))
+        {
+            var encodedData = token.Replace("\n", "\\n");
+            await httpContext.Response.Body.WriteAsync(Encoding.UTF8.GetBytes($"data: {encodedData}\n\n"), cts.Token);
+            await httpContext.Response.Body.FlushAsync();
+        }
+    }
+    catch (OperationCanceledException)
+    { }
+
+    await httpContext.Response.Body.WriteAsync(Encoding.UTF8.GetBytes($"data: <|EOS|>\n\n"));
+    await httpContext.Response.Body.FlushAsync();
+});
+
 app.MapGet("/debug/context", async (HttpContext httpContext) =>
 {
     var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
     var session = manager.GetSession(manager.Sessions.First());
-    await httpContext.Response.WriteAsync($"<|BOS|>{session.Conversation}<|EOD|>");
+    await httpContext.Response.WriteAsync($"<|BOS|>{session.Conversation}<|EOS|>");
+});
+
+app.MapGet("/debug/template", async (HttpContext httpContext) =>
+{
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    var session = manager.GetSession(manager.Sessions.First());
+    await httpContext.Response.WriteAsync($"[{session.Options.Template}]");
 });
 
 await app.RunAsync();

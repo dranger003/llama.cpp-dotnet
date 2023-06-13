@@ -61,7 +61,8 @@ namespace LlamaCppCli
         {
 #if DEBUG
             //args = new[] { "0", @"C:\LLM_MODELS\lmsys\ggml-vicuna-13b-v1.1-q4_0.bin", @"..\..\context.txt" };
-            args = new[] { "1", @"C:\LLM_MODELS\lmsys\ggml-vicuna-13b-v1.1-q5_1.bin", @"..\..\template_vicuna-v1.1.txt" };
+            //args = new[] { "1", @"C:\LLM_MODELS\lmsys\ggml-vicuna-13b-v1.1-q5_1.bin", @"..\..\template_vicuna-v1.1.txt" };
+            args = new[] { "0", @"C:\LLM_MODELS\sentence-transformers\ggml-all-MiniLM-L12-v2-f32.bin" };
 #endif
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
@@ -182,6 +183,7 @@ namespace LlamaCppCli
                     BertCppInterop.bert_tokenize(ctx, query)
                 );
 
+                var n_embd = BertCppInterop.bert_n_embd(ctx);
                 //Console.WriteLine(queryEmbeddings.ToJsonArray());
 
                 var documentsEmbeddings = documents
@@ -189,16 +191,34 @@ namespace LlamaCppCli
                     .Select(x => (x.Text, Embeddings: BertCppInterop.bert_eval(ctx, bparams.n_threads, x.Tokens)))
                     .ToList();
 
-                var colunmNames = Enumerable.Range(0, 384).Select(x => $"e{x:000}").ToList();
+                var colunmNames = Enumerable.Range(0, n_embd).Select(x => $"e{x:000}").ToList();
                 //Console.WriteLine(String.Join("\n", colunmNames.Select(x => $"public double {x} {{ get; set; }} = 0.0d;")));
                 //SqlMapper.AddTypeHandler(new SqlMapperEmbeddingsTypeHandler(colunmNames));
                 using (var db = new SqlConnection(@"Server=(LocalDB)\ProjectModels;Database=Db1;Integrated Security=true"))
                 {
+                    var tableName = "Embeddings_2";
+                    var tableExists = await db.ExecuteScalarAsync<bool>($"SELECT OBJECT_ID(N'[dbo].[{tableName}]')");
+
+                    if (!tableExists)
+                    {
+                        await db.ExecuteAsync(
+                            $"""
+                            CREATE          TABLE [dbo].[{tableName}] (
+                                                [Id] [int] IDENTITY
+                                                ,[Text] [nvarchar](max)
+                                                ,[Magnitude] [float]
+                                                {String.Join("\n", colunmNames.Select(x => $",[{x}] [float]"))}
+                                                ,CONSTRAINT [PK_Embeddings_3] PRIMARY KEY CLUSTERED ([Id] ASC)
+                                            )
+                            """
+                        );
+                    }
+
                     if (documentsEmbeddings.Any())
                     {
                         await db.ExecuteAsync(
                             $"""
-                            INSERT INTO     [Embeddings_2] ([Text], [Magnitude], {String.Join(", ", colunmNames.Select(x => $"[{x}]"))})
+                            INSERT INTO     [{tableName}] ([Text], [Magnitude], {String.Join(", ", colunmNames.Select(x => $"[{x}]"))})
                             VALUES          (@Text, @Magnitude, {String.Join(", ", colunmNames.Select(x => $"@{x}"))})
                             """,
                             documentsEmbeddings.Select(
@@ -228,10 +248,10 @@ namespace LlamaCppCli
                         									,[u].[Text]
                         									,[u].[Magnitude]
                         									,[u].[Embedding]
-                        					FROM			[Embeddings_2]
-                        									UNPIVOT (
-                        										[Embedding] FOR [ColumnName] IN ({String.Join(", ", colunmNames.Select(x => $"[{x}]"))})
-                        									) as [u]
+                        					FROM			[{tableName}]
+                        					                UNPIVOT (
+                                                                [Embedding] FOR [ColumnName] IN ({String.Join(", ", colunmNames.Select(x => $"[{x}]"))})
+                                                            ) as [u]
                         				)
                         SELECT			[a].[Text]
                         				,SUM([a].[Embedding] * [b].[value]) / ([a].[Magnitude] * @QueryMagnitude) [CosineSimilarity]
