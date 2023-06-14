@@ -1,11 +1,8 @@
 using System.Net;
 using System.Text;
-using System.Text.Json;
 
 using LlamaCppLib;
 using LlamaCppWeb;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -167,8 +164,7 @@ app.MapPost("/v1/chat/completions", async (HttpContext httpContext, CreateChatCo
 app.MapGet("/debug/load", async (HttpContext httpContext) =>
 {
     var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
-    //var modelName = "vicuna-13b-v1.1-q5_1";
-    var modelName = "wizard-vicuna-13b-q5_1";
+    var modelName = "tulu";
     var sessionName = "Conversation #1";
     manager.LoadModel(modelName);
     var session = manager.CreateSession(sessionName);
