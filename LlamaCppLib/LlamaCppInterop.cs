@@ -42,14 +42,22 @@ namespace LlamaCppLib
             public int main_gpu;
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
             public float[] tensor_split;
+            [MarshalAs(UnmanagedType.I1)]
+            public bool low_vram;
             public int seed;
 
-            [MarshalAs(UnmanagedType.I1)] public bool f16_kv;
-            [MarshalAs(UnmanagedType.I1)] public bool logits_all;
-            [MarshalAs(UnmanagedType.I1)] public bool vocab_only;
-            [MarshalAs(UnmanagedType.I1)] public bool use_mmap;
-            [MarshalAs(UnmanagedType.I1)] public bool use_mlock;
-            [MarshalAs(UnmanagedType.I1)] public bool embedding;
+            [MarshalAs(UnmanagedType.I1)]
+            public bool f16_kv;
+            [MarshalAs(UnmanagedType.I1)]
+            public bool logits_all;
+            [MarshalAs(UnmanagedType.I1)]
+            public bool vocab_only;
+            [MarshalAs(UnmanagedType.I1)]
+            public bool use_mmap;
+            [MarshalAs(UnmanagedType.I1)]
+            public bool use_mlock;
+            [MarshalAs(UnmanagedType.I1)]
+            public bool embedding;
 
             public llama_progress_callback progress_callback;
             public nint progress_callback_user_data;

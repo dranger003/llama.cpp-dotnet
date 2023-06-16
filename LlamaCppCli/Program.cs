@@ -733,6 +733,9 @@ namespace LlamaCppCli
 
             lparams.n_ctx = aparams.n_ctx;
             lparams.n_gpu_layers = aparams.n_gpu_layers;
+            lparams.main_gpu = aparams.main_gpu;
+            Array.Copy(aparams.tensor_split, lparams.tensor_split, lparams.tensor_split.Length);
+            lparams.low_vram = aparams.low_vram;
             lparams.seed = aparams.seed;
             lparams.f16_kv = aparams.memory_f16;
             lparams.use_mmap = aparams.use_mmap;

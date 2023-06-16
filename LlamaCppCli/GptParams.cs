@@ -11,6 +11,9 @@
         public int n_batch = 512;                                               // batch size for prompt processing (must be >=32 to use BLAS)
         public int n_keep = 0;                                                  // number of tokens to keep from initial prompt
         public int n_gpu_layers = 0;                                            // number of layers to store in VRAM
+        public int main_gpu = 0;                                                // the GPU that is used for scratch and small tensors
+        public float[] tensor_split = new float[16];                            // how split tensors should be distributed across GPUs
+        public bool low_vram = false;                                           // if true, reduce VRAM usage at the cost of performance
 
         // sampling parameters
         public Dictionary<LlamaToken, float> logit_bias = new();                // logit bias for specific tokens
