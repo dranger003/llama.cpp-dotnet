@@ -5,6 +5,7 @@ using LlamaCppLib;
 
 namespace LlamaCppCli
 {
+    using static LlamaCppLib.LlamaCppInterop;
     using LlamaContext = System.IntPtr;
     using LlamaToken = System.Int32;
 
@@ -52,17 +53,16 @@ namespace LlamaCppCli
         static async Task Main(string[] args)
         {
 #if DEBUG
-            //args = new[] { "0", @"C:\LLM_MODELS\lmsys\ggml-vicuna-13b-v1.1-q4_0.bin", @"..\..\context.txt" };
-            args = new[] { "1", @"C:\LLM_MODELS\lmsys\ggml-vicuna-13b-v1.1-q5_1.bin", @"..\..\template_vicuna-v1.1.txt" };
+            args = new[] { "0", @"C:\LLM_MODELS\allenai\ggml-tulu-7b-q4_K_M.bin", "Hello?" };
 #endif
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
+                (nameof(SimpleSample), SimpleSample),
                 (nameof(RawInterfaceSample), RawInterfaceSample),
                 (nameof(WrappedInterfaceSampleWithoutSession), WrappedInterfaceSampleWithoutSession),
                 (nameof(WrappedInterfaceSampleWithSession), WrappedInterfaceSampleWithSession),
                 (nameof(WrappedInterfaceSampleWithSessionInteractive), WrappedInterfaceSampleWithSessionInteractive),
                 (nameof(GetEmbeddings), GetEmbeddings),
-                //(nameof(GithubReadmeSample), GithubReadmeSample),
             }
                 .Select((sample, index) => (sample, index))
                 .ToDictionary(k => k.sample.Name, v => (Index: v.index, v.sample.Func));
@@ -74,16 +74,10 @@ namespace LlamaCppCli
                     Console.WriteLine($"    [{sample.Value.Index}] = {sample.Key}");
             };
 
-            //if (args.Length > 0 && Int32.Parse(args[0]) == samples.Select((x, i) => (x, i)).Single(x => x.x.Key == nameof(GithubReadmeSample)).i)
-            //{
-            //    await samples[nameof(GithubReadmeSample)].Func(args);
-            //    return;
-            //}
-
             if (args.Length < 2)
             {
                 Console.WriteLine($"USAGE:");
-                Console.WriteLine($"    {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} <SampleIndex> <ModelPath> [TemplatePath] [GpuLayers]");
+                Console.WriteLine($"    {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} <SampleIndex> <ModelPath>");
                 PrintAvailableSamples();
                 return;
             }
@@ -91,12 +85,6 @@ namespace LlamaCppCli
             if (!Path.Exists(args[1]))
             {
                 Console.WriteLine($"ERROR: Model not found ({Path.GetFullPath(args[1])}).");
-                return;
-            }
-
-            if (args.Length > 2 && !Path.Exists(args[2]))
-            {
-                Console.WriteLine($"ERROR: Template not found ({Path.GetFullPath(args[2])}).");
                 return;
             }
 
@@ -114,6 +102,96 @@ namespace LlamaCppCli
         }
 
         static string LoadTemplate(string path) => File.ReadAllText(path).Replace("{prompt}", "{0}").Replace("{context}", "{1}");
+
+        static async Task SimpleSample(string[] args)
+        {
+            if (args.Length < 1)
+            {
+                await Console.Out.WriteLineAsync($"usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} MODEL_PATH [PROMPT]");
+                return;
+            }
+
+            var aparams = new GptParams();
+            aparams.model = args[0];
+            aparams.prompt = args.Length > 1 ? args[1] : "Hello my name is";
+            aparams.n_gpu_layers = args.Length > 2 ? Int32.Parse(args[2]) : 0;
+
+            LlamaCppInterop.llama_init_backend();
+
+            var ctx = Program.llama_init_from_gpt_params(aparams);
+
+            if (ctx == IntPtr.Zero)
+            {
+                await Console.Error.WriteLineAsync($"{nameof(SimpleSample)}: error: unable to load model");
+                return;
+            }
+
+            var tokens_list = Program.llama_tokenize(ctx, aparams.prompt, true) ?? new();
+
+            var max_context_size = LlamaCppInterop.llama_n_ctx(ctx);
+            var max_tokens_list_size = max_context_size - 4;
+
+            if (tokens_list.Count > max_tokens_list_size)
+            {
+                await Console.Error.WriteLineAsync($"{nameof(SimpleSample)}: error: prompt too long ({tokens_list.Count} tokens, max {max_tokens_list_size})");
+                return;
+            }
+
+            await Console.Error.WriteLineAsync("\n");
+
+            foreach (var id in tokens_list)
+            {
+                await Console.Out.WriteAsync(llama_token_to_str(ctx, id));
+            }
+
+            await Console.Out.FlushAsync();
+
+            var cancel = false;
+            Console.CancelKeyPress += (s, e) => e.Cancel = cancel = true;
+
+            while (LlamaCppInterop.llama_get_kv_cache_token_count(ctx) < max_context_size && !cancel)
+            {
+                if (LlamaCppInterop.llama_eval(ctx, tokens_list.ToArray(), tokens_list.Count, LlamaCppInterop.llama_get_kv_cache_token_count(ctx), aparams.n_threads) > 0)
+                {
+                    await Console.Error.WriteLineAsync($"{nameof(SimpleSample)} : failed to eval");
+                    return;
+                }
+
+                tokens_list.Clear();
+
+                var logits = LlamaCppInterop.llama_get_logits(ctx);
+                var n_vocab = LlamaCppInterop.llama_n_vocab(ctx);
+
+                var candidates = new List<LlamaCppInterop.llama_token_data>(n_vocab);
+
+                for (LlamaToken tokenId = 0; tokenId < n_vocab; tokenId++)
+                {
+                    candidates.Add(new LlamaCppInterop.llama_token_data { id = tokenId, logit = logits[tokenId], p = 0.0f });
+                }
+
+                var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates.ToArray(), size = (ulong)candidates.Count, sorted = false };
+
+                var new_token_id = LlamaCppInterop.llama_sample_token_greedy(ctx, candidates_p);
+
+                if (new_token_id == LlamaCppInterop.llama_token_eos())
+                {
+                    await Console.Out.WriteLineAsync($" [end of text]");
+                    break;
+                }
+
+                await Console.Out.WriteAsync($"{LlamaCppInterop.llama_token_to_str(ctx, new_token_id)}");
+                await Console.Out.FlushAsync();
+
+                tokens_list.Add(new_token_id);
+            }
+
+            if (cancel)
+            {
+                await Console.Out.WriteLineAsync($" [cancelled]");
+            }
+
+            LlamaCppInterop.llama_free(ctx);
+        }
 
         static async Task RawInterfaceSample(string[] args)
         {
@@ -546,7 +624,7 @@ namespace LlamaCppCli
             );
         }
 
-        public static LlamaContext llama_init_from_gpt_params(GptParams aparams)
+        static LlamaContext llama_init_from_gpt_params(GptParams aparams)
         {
             var lparams = LlamaCppInterop.llama_context_default_params();
 
@@ -569,6 +647,13 @@ namespace LlamaCppCli
                 LlamaCppInterop.llama_apply_lora_from_file(lctx, aparams.lora_adapter, aparams.lora_base, aparams.n_threads);
 
             return lctx;
+        }
+
+        static List<LlamaToken> llama_tokenize(LlamaContext ctx, string text, bool add_bos)
+        {
+            var res = new LlamaToken[text.Length + (add_bos ? 1 : 0)];
+            var n = LlamaCppInterop.llama_tokenize(ctx, text, res, res.Length, add_bos);
+            return new(res.Take(n));
         }
     }
 }
