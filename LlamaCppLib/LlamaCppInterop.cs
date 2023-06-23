@@ -36,16 +36,18 @@ namespace LlamaCppLib
         [StructLayout(LayoutKind.Sequential)]
         public struct llama_context_params
         {
+            public int seed;
             public int n_ctx;
             public int n_batch;
             public int n_gpu_layers;
             public int main_gpu;
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
             public float[] tensor_split;
+            public llama_progress_callback progress_callback;
+            public nint progress_callback_user_data;
+
             [MarshalAs(UnmanagedType.I1)]
             public bool low_vram;
-            public int seed;
-
             [MarshalAs(UnmanagedType.I1)]
             public bool f16_kv;
             [MarshalAs(UnmanagedType.I1)]
@@ -58,9 +60,6 @@ namespace LlamaCppLib
             public bool use_mlock;
             [MarshalAs(UnmanagedType.I1)]
             public bool embedding;
-
-            public llama_progress_callback progress_callback;
-            public nint progress_callback_user_data;
         }
 
         public enum LLAMA_FTYPE
