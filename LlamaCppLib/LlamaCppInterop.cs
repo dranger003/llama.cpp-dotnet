@@ -3,6 +3,7 @@
 namespace LlamaCppLib
 {
     using llama_context = System.IntPtr;
+    using llama_model = System.IntPtr;
     using llama_token = System.Int32;
 
     public static unsafe class LlamaCppInterop
@@ -100,22 +101,17 @@ namespace LlamaCppLib
         [DllImport("llama")]
         public static extern long llama_time_us();
 
-        /// <summary>
-        /// Various functions for loading a ggml llama model.
-        /// Allocate (almost) all memory needed for the model.
-        /// </summary>
-        /// <param name="path_model">Model file path</param>
-        /// <param name="cparams">Parameters to use for loading the model</param>
-        /// <returns>LlamaContext on success or null on failure</returns>
         [DllImport("llama")]
-        public static extern llama_context llama_init_from_file(string path_model, llama_context_params cparams);
+        public static extern llama_model llama_load_model_from_file(string path_model, llama_context_params cparams);
 
-        /// <summary>
-        /// Frees all allocated memory
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
         [DllImport("llama")]
-        public static extern void llama_free(llama_context ctx);
+        public static extern void llama_free_model(llama_model model);
+
+        [DllImport("llama")]
+        public static extern llama_context llama_new_context_with_model(llama_model model, llama_context_params cparams);
+
+        [DllImport("llama")]
+        public static extern void llama_free(llama_context model);
 
         /// <summary>
         /// TODO: not great API - very likely to change (from llama.cpp)
@@ -139,7 +135,7 @@ namespace LlamaCppLib
         /// <param name="n_threads">nthread - how many threads to use. If <=0, will use std::thread::hardware_concurrency(), else the number given</param>
         /// <returns>Returns 0 on success</returns>
         [DllImport("llama")]
-        public static extern int llama_apply_lora_from_file(llama_context ctx, string path_lora, string? path_base_model, int n_threads);
+        public static extern int llama_model_apply_lora_from_file(llama_model model, string path_lora, string? path_base_model, int n_threads);
 
         /// <summary>
         /// </summary>

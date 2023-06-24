@@ -82,7 +82,7 @@ namespace LlamaCppLib
             cparams.use_mlock = _options.UseMemoryLocking ?? false;
             cparams.embedding = false;
 
-            _model = LlamaCppInterop.llama_init_from_file(modelPath, cparams);
+            _model = LlamaCppInterop.llama_load_model_from_file(modelPath, cparams);
 
             if (useLora)
             {
@@ -95,7 +95,7 @@ namespace LlamaCppLib
                 if (loraBaseModelPath == null)
                     throw new ArgumentNullException(loraPath, nameof(loraBaseModelPath));
 
-                var result = LlamaCppInterop.llama_apply_lora_from_file(_model, loraPath, loraBaseModelPath, Options.ThreadCount ?? 0);
+                var result = LlamaCppInterop.llama_model_apply_lora_from_file(_model, loraPath, loraBaseModelPath, Options.ThreadCount ?? 0);
                 if (result != 0)
                     throw new Exception($"Unable to load LoRA file (return code: {result}).");
             }
