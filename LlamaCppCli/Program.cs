@@ -115,7 +115,7 @@ namespace LlamaCppCli
 
             var aparams = new GptParams();
             aparams.model = args[0];
-            aparams.prompt = args.Length > 2 ? args[2] : "Hello my name is";
+            aparams.prompt = args.Length > 2 ? args[2].Replace("\\n", "\n") : "Hello my name is";
             aparams.n_gpu_layers = args.Length > 1 ? Int32.Parse(args[1]) : 0;
 
             LlamaCppInterop.llama_init_backend();
