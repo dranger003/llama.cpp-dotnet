@@ -123,7 +123,12 @@ namespace LlamaCppCli
             var cancel = false;
             Console.CancelKeyPress += (s, e) => e.Cancel = cancel = true;
 
-            await Console.Out.WriteLineAsync("\nEntering interactive mode.\nPress <enter> on an empty input to quit.\nPress <Ctrl+C> to cancel token predictions.");
+            await Console.Out.WriteLineAsync("""
+
+                Entering interactive mode.
+                Press <Enter> on an empty input to quit.
+                Press <Ctrl+C> to cancel token predictions.
+                """);
 
             while (true)
             {
@@ -172,11 +177,12 @@ namespace LlamaCppCli
 
                     tokens_list.Add(new_token_id);
                 }
-            }
 
-            if (cancel)
-            {
-                await Console.Out.WriteLineAsync($" [cancelled]");
+                if (cancel)
+                {
+                    await Console.Out.WriteLineAsync($" [cancelled]");
+                    cancel = false;
+                }
             }
 
             LlamaCppInterop.llama_free(init.Context);
