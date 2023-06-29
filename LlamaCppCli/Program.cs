@@ -1,12 +1,9 @@
 ﻿using System.Reflection;
-using System.Text;
 
 using LlamaCppLib;
 
 namespace LlamaCppCli
 {
-    using static LlamaCppLib.LlamaCppInterop;
-
     using LlamaModel = System.IntPtr;
     using LlamaContext = System.IntPtr;
     using LlamaToken = System.Int32;

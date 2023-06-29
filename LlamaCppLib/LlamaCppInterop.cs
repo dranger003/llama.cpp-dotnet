@@ -37,7 +37,7 @@ namespace LlamaCppLib
         [StructLayout(LayoutKind.Sequential)]
         public struct llama_context_params
         {
-            public int seed;
+            public uint seed;
             public int n_ctx;
             public int n_batch;
             public int n_gpu_layers;
@@ -150,7 +150,7 @@ namespace LlamaCppLib
         /// <param name="ctx">LlamaContext</param>
         /// <param name="seed">Seed</param>
         [DllImport("llama")]
-        public static extern void llama_set_rng_seed(llama_context ctx, int seed);
+        public static extern void llama_set_rng_seed(llama_context ctx, uint seed);
 
         /// <summary>
         /// Returns the size in bytes of the state (rng, logits, embedding and kv_cache)
