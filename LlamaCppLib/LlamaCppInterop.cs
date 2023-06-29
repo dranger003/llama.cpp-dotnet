@@ -96,7 +96,7 @@ namespace LlamaCppLib
         public static extern bool llama_mlock_supported();
 
         [DllImport("llama")]
-        public static extern void llama_init_backend();
+        public static extern void llama_init_backend(bool numa = false);
 
         [DllImport("llama")]
         public static extern long llama_time_us();
@@ -212,6 +212,18 @@ namespace LlamaCppLib
         /// <returns>Returns 0 on success</returns>
         [DllImport("llama")]
         public static extern int llama_eval(llama_context ctx, llama_token[] tokens, int n_tokens, int n_past, int n_threads);
+
+        /// <summary>
+        /// Same as llama_eval, but use float matrix input directly.
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="embd"></param>
+        /// <param name="n_tokens"></param>
+        /// <param name="n_past"></param>
+        /// <param name="n_threads"></param>
+        /// <returns></returns>
+        [DllImport("llama")]
+        public static extern int llama_eval_embd(llama_context ctx, float[] embd, int n_tokens, int n_past, int n_threads);
 
         /// <summary>
         /// Convert the provided text into tokens.
