@@ -4,7 +4,7 @@
 
     internal class GptParams
     {
-        public int seed = -1;                                                   // RNG seed
+        public uint seed = unchecked((uint)-1);                                 // RNG seed
         public int n_threads = Math.Min(4, Environment.ProcessorCount / 2);     // assumes hyperthreading (i.e. divide by 2)
         public int n_predict = -1;                                              // new tokens to predict
         public int n_ctx = 512;                                                 // context size

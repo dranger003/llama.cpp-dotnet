@@ -9,7 +9,7 @@ namespace LlamaCppWeb
         // Model options override global options
         public class ModelOptions
         {
-            public int? Seed { get; set; }
+            public uint? Seed { get; set; }
             public int? PredictCount { get; set; }
             public int? ContextSize { get; set; }
             public int? LastTokenCountPenalty { get; set; }
@@ -45,7 +45,7 @@ namespace LlamaCppWeb
         }
 
         // Global options
-        public int? Seed { get; set; }
+        public uint? Seed { get; set; }
         public int? PredictCount { get; set; }
         public int? ContextSize { get; set; }
         public int? LastTokenCountPenalty { get; set; }

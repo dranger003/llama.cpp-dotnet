@@ -6,7 +6,7 @@
 
     public class LlamaCppOptions
     {
-        public int? Seed { get; set; }
+        public uint? Seed { get; set; }
         public int? PredictCount { get; set; }
         public int? ContextSize { get; set; }
         public int? LastTokenCountPenalty { get; set; }
