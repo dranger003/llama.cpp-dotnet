@@ -236,11 +236,11 @@ namespace LlamaCppCli
 
             var modelPath = args[0];
             var gpuLayers = Int32.Parse(args[1]);
-            var prompt = args.Length > 3 ? args[2] : "### System:\nYou are a helpful assistant.\n\n### User:\nHello?\n\n### Response:\n";
+            var prompt = args.Length > 3 ? args[2] : "### System:\nYou are a helpful assistant.\n\n### User:\nWrite a table containing the planets of the solar system.\n\n### Response:\n";
 
             var options = new LlamaCppOptions
             {
-                ThreadCount = 8,
+                ThreadCount = 4,
                 ContextSize = 2048,
                 TopK = 40,
                 TopP = 0.95f,
@@ -248,21 +248,24 @@ namespace LlamaCppCli
                 RepeatPenalty = 1.1f,
                 PenalizeNewLine = false,
                 GpuLayers = gpuLayers,
+                Mirostat = Mirostat.Mirostat2,
             };
 
             var model = new LlamaCpp("Model #1", options);
             model.Load(modelPath);
 
             var cancellationTokenSource = new CancellationTokenSource();
-            Console.CancelKeyPress += (s, e) =>
-            {
-                e.Cancel = true;
-                cancellationTokenSource.Cancel();
-            };
+            Console.CancelKeyPress += (s, e) => cancellationTokenSource.Cancel(!(e.Cancel = true));
+
+            await Console.Out.WriteLineAsync($"{new String('=', Console.WindowWidth)}");
+            await Console.Out.WriteLineAsync(prompt);
+            await Console.Out.WriteLineAsync($"{new String('=', Console.WindowWidth)}");
 
             var predictOptions = new PredictOptions { PromptVocabIds = model.Tokenize(prompt, true) };
             await foreach (var prediction in model.Predict(predictOptions, cancellationTokenSource.Token))
                 await Console.Out.WriteAsync(prediction.Value);
+
+            await Console.Out.WriteLineAsync($"\n{new String('=', Console.WindowWidth)}");
         }
 
         static void PrintParams(GptParams aparams)
