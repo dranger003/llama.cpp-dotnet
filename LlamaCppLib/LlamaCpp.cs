@@ -12,6 +12,7 @@ namespace LlamaCppLib
         private LlamaContext _modelContext;
         private string _modelName;
         private LlamaCppOptions _options = new();
+        private byte[]? _state;
 
         public LlamaCpp(string name, LlamaCppOptions options)
         {
@@ -30,6 +31,8 @@ namespace LlamaCppLib
             }
         }
 
+        public LlamaContext Handle => _modelContext;
+
         public string ModelName { get => _modelName; }
 
         public LlamaCppOptions Options { get => _options; }
@@ -45,6 +48,17 @@ namespace LlamaCppLib
             vocabIds
                 .Select(vocabId => LlamaCppInterop.llama_token_to_str(_modelContext, vocabId))
                 .Aggregate((a, b) => $"{a}{b}") : String.Empty;
+
+        private byte[] GetState() => LlamaCppInterop.llama_copy_state_data(_modelContext);
+        private void SetState(byte[] state) => LlamaCppInterop.llama_set_state_data(_modelContext, state);
+
+        public void ResetState()
+        {
+            if (_state == null)
+                return;
+
+            SetState(_state);
+        }
 
         /// <summary>
         /// Load a model and optionally load a LoRA adapter
@@ -98,6 +112,8 @@ namespace LlamaCppLib
                 if (result != 0)
                     throw new Exception($"Unable to load LoRA file (return code: {result}).");
             }
+
+            _state = GetState();
         }
 
         public async IAsyncEnumerable<KeyValuePair<LlamaToken, string>> Predict(PredictOptions options, [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -116,6 +132,7 @@ namespace LlamaCppLib
             var n_threads = _options.ThreadCount ?? 4;
             var n_batch = 512;
             var n_past = 0;
+
             var top_k = _options.TopK ?? 40;
             var top_p = _options.TopP ?? 0.95f;
             var tfs_z = _options.TfsZ ?? 1.0f;

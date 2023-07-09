@@ -166,8 +166,16 @@ namespace LlamaCppLib
         /// <param name="ctx">LlamaContext</param>
         /// <param name="dest">Destination needs to have allocated enough memory.</param>
         /// <returns>Returns the number of bytes copied</returns>
-        [DllImport("llama")]
-        public static extern int llama_copy_state_data(llama_context ctx, nint dest);
+        [DllImport("llama", EntryPoint = "llama_copy_state_data")]
+        private static extern int _llama_copy_state_data(llama_context ctx, byte[] dest);
+
+        public static byte[] llama_copy_state_data(llama_context ctx)
+        {
+            var size = llama_get_state_size(ctx);
+            var state = new byte[size];
+            var count = _llama_copy_state_data(ctx, state);
+            return state.Take(count).ToArray();
+        }
 
         /// <summary>
         /// Set the state reading from the specified address
@@ -176,7 +184,7 @@ namespace LlamaCppLib
         /// <param name="src">State source</param>
         /// <returns>Returns the number of bytes read</returns>
         [DllImport("llama")]
-        public static extern int llama_set_state_data(llama_context ctx, nint src);
+        public static extern int llama_set_state_data(llama_context ctx, byte[] src);
 
         /// <summary>
         /// Load session file
