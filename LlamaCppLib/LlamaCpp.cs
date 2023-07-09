@@ -2,12 +2,14 @@
 
 namespace LlamaCppLib
 {
+    using LlamaModel = System.IntPtr;
     using LlamaContext = System.IntPtr;
     using LlamaToken = System.Int32;
 
     public class LlamaCpp : IDisposable
     {
-        private LlamaContext _model;
+        private LlamaModel _model;
+        private LlamaContext _modelContext;
         private string _modelName;
         private LlamaCppOptions _options = new();
 
@@ -19,10 +21,12 @@ namespace LlamaCppLib
 
         public void Dispose()
         {
-            if (_model != nint.Zero)
+            if (_model != IntPtr.Zero)
             {
-                LlamaCppInterop.llama_free(_model);
-                _model = nint.Zero;
+                LlamaCppInterop.llama_free(_modelContext);
+                _modelContext = IntPtr.Zero;
+                LlamaCppInterop.llama_free_model(_model);
+                _model = IntPtr.Zero;
             }
         }
 
@@ -30,21 +34,17 @@ namespace LlamaCppLib
 
         public LlamaCppOptions Options { get => _options; }
 
-        public LlamaCppSession CreateSession(string sessionName) =>
-            new(this, sessionName);
-
         public List<LlamaToken> Tokenize(string text, bool addBos = false)
         {
             var tokens = new LlamaToken[_options.ContextSize ?? 1];
-            var count = LlamaCppInterop.llama_tokenize(_model, text, tokens, tokens.Length, addBos);
+            var count = LlamaCppInterop.llama_tokenize(_modelContext, text, tokens, tokens.Length, addBos);
             return new(tokens.Take(count));
         }
 
-        public string Detokenize(IEnumerable<LlamaToken> vocabIds) =>
+        public string Detokenize(IEnumerable<LlamaToken> vocabIds) => vocabIds.Any() ?
             vocabIds
-                .Select(vocabId => LlamaCppInterop.llama_token_to_str(_model, vocabId))
-                .DefaultIfEmpty()
-                .Aggregate((a, b) => $"{a}{b}") ?? String.Empty;
+                .Select(vocabId => LlamaCppInterop.llama_token_to_str(_modelContext, vocabId))
+                .Aggregate((a, b) => $"{a}{b}") : String.Empty;
 
         /// <summary>
         /// Load a model and optionally load a LoRA adapter
@@ -63,7 +63,7 @@ namespace LlamaCppLib
             if (!File.Exists(modelPath))
                 throw new FileNotFoundException($"Model file not found \"{modelPath}\".");
 
-            if (_model != nint.Zero)
+            if (_modelContext != IntPtr.Zero)
                 throw new InvalidOperationException($"Model already loaded.");
 
             var useLora = loraPath != null;
@@ -73,16 +73,15 @@ namespace LlamaCppLib
 
             var cparams = LlamaCppInterop.llama_context_default_params();
             cparams.n_ctx = _options.ContextSize ?? 512;
+            cparams.n_batch = 512;
             cparams.n_gpu_layers = _options.GpuLayers ?? 0;
             cparams.seed = _options.Seed ?? 0;
             cparams.f16_kv = _options.UseHalf ?? true;
-            cparams.logits_all = false;
-            cparams.vocab_only = false;
             cparams.use_mmap = useLora ? false : (_options.UseMemoryMapping ?? cparams.use_mmap);
             cparams.use_mlock = _options.UseMemoryLocking ?? false;
-            cparams.embedding = false;
 
             _model = LlamaCppInterop.llama_load_model_from_file(modelPath, cparams);
+            _modelContext = LlamaCppInterop.llama_new_context_with_model(_model, cparams);
 
             if (useLora)
             {
@@ -103,98 +102,46 @@ namespace LlamaCppLib
 
         public async IAsyncEnumerable<KeyValuePair<LlamaToken, string>> Predict(PredictOptions options, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            if (_model == nint.Zero)
+            if (_modelContext == IntPtr.Zero)
                 throw new InvalidOperationException("You must load a model.");
 
             if (!_options.IsConfigured)
                 throw new InvalidOperationException("You must configure the model.");
 
-            var sampledVocabIds = new List<int>();
-            sampledVocabIds.AddRange(options.PromptVocabIds);
+            var tokens_list = options.PromptVocabIds;
 
-            var endOfStream = false;
-            while (!endOfStream && !cancellationToken.IsCancellationRequested)
+            while (LlamaCppInterop.llama_get_kv_cache_token_count(_modelContext) < LlamaCppInterop.llama_n_ctx(_modelContext) && !cancellationToken.IsCancellationRequested)
             {
-                if (options.ContextVocabIds.Count >= LlamaCppInterop.llama_n_ctx(_model))
-                    throw new NotImplementedException($"Context rotation not yet implemented (max context reached: {options.ContextVocabIds.Count}).");
+                LlamaCppInterop.llama_eval(
+                    _modelContext,
+                    tokens_list.ToArray(),
+                    tokens_list.Count,
+                    LlamaCppInterop.llama_get_kv_cache_token_count(_modelContext),
+                    _options.ThreadCount ?? 4
+                );
 
-                LlamaCppInterop.llama_eval(_model, sampledVocabIds.ToArray(), sampledVocabIds.Count, options.ContextVocabIds.Count, _options.ThreadCount ?? 1);
-                options.ContextVocabIds.AddRange(sampledVocabIds);
+                tokens_list.Clear();
 
-                var mirostatMU = options.MirostatMU;
-                var id = Sample(options.ContextVocabIds, ref mirostatMU);
-                options.MirostatMU = mirostatMU;
+                var logits = LlamaCppInterop.llama_get_logits(_modelContext);
+                var n_vocab = LlamaCppInterop.llama_n_vocab(_modelContext);
 
-                sampledVocabIds.ClearAdd(id);
-                yield return new(id, LlamaCppInterop.llama_token_to_str(_model, id));
-                endOfStream = id == LlamaCppInterop.llama_token_eos();
+                var candidates = new List<LlamaCppInterop.llama_token_data>(n_vocab);
+                for (LlamaToken tokenId = 0; tokenId < n_vocab; tokenId++)
+                    candidates.Add(new LlamaCppInterop.llama_token_data { id = tokenId, logit = logits[tokenId], p = 0.0f });
+
+                var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates.ToArray(), size = (ulong)candidates.Count, sorted = false };
+                var new_token_id = LlamaCppInterop.llama_sample_token_greedy(_modelContext, candidates_p);
+
+                if (new_token_id == LlamaCppInterop.llama_token_eos())
+                    break;
+
+                var token = LlamaCppInterop.llama_token_to_str(_modelContext, new_token_id);
+                tokens_list.Add(new_token_id);
+
+                yield return new(new_token_id, token);
             }
 
             await Task.CompletedTask;
-        }
-
-        private LlamaToken Sample(List<LlamaToken> contextVocabIds, ref float mirostatMU)
-        {
-            var logits = LlamaCppInterop.llama_get_logits(_model);
-            var vocabCount = LlamaCppInterop.llama_n_vocab(_model);
-
-            // Apply logit biases
-            foreach (var logit in _options.LogitBias)
-                logits[logit.Key] += logit.Value;
-
-            var candidates = new List<LlamaCppInterop.llama_token_data>(vocabCount);
-            for (LlamaToken tokenId = 0; tokenId < vocabCount; tokenId++)
-                candidates.Add(new LlamaCppInterop.llama_token_data { id = tokenId, logit = logits[tokenId], p = 0.0f });
-
-            var candidates_p = new LlamaCppInterop.llama_token_data_array
-            {
-                data = candidates.ToArray(),
-                size = (ulong)candidates.Count,
-                sorted = false
-            };
-
-            // Apply penalties
-            var nl_logit = logits[LlamaCppInterop.llama_token_nl()];
-
-            LlamaCppInterop.llama_sample_repetition_penalty(_model, candidates_p, contextVocabIds, _options.RepeatPenalty ?? 0);
-            LlamaCppInterop.llama_sample_frequency_and_presence_penalties(_model, candidates_p, contextVocabIds, _options.FrequencyPenalty ?? 0, _options.PresencePenalty ?? 0);
-
-            if (!(_options.PenalizeNewLine ?? true))
-                logits[LlamaCppInterop.llama_token_nl()] = nl_logit;
-
-            var id = default(LlamaToken);
-
-            if ((_options.Temperature ?? 0) <= 0)
-            {
-                // Greedy sampling
-                id = LlamaCppInterop.llama_sample_token_greedy(_model, candidates_p);
-            }
-            else
-            {
-                if (_options.Mirostat == Mirostat.Mirostat)
-                {
-                    var mirostat_m = 100;
-                    LlamaCppInterop.llama_sample_temperature(_model, candidates_p, _options.Temperature ?? 0);
-                    id = LlamaCppInterop.llama_sample_token_mirostat(_model, candidates_p, _options.MirostatTAU ?? 0, _options.MirostatETA ?? 0, mirostat_m, ref mirostatMU);
-                }
-                else if (_options.Mirostat == Mirostat.Mirostat2)
-                {
-                    LlamaCppInterop.llama_sample_temperature(_model, candidates_p, _options.Temperature ?? 0);
-                    id = LlamaCppInterop.llama_sample_token_mirostat_v2(_model, candidates_p, _options.MirostatTAU ?? 0, _options.MirostatETA ?? 0, ref mirostatMU);
-                }
-                else
-                {
-                    // Temperature sampling
-                    LlamaCppInterop.llama_sample_top_k(_model, candidates_p, _options.TopK ?? 0);
-                    LlamaCppInterop.llama_sample_tail_free(_model, candidates_p, _options.TfsZ ?? 0);
-                    LlamaCppInterop.llama_sample_typical(_model, candidates_p, _options.TypicalP ?? 0);
-                    LlamaCppInterop.llama_sample_top_p(_model, candidates_p, _options.TopP ?? 0);
-                    LlamaCppInterop.llama_sample_temperature(_model, candidates_p, _options.Temperature ?? 0);
-                    id = LlamaCppInterop.llama_sample_token(_model, candidates_p);
-                }
-            }
-
-            return id;
         }
     }
 }

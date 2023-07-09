@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
-
+using System.Text;
+using System.Text.RegularExpressions;
 using LlamaCppLib;
 
 namespace LlamaCppCli
@@ -44,11 +45,13 @@ namespace LlamaCppCli
         static async Task Main(string[] args)
         {
 #if DEBUG
-            args = new[] { "0", @"C:\LLM_MODELS\allenai\ggml-tulu-7b-q4_K_M.bin", "Hello?" };
+            //args = new[] { "0", @"C:\LLM_MODELS\allenai\ggml-tulu-7b-q4_K_M.bin", "Hello?" };
+            args = new[] { "1", @"C:\LLM_MODELS\WizardLM\ggml-wizardlm-v1.1-13b-q8_0.bin", "60" };
 #endif
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
                 (nameof(SimpleSample), SimpleSample),
+                (nameof(ManagedSample), ManagedSample),
             }
                 .Select((sample, index) => (sample, index))
                 .ToDictionary(k => k.sample.Name, v => (Index: v.index, v.sample.Func));
@@ -89,9 +92,9 @@ namespace LlamaCppCli
 
         static async Task SimpleSample(string[] args)
         {
-            if (args.Length < 1)
+            if (args.Length < 2)
             {
-                await Console.Out.WriteLineAsync($"usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} model_path [gpu_layers] [template_string]");
+                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} model_path [gpu_layers] [template_string]");
                 return;
             }
 
@@ -122,22 +125,55 @@ namespace LlamaCppCli
 
             await Console.Out.WriteLineAsync("""
 
-                Entering interactive mode.
-                Press <Enter> on an empty input to quit.
-                Press <Ctrl+C> to cancel token predictions.
+                Entering interactive mode:
+                    * Press <Enter> on an empty input to quit.
+                    * Press <Ctrl+C> to cancel token predictions.
+                    * Enter "/load <file>" to load a text file as the input.
+                    * Enter "/text" to view the last input sent to the model.
                 """);
+
+            var text = new StringBuilder();
 
             while (true)
             {
-                await Console.Out.WriteAsync($"\nPrompt: ");
+                await Console.Out.WriteLineAsync($"\nInput:");
                 var prompt = await Console.In.ReadLineAsync();
 
                 if (String.IsNullOrWhiteSpace(prompt))
+                {
+                    await Console.Out.WriteLineAsync("Quitting...");
                     break;
+                }
 
-                await Console.Out.WriteAsync($"Response: ");
+                var match = Regex.Match(prompt, @"^\/(?<Command>[^ ]+)\s*(?<Params>.*)$");
+                switch (match.Groups["Command"].Value)
+                {
+                    case "text":
+                        await Console.Out.WriteLineAsync($"============================================\n{text}\n============================================");
+                        continue;
+                    case "load":
+                        var fileName = match.Groups["Params"].Value;
+                        await Console.Out.WriteLineAsync($"Loading file... ({fileName})");
+                        if (!File.Exists(fileName))
+                        {
+                            await Console.Out.WriteLineAsync($"File not found.");
+                            continue;
+                        }
 
-                var tokens_list = Program.llama_tokenize(init.Context, String.Format(template, prompt), true) ?? new();
+                        text.Clear();
+                        text.Append(File.ReadAllText(fileName));
+                        await Console.Out.WriteLineAsync($"{text}");
+                        break;
+                    default:
+                        text.Clear();
+                        text.Append(String.Format(template, prompt));
+                        break;
+                }
+
+                //await Console.Out.WriteLineAsync($"==>DEBUG<==\n{text}\n==>DEBUG<==");
+                await Console.Out.WriteLineAsync($"\nOutput:");
+
+                var tokens_list = Program.llama_tokenize(init.Context, $"{text}", true) ?? new();
 
                 while (LlamaCppInterop.llama_get_kv_cache_token_count(init.Context) < max_context_size && !cancel)
                 {
@@ -165,11 +201,15 @@ namespace LlamaCppCli
 
                     if (new_token_id == LlamaCppInterop.llama_token_eos())
                     {
-                        await Console.Out.WriteLineAsync($" [end of text]");
+                        //await Console.Out.WriteLineAsync($" [end of text]");
+                        await Console.Out.WriteLineAsync();
                         break;
                     }
 
-                    await Console.Out.WriteAsync($"{LlamaCppInterop.llama_token_to_str(init.Context, new_token_id)}");
+                    var token = LlamaCppInterop.llama_token_to_str(init.Context, new_token_id);
+                    //text.Append(token);
+
+                    await Console.Out.WriteAsync(token);
                     await Console.Out.FlushAsync();
 
                     tokens_list.Add(new_token_id);
@@ -184,6 +224,45 @@ namespace LlamaCppCli
 
             LlamaCppInterop.llama_free(init.Context);
             LlamaCppInterop.llama_free_model(init.Model);
+        }
+
+        static async Task ManagedSample(string[] args)
+        {
+            if (args.Length < 2)
+            {
+                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} model_path [gpu_layers] [prompt]");
+                return;
+            }
+
+            var modelPath = args[0];
+            var gpuLayers = Int32.Parse(args[1]);
+            var prompt = args.Length > 3 ? args[2] : "### System:\nYou are a helpful assistant.\n\n### User:\nHello?\n\n### Response:\n";
+
+            var options = new LlamaCppOptions
+            {
+                ThreadCount = 8,
+                ContextSize = 2048,
+                TopK = 40,
+                TopP = 0.95f,
+                Temperature = 0.8f,
+                RepeatPenalty = 1.1f,
+                PenalizeNewLine = false,
+                GpuLayers = gpuLayers,
+            };
+
+            var model = new LlamaCpp("Model #1", options);
+            model.Load(modelPath);
+
+            var cancellationTokenSource = new CancellationTokenSource();
+            Console.CancelKeyPress += (s, e) =>
+            {
+                e.Cancel = true;
+                cancellationTokenSource.Cancel();
+            };
+
+            var predictOptions = new PredictOptions { PromptVocabIds = model.Tokenize(prompt, true) };
+            await foreach (var prediction in model.Predict(predictOptions, cancellationTokenSource.Token))
+                await Console.Out.WriteAsync(prediction.Value);
         }
 
         static void PrintParams(GptParams aparams)
