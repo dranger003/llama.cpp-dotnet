@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+
 using LlamaCppLib;
 
 namespace LlamaCppCli
@@ -45,8 +46,9 @@ namespace LlamaCppCli
         static async Task Main(string[] args)
         {
 #if DEBUG
-            //args = new[] { "0", @"C:\LLM_MODELS\allenai\ggml-tulu-7b-q4_K_M.bin", "Hello?" };
-            args = new[] { "1", @"C:\LLM_MODELS\WizardLM\ggml-wizardlm-v1.1-13b-q8_0.bin", "60" };
+            //args = new[] { "0", @"C:\LLM_MODELS\allenai\ggml-tulu-7b-q4_K_M.bin", "Hello? Anyone here?" };
+            //args = new[] { "1", @"C:\LLM_MODELS\WizardLM\ggml-wizardlm-v1.1-13b-q8_0.bin", "60" };
+            args = new[] { "1", @"C:\LLM_MODELS\WizardLM\wizardlm-30b.ggmlv3.q4_K_M.bin", "60" };
 #endif
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
@@ -234,9 +236,20 @@ namespace LlamaCppCli
                 return;
             }
 
+            var input = """
+                ### System:
+                You are a helpful assistant.
+                
+                ### User:
+                Write a table containing the planets of the solar system in order from the Sun, with a column for the name and another column for the distance to the Sun in AU.
+
+                ### Response:
+
+                """;
+
             var modelPath = args[0];
             var gpuLayers = Int32.Parse(args[1]);
-            var prompt = args.Length > 3 ? args[2] : "### System:\nYou are a helpful assistant.\n\n### User:\nWrite a table containing the planets of the solar system.\n\n### Response:\n";
+            var prompt = args.Length > 3 ? args[2] : input;
 
             var options = new LlamaCppOptions
             {
@@ -244,11 +257,13 @@ namespace LlamaCppCli
                 ContextSize = 2048,
                 TopK = 40,
                 TopP = 0.95f,
-                Temperature = 0.8f,
+                Temperature = 0.1f,
                 RepeatPenalty = 1.1f,
                 PenalizeNewLine = false,
                 GpuLayers = gpuLayers,
                 Mirostat = Mirostat.Mirostat2,
+                MirostatTAU = 5.0f,
+                MirostatETA = 0.1f,
             };
 
             var model = new LlamaCpp("Model #1", options);

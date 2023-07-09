@@ -49,15 +49,12 @@ namespace LlamaCppLib
                 .Select(vocabId => LlamaCppInterop.llama_token_to_str(_modelContext, vocabId))
                 .Aggregate((a, b) => $"{a}{b}") : String.Empty;
 
-        private byte[] GetState() => LlamaCppInterop.llama_copy_state_data(_modelContext);
-        private void SetState(byte[] state) => LlamaCppInterop.llama_set_state_data(_modelContext, state);
-
         public void ResetState()
         {
             if (_state == null)
                 return;
 
-            SetState(_state);
+            LlamaCppInterop.llama_set_state_data(_modelContext, _state);
         }
 
         /// <summary>
@@ -89,13 +86,14 @@ namespace LlamaCppLib
             cparams.n_ctx = _options.ContextSize ?? 512;
             cparams.n_batch = 512;
             cparams.n_gpu_layers = _options.GpuLayers ?? 0;
-            cparams.seed = _options.Seed ?? 0;
+            cparams.seed = _options.Seed ?? unchecked((uint)-1);
             cparams.f16_kv = _options.UseHalf ?? true;
             cparams.use_mmap = useLora ? false : (_options.UseMemoryMapping ?? cparams.use_mmap);
             cparams.use_mlock = _options.UseMemoryLocking ?? false;
 
             _model = LlamaCppInterop.llama_load_model_from_file(modelPath, cparams);
             _modelContext = LlamaCppInterop.llama_new_context_with_model(_model, cparams);
+            _state = LlamaCppInterop.llama_copy_state_data(_modelContext);
 
             if (useLora)
             {
@@ -112,8 +110,6 @@ namespace LlamaCppLib
                 if (result != 0)
                     throw new Exception($"Unable to load LoRA file (return code: {result}).");
             }
-
-            _state = GetState();
         }
 
         public async IAsyncEnumerable<KeyValuePair<LlamaToken, string>> Predict(PredictOptions options, [EnumeratorCancellation] CancellationToken cancellationToken = default)

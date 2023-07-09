@@ -121,7 +121,7 @@ namespace LlamaCppLib
         /// <param name="path_base_model">Model file path</param>
         /// <param name="n_threads">nthread - how many threads to use. If <=0, will use std::thread::hardware_concurrency(), else the number given</param>
         /// <returns>Returns 0 on success</returns>
-        [DllImport("llama", EntryPoint = "llama_model_quantize")]
+        [DllImport("llama")]
         public static extern int llama_model_quantize(string fname_inp, string fname_out, LLAMA_FTYPE ftype, int nthread);
 
         /// <summary>
@@ -158,7 +158,7 @@ namespace LlamaCppLib
         /// <param name="ctx">LlamaContext</param>
         /// <returns>Returns the size in bytes of the state (rng, logits, embedding and kv_cache)</returns>
         [DllImport("llama")]
-        public static extern int llama_get_state_size(llama_context ctx);
+        public static extern nuint llama_get_state_size(llama_context ctx);
 
         /// <summary>
         /// Copies the state to the specified destination address.
@@ -171,7 +171,7 @@ namespace LlamaCppLib
 
         public static byte[] llama_copy_state_data(llama_context ctx)
         {
-            var size = llama_get_state_size(ctx);
+            var size = Math.Min(llama_get_state_size(ctx).ToUInt32(), 0x7FEFFFFF);
             var state = new byte[size];
             var count = _llama_copy_state_data(ctx, state);
             return state.Take(count).ToArray();
