@@ -58,7 +58,7 @@ namespace LlamaCppCli
         {
             if (args.Length < 1)
             {
-                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} model_path [gpu_layers] [template]");
+                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} 0 model_path [gpu_layers] [template]");
                 return;
             }
 
@@ -127,7 +127,7 @@ namespace LlamaCppCli
         {
             if (args.Length < 2)
             {
-                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} base_url model_name [template]");
+                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} 1 base_url model_name [template]");
                 return;
             }
 
