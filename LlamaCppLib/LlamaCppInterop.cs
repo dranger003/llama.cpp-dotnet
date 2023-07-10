@@ -96,7 +96,10 @@ namespace LlamaCppLib
         public static extern bool llama_mlock_supported();
 
         [DllImport("llama")]
-        public static extern void llama_init_backend(bool numa = false);
+        public static extern void llama_backend_init(bool numa = false);
+
+        [DllImport("llama")]
+        public static extern void llama_backend_free();
 
         [DllImport("llama")]
         public static extern long llama_time_us();
