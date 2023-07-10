@@ -9,16 +9,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LlamaCppCli", "LlamaCppCli\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LlamaCppWeb", "LlamaCppWeb\LlamaCppWeb.csproj", "{9C1B4C2E-F84D-421E-B924-C5C394288AC5}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{3A0CF503-9FAF-4234-A173-B4C452FF6885}"
-	ProjectSection(SolutionItems) = preProject
-		template_alpaca-with-input.txt = template_alpaca-with-input.txt
-		template_alpaca-without-input.txt = template_alpaca-without-input.txt
-		template_stable-vicuna.txt = template_stable-vicuna.txt
-		template_vicuna-v1.1.txt = template_vicuna-v1.1.txt
-		template_wizardlm.txt = template_wizardlm.txt
-		template_wizardvicunalm.txt = template_wizardvicunalm.txt
-	EndProjectSection
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
