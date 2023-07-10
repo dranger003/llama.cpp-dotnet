@@ -73,7 +73,7 @@ namespace LlamaCppCli
                 Template = template,
             };
 
-            var model = new LlamaCpp();
+            using var model = new LlamaCpp();
             model.Load(modelPath, modelOptions);
 
             var cancellationTokenSource = new CancellationTokenSource();
