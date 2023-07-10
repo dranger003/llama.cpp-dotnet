@@ -6,7 +6,7 @@
 
 C# bindings for llama.cpp including a .NET core library and sample projects (CLI & Web API).
 
-![demo-web-20230709](https://github.com/dranger003/llama.cpp-dotnet/assets/1760549/c80b7848-30ab-4346-97db-90ce115ebdc4)
+![demo-web-2](https://github.com/dranger003/llama.cpp-dotnet/assets/1760549/f261ae13-20e1-4f41-964f-e1942649dcd4)
 
 ### Quick Start
 
