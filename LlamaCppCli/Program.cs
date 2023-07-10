@@ -34,6 +34,13 @@ namespace LlamaCppCli
                     Console.WriteLine($"    [{sample.Value.Index}] = {sample.Key}");
             };
 
+            if (args.Length < 1)
+            {
+                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} <SampleIndex> <SampleArgs>");
+                PrintAvailableSamples();
+                return;
+            }
+
             var sampleIndex = Int32.Parse(args[0]);
             var sampleName = samples.SingleOrDefault(sample => sample.Value.Index == sampleIndex).Key;
 
