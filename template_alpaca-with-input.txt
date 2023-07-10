@@ -1,7 +1,0 @@
-### Instruction:
-{prompt}
-
-### Input:
-{context}
-
-### Response:

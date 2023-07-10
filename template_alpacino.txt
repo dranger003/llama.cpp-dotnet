@@ -1,4 +1,0 @@
-### Instruction:
-{prompt}
-
-### Response:
