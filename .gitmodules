@@ -1,3 +1,6 @@
 [submodule "llama.cpp"]
 	path = llama.cpp
 	url = https://github.com/dranger003/llama.cpp.git
+[submodule "ggllm.cpp"]
+	path = ggllm.cpp
+	url = https://github.com/dranger003/ggllm.cpp.git
