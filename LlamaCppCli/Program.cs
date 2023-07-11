@@ -63,11 +63,12 @@ namespace LlamaCppCli
             }
 
             var modelPath = args[0];
-            var gpuLayers = Int32.Parse(args[1]);
+            var gpuLayers = args.Length > 1 ? Int32.Parse(args[1]) : 0;
             var template = args.Length > 2 ? args[2] : "{0}";
 
             var modelOptions = new LlamaCppModelOptions
             {
+                Seed = 0,
                 ContextSize = 2048,
                 GpuLayers = gpuLayers,
                 Template = template,
@@ -81,17 +82,20 @@ namespace LlamaCppCli
 
             var predictOptions = new LlamaCppPredictOptions
             {
-                ThreadCount = 4,
-                TopK = 40,
-                TopP = 0.95f,
-                Temperature = 0.1f,
-                RepeatPenalty = 1.1f,
-                PenalizeNewLine = false,
+                //ThreadCount = 4,
+                //TopK = 40,
+                //TopP = 0.95f,
+                //Temperature = 0.0f,
+                //RepeatPenalty = 1.1f,
+                //PenalizeNewLine = false,
                 Mirostat = Mirostat.Mirostat2,
-                MirostatTAU = 5.0f,
-                MirostatETA = 0.1f,
-                ResetState = true,
+                //MirostatTAU = 5.0f,
+                //MirostatETA = 0.1f,
+                ResetState = true, // No context
             };
+
+            //await Console.Out.WriteLineAsync($"\n{JsonSerializer.Serialize(modelOptions, new JsonSerializerOptions { WriteIndented = true })}");
+            //await Console.Out.WriteLineAsync($"\n{JsonSerializer.Serialize(predictOptions, new JsonSerializerOptions { WriteIndented = true })}");
 
             await Console.Out.WriteLineAsync(
                 """
@@ -115,7 +119,17 @@ namespace LlamaCppCli
                 predictOptions.Prompt = String.Format(modelOptions.Template, prompt);
 
                 await foreach (var prediction in model.Predict(predictOptions, cancellationTokenSource.Token))
-                    await Console.Out.WriteAsync(prediction.Value);
+                {
+                    var token = prediction.Value;
+                    await Console.Out.WriteAsync(token);
+                }
+
+                if (cancellationTokenSource.IsCancellationRequested)
+                {
+                    await Console.Out.WriteAsync(" [Cancelled]");
+                    cancellationTokenSource.Dispose();
+                    cancellationTokenSource = new();
+                }
 
                 await Console.Out.WriteLineAsync();
             }
@@ -127,15 +141,16 @@ namespace LlamaCppCli
         {
             if (args.Length < 2)
             {
-                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} 1 base_url model_name [template]");
+                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} 1 base_url model_name [gpu_layers] [template]");
                 return;
             }
 
             var baseUrl = args[0];
             var modelName = args[1];
-            var template = args.Length > 2 ? args[2] : "{0}";
+            var gpuLayers = args.Length > 2 ? Int32.Parse(args[2]) : 0;
+            var template = args.Length > 3 ? args[3] : "{0}";
 
-            var modelOptions = new LlamaCppModelOptions() { ContextSize = 2048, GpuLayers = 60, Template = template };
+            var modelOptions = new LlamaCppModelOptions() { ContextSize = 2048, GpuLayers = gpuLayers, Template = template };
 
             var cancellationTokenSource = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) => cancellationTokenSource.Cancel(!(e.Cancel = true));
@@ -166,7 +181,19 @@ namespace LlamaCppCli
 
             // Run prediction(s)
             {
-                var predictOptions = new LlamaCppPredictOptions() { ResetState = true, Mirostat = Mirostat.Mirostat2 };
+                var predictOptions = new LlamaCppPredictOptions
+                {
+                    //ThreadCount = 4,
+                    //TopK = 40,
+                    //TopP = 0.95f,
+                    //Temperature = 0.0f,
+                    //RepeatPenalty = 1.1f,
+                    //PenalizeNewLine = false,
+                    Mirostat = Mirostat.Mirostat2,
+                    //MirostatTAU = 5.0f,
+                    //MirostatETA = 0.1f,
+                    ResetState = true, // No context
+                };
 
                 await Console.Out.WriteLineAsync(
                     """
@@ -179,36 +206,48 @@ namespace LlamaCppCli
 
                 while (true)
                 {
-                    await Console.Out.WriteLineAsync("\nInput:");
-
-                    var prompt = await Console.In.ReadLineAsync() ?? String.Empty;
-                    if (String.IsNullOrWhiteSpace(prompt))
-                        break;
-
-                    await Console.Out.WriteLineAsync("\nOutput:");
-
-                    predictOptions.Prompt = String.Format(modelOptions.Template, prompt);
-
-                    using var request = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/model/predict?{nameof(predictOptions)}={HttpUtility.UrlEncode(JsonSerializer.Serialize(predictOptions))}");
-                    request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
-
-                    var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationTokenSource.Token);
-                    response.EnsureSuccessStatusCode();
-
-                    await using var stream = await response.Content.ReadAsStreamAsync(cancellationTokenSource.Token);
-                    using var reader = new StreamReader(stream);
-
-                    while (!reader.EndOfStream && !cancellationTokenSource.IsCancellationRequested)
+                    try
                     {
-                        var data = await reader.ReadLineAsync(cancellationTokenSource.Token);
-                        if (data == null)
+                        await Console.Out.WriteLineAsync("\nInput:");
+
+                        var prompt = await Console.In.ReadLineAsync(cancellationTokenSource.Token) ?? String.Empty;
+                        if (String.IsNullOrWhiteSpace(prompt))
                             break;
 
-                        var token = Regex.Match(data, @"(?<=data:\s).*").Value.Replace("\\n", "\n");
-                        await Console.Out.WriteAsync(token);
-                    }
+                        await Console.Out.WriteLineAsync("\nOutput:");
 
-                    await Console.Out.WriteLineAsync();
+                        predictOptions.Prompt = String.Format(modelOptions.Template, prompt);
+
+                        using var request = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/model/predict?{nameof(predictOptions)}={HttpUtility.UrlEncode(JsonSerializer.Serialize(predictOptions))}");
+                        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+
+                        var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationTokenSource.Token);
+                        response.EnsureSuccessStatusCode();
+
+                        await using var stream = await response.Content.ReadAsStreamAsync(cancellationTokenSource.Token);
+                        using var reader = new StreamReader(stream);
+
+                        while (!reader.EndOfStream && !cancellationTokenSource.IsCancellationRequested)
+                        {
+                            var data = await reader.ReadLineAsync(cancellationTokenSource.Token);
+                            if (data == null)
+                                break;
+
+                            var token = Regex.Match(data, @"(?<=data:\s).*").Value.Replace("\\n", "\n");
+                            await Console.Out.WriteAsync(token);
+                        }
+
+                        cancellationTokenSource.Token.ThrowIfCancellationRequested();
+
+                        await Console.Out.WriteLineAsync();
+                    }
+                    catch (Exception ex) when (ex is TaskCanceledException || ex is OperationCanceledException)
+                    {
+                        await Console.Out.WriteLineAsync(" [Cancelled]");
+
+                        cancellationTokenSource.Dispose();
+                        cancellationTokenSource = new();
+                    }
                 }
             }
         }

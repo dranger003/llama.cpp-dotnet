@@ -144,6 +144,8 @@ namespace LlamaCppLib
             var mirostat_tau = options.MirostatTAU;
             var mirostat_eta = options.MirostatETA;
 
+            var mirostat_mu = 2.0f * mirostat_tau;
+
             while (LlamaCppInterop.llama_get_kv_cache_token_count(_context) < LlamaCppInterop.llama_n_ctx(_context) && !cancellationToken.IsCancellationRequested)
             {
                 for (var i = 0; i < embd.Count; i += n_batch)
@@ -203,7 +205,6 @@ namespace LlamaCppLib
                         // Mirostat
                         if (options.Mirostat == Mirostat.Mirostat)
                         {
-                            var mirostat_mu = 2.0f * mirostat_tau;
                             var mirostat_m = 100;
                             LlamaCppInterop.llama_sample_temperature(_context, candidates_p, temp);
                             id = LlamaCppInterop.llama_sample_token_mirostat(_context, candidates_p, mirostat_tau, mirostat_eta, mirostat_m, ref mirostat_mu);
@@ -211,7 +212,6 @@ namespace LlamaCppLib
                         // Mirostat2
                         else if (options.Mirostat == Mirostat.Mirostat2)
                         {
-                            var mirostat_mu = 2.0f * mirostat_tau;
                             LlamaCppInterop.llama_sample_temperature(_context, candidates_p, options.Temperature);
                             id = LlamaCppInterop.llama_sample_token_mirostat_v2(_context, candidates_p, mirostat_tau, mirostat_eta, ref mirostat_mu);
                         }
@@ -237,7 +237,8 @@ namespace LlamaCppLib
                 last_n_tokens.Add(id);
                 embd.Add(id);
 
-                yield return new(id, LlamaCppInterop.llama_token_to_str(_context, id));
+                var token = LlamaCppInterop.llama_token_to_str(_context, id);
+                yield return new(id, token);
             }
 
             await Task.CompletedTask;

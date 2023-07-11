@@ -57,8 +57,16 @@ app.MapGet("/model/predict", async (HttpContext httpContext, LlamaCppPredictOpti
 
     httpContext.Response.ContentType = "text/event-stream";
 
-    await foreach (var prediction in model.Predict(predictOptions, cts.Token))
-        await httpContext.Response.WriteAsync($"data: {prediction.Value.Replace("\n", "\\n")}\n");
+    try
+    {
+        await foreach (var prediction in model.Predict(predictOptions, cts.Token))
+        {
+            var token = prediction.Value.Replace("\n", "\\n");
+            await httpContext.Response.WriteAsync($"data: {token}\n\n", cts.Token);
+        }
+    }
+    catch (OperationCanceledException)
+    { }
 });
 
 await app.RunAsync();
