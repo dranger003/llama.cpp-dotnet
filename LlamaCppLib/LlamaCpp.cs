@@ -212,7 +212,7 @@ namespace LlamaCppLib
                         // Mirostat2
                         else if (options.Mirostat == Mirostat.Mirostat2)
                         {
-                            LlamaCppInterop.llama_sample_temperature(_context, candidates_p, options.Temperature);
+                            LlamaCppInterop.llama_sample_temperature(_context, candidates_p, temp);
                             id = LlamaCppInterop.llama_sample_token_mirostat_v2(_context, candidates_p, mirostat_tau, mirostat_eta, ref mirostat_mu);
                         }
                         // Temperature
