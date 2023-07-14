@@ -1,6 +1,8 @@
-﻿namespace LlamaCppLib
+﻿using System.Text.Json;
+using System.Text.RegularExpressions;
+
+namespace LlamaCppLib
 {
-    using System.Text.Json;
     using LlamaToken = System.Int32;
 
     public enum Mirostat { Disabled, Mirostat, Mirostat2 }
@@ -14,8 +16,6 @@
         public bool UseMemoryMapping { get; set; } = true;
         public bool UseMemoryLocking { get; set; } = false;
         public int GpuLayers { get; set; } = 0;
-
-        public string Template { get; set; } = "{0}";
 
         public static bool TryParse(string input, out LlamaCppModelOptions options)
         {
@@ -44,7 +44,11 @@
         public float MirostatETA { get; set; } = 0.1f;
 
         public bool ResetState { get; set; } = false;
+
+        public string Template { get; set; } = "{prompt}";
         public string Prompt { get; set; } = String.Empty;
+
+        public string Input { get => Regex.Replace(Template, @"\{0\}|\{prompt\}", Prompt); }
 
         public static bool TryParse(string input, out LlamaCppPredictOptions options)
         {

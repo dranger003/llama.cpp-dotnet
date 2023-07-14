@@ -123,7 +123,7 @@ namespace LlamaCppLib
             if (options.ResetState)
                 ResetState();
 
-            var embd = Tokenize(options.Prompt, true);
+            var embd = Tokenize(options.Input, true);
 
             var n_ctx = LlamaCppInterop.llama_n_ctx(_context);
             var last_n_tokens = new List<LlamaToken>(n_ctx);

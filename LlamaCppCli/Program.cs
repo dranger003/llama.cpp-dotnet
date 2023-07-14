@@ -75,7 +75,6 @@ namespace LlamaCppCli
                 Seed = 0,
                 ContextSize = 2048,
                 GpuLayers = gpuLayers,
-                Template = template,
             };
 
             using var model = new LlamaCpp();
@@ -96,6 +95,7 @@ namespace LlamaCppCli
                 //MirostatTAU = 5.0f,
                 //MirostatETA = 0.1f,
                 ResetState = true, // No context
+                Template = template,
             };
 
             //await Console.Out.WriteLineAsync($"\n{JsonSerializer.Serialize(modelOptions, new JsonSerializerOptions { WriteIndented = true })}");
@@ -114,13 +114,11 @@ namespace LlamaCppCli
             {
                 await Console.Out.WriteLineAsync("\nInput:");
 
-                var prompt = await Console.In.ReadLineAsync() ?? String.Empty;
-                if (String.IsNullOrWhiteSpace(prompt))
+                predictOptions.Prompt = await Console.In.ReadLineAsync() ?? String.Empty;
+                if (String.IsNullOrWhiteSpace(predictOptions.Prompt))
                     break;
 
                 await Console.Out.WriteLineAsync("\nOutput:");
-
-                predictOptions.Prompt = String.Format(modelOptions.Template, prompt);
 
                 await foreach (var prediction in model.Predict(predictOptions, cancellationTokenSource.Token))
                 {
@@ -154,7 +152,7 @@ namespace LlamaCppCli
             var gpuLayers = args.Length > 2 ? Int32.Parse(args[2]) : 0;
             var template = args.Length > 3 ? args[3] : "{0}";
 
-            var modelOptions = new LlamaCppModelOptions() { ContextSize = 2048, GpuLayers = gpuLayers, Template = template };
+            var modelOptions = new LlamaCppModelOptions() { ContextSize = 2048, GpuLayers = gpuLayers };
 
             var cancellationTokenSource = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) => cancellationTokenSource.Cancel(!(e.Cancel = true));
@@ -197,6 +195,7 @@ namespace LlamaCppCli
                     //MirostatTAU = 5.0f,
                     //MirostatETA = 0.1f,
                     ResetState = true, // No context
+                    Template = template,
                 };
 
                 await Console.Out.WriteLineAsync(
@@ -214,13 +213,11 @@ namespace LlamaCppCli
                     {
                         await Console.Out.WriteLineAsync("\nInput:");
 
-                        var prompt = await Console.In.ReadLineAsync(cancellationTokenSource.Token) ?? String.Empty;
-                        if (String.IsNullOrWhiteSpace(prompt))
+                        predictOptions.Prompt = await Console.In.ReadLineAsync(cancellationTokenSource.Token) ?? String.Empty;
+                        if (String.IsNullOrWhiteSpace(predictOptions.Prompt))
                             break;
 
                         await Console.Out.WriteLineAsync("\nOutput:");
-
-                        predictOptions.Prompt = String.Format(modelOptions.Template, prompt);
 
                         using var request = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/model/predict?{nameof(predictOptions)}={HttpUtility.UrlEncode(JsonSerializer.Serialize(predictOptions))}");
                         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
