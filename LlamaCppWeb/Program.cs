@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 
 using LlamaCppLib;
@@ -44,6 +45,20 @@ app.MapGet("/model/status", async (HttpContext httpContext) =>
     await httpContext.Response.WriteAsync(JsonSerializer.Serialize(new { Status = Enum.GetName(manager.Status), manager.Model?.Options }, new JsonSerializerOptions { WriteIndented = true }));
 });
 
+app.MapGet("/model/tokenize", async (HttpContext httpContext, string prompt) =>
+{
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppManager>();
+    var model = manager.Model;
+    if (model == null)
+    {
+        await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.BadRequest);
+        return;
+    }
+
+    var tokens = model.Tokenize(prompt);
+    await httpContext.Response.WriteAsync(JsonSerializer.Serialize(new { TokenCount = tokens.Count, Tokens = tokens }, new JsonSerializerOptions { WriteIndented = true }));
+});
+
 app.MapGet("/model/predict", async (HttpContext httpContext, LlamaCppPredictOptions predictOptions) =>
 {
     var lifetime = httpContext.RequestServices.GetRequiredService<IHostApplicationLifetime>();
@@ -62,7 +77,8 @@ app.MapGet("/model/predict", async (HttpContext httpContext, LlamaCppPredictOpti
         await foreach (var prediction in model.Predict(predictOptions, cts.Token))
         {
             var token = prediction.Value.Replace("\n", "\\n");
-            await httpContext.Response.WriteAsync($"data: {token}\n\n", cts.Token);
+            //await httpContext.Response.WriteAsync($"data: {token}\n\n", cts.Token);
+            await httpContext.Response.Body.WriteAsync(Encoding.UTF8.GetBytes($"data: {token}\n\n"), cts.Token);
         }
     }
     catch (OperationCanceledException)
