@@ -47,7 +47,7 @@
 			<LibraryFiles Include="$(CMakeProject)/bin/$(Configuration)/$(LibraryFileExtension)" />
 			<LibraryFiles Include="$(CMakeProject)/$(LibraryFileExtension)" />
 		</ItemGroup>
-		<Copy SourceFiles="@(LibraryFiles)" DestinationFolder="$(SolutionDir)/$(Platform)/$(Configuration)" />
+		<Copy SourceFiles="@(LibraryFiles)" DestinationFolder="$(SolutionDir)/$(Platform)/$(Configuration)/$(MSBuildProjectName)" />
 	</Target>
 
 	<Target Name="CMakeClean" AfterTargets="Clean">

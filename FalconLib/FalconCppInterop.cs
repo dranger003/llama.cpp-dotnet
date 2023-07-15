@@ -98,111 +98,111 @@ namespace FalconCppLib
             public bool quantize_output_tensor;
         }
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern falcon_context_params falcon_context_default_params();
         //LLAMA_API struct falcon_context_params falcon_context_default_params();
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern llama_model_quantize_params llama_model_quantize_default_params();
         //LLAMA_API struct llama_model_quantize_params llama_model_quantize_default_params();
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern bool llama_mmap_supported();
         //LLAMA_API bool llama_mmap_supported();
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern bool llama_mlock_supported();
         //LLAMA_API bool llama_mlock_supported();
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern void falcon_init_backend();
         //LLAMA_API void falcon_init_backend();
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern long llama_time_us();
         //LLAMA_API int64_t llama_time_us();
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern falcon_context falcon_init_from_file(string path_model, falcon_context_params cparams);
         //LLAMA_API struct falcon_context * falcon_init_from_file(const char * path_model, struct falcon_context_params   params);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern void falcon_context_set_buffers(falcon_context ctx, int n_batch, int n_ctx);
         //LLAMA_API void falcon_context_set_buffers(falcon_context *ctx, int n_batch, int n_ctx);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern falcon_model falcon_get_falcon_model(falcon_context ctx);
         //LLAMA_API struct falcon_model * falcon_get_falcon_model(falcon_context * ctx);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern void llama_free(falcon_context model);
         //LLAMA_API void llama_free(struct falcon_context * ctx);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern int falcon_model_quantize(string fname_inp, string fname_out, llama_model_quantize_params qparams);
         //LLAMA_API int falcon_model_quantize(const char * fname_inp, const char * fname_out, const llama_model_quantize_params * params);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern int llama_apply_lora_from_file(falcon_context ctx, string path_lora, string path_base_model, int n_threads);
         //LLAMA_API int llama_apply_lora_from_file(struct falcon_context * ctx, const char * path_lora, const char * path_base_model, int   n_threads);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern int llama_get_kv_cache_token_count(falcon_context ctx);
         //LLAMA_API int llama_get_kv_cache_token_count(const struct falcon_context * ctx);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern void llama_set_rng_seed(falcon_context ctx, int seed);
         //LLAMA_API void llama_set_rng_seed(struct falcon_context * ctx, int seed);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern long llama_get_state_size(falcon_context ctx);
         //LLAMA_API size_t llama_get_state_size(const struct falcon_context * ctx);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern long falcon_copy_state_data(falcon_context ctx, byte[] dst);
         //LLAMA_API size_t falcon_copy_state_data(struct falcon_context * ctx, uint8_t * dst);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern long falcon_set_state_data(falcon_context ctx, byte[] src);
         //LLAMA_API size_t falcon_set_state_data(struct falcon_context * ctx, uint8_t * src);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern bool llama_load_session_file(falcon_context ctx, string path_session, falcon_token tokens_out, long n_token_capacity, out long n_token_count_out);
         //LLAMA_API bool llama_load_session_file(struct falcon_context * ctx, const char * path_session, falcon_token * tokens_out, size_t n_token_capacity, size_t * n_token_count_out);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern bool llama_save_session_file(falcon_context ctx, string path_session, falcon_token tokens, long n_token_count);
         //LLAMA_API bool llama_save_session_file(struct falcon_context * ctx, const char * path_session, const falcon_token * tokens, size_t n_token_count);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern int falcon_eval(falcon_context ctx, falcon_token[] tokens, int n_tokens, int n_past, int n_threads, int debug_timings);
         //LLAMA_API int falcon_eval(struct falcon_context * ctx, const falcon_token * tokens, int   n_tokens, int   n_past, int   n_threads,  int debug_timings);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern int falcon_eval_export(falcon_context ctx, string fname);
         //LLAMA_API int falcon_eval_export(struct falcon_context * ctx, const char * fname);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern int falcon_tokenize(falcon_context ctx, string text, falcon_token[] tokens, int n_max_tokens, bool add_bos);
         //LLAMA_API int falcon_tokenize(struct falcon_context * ctx, const char * text, falcon_token * tokens, int   n_max_tokens, bool   add_bos);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern int falcon_n_vocab(falcon_context ctx);
         //LLAMA_API int falcon_n_vocab(const struct falcon_context * ctx);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern int falcon_n_ctx(falcon_context ctx);
         //LLAMA_API int falcon_n_ctx  (const struct falcon_context * ctx);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern int falcon_n_embd(falcon_context ctx);
         //LLAMA_API int falcon_n_embd (const struct falcon_context * ctx);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern int falcon_get_vocab(falcon_context ctx, string[] strings, float[] scores, int capacity);
         //LLAMA_API int falcon_get_vocab(const struct falcon_context * ctx, const char * * strings, float * scores, int   capacity);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern falcon_context falcon_context_prepare(falcon_context_params cparams, falcon_model model, string context_name, bool verbose);
         //LLAMA_API struct falcon_context * falcon_context_prepare(falcon_context_params params, falcon_model *model, std::string context_name, bool verbose);
 
@@ -220,7 +220,7 @@ namespace FalconCppLib
         }
         //LLAMA_API float * falcon_get_logits(struct falcon_context * ctx);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern float[] falcon_get_embeddings(falcon_context ctx);
         //LLAMA_API float * falcon_get_embeddings(struct falcon_context * ctx);
 
@@ -236,19 +236,19 @@ namespace FalconCppLib
         public static readonly string[] FINETUNE_NAME = { "UNSPECIFIED", "NONE", "ALPACA", "OPENASSISTANT", "WIZARD", "FALCONINSTRUCT" };
         //static const char *FINETUNE_NAME[6] = { "UNSPECIFIED", "NONE", "ALPACA", "OPENASSISTANT", "WIZARD", "FALCONINSTRUCT" };
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern t_finetune_type falcon_detect_finetune(falcon_context ctx, string model_path);
         //LLAMA_API t_finetune_type falcon_detect_finetune(falcon_context * ctx, std::string model_path);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern falcon_token falcon_token_bos();
         //LLAMA_API falcon_token falcon_token_bos();
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern falcon_token falcon_token_eos();
         //LLAMA_API falcon_token falcon_token_eos();
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern falcon_token falcon_token_nl();
         //LLAMA_API falcon_token falcon_token_nl();
 
@@ -286,11 +286,11 @@ namespace FalconCppLib
         }
         //LLAMA_API void llama_sample_frequency_and_presence_penalties(struct falcon_context * ctx, falcon_token_data_array * candidates, const falcon_token * last_tokens, size_t last_tokens_size, float alpha_frequency, float alpha_presence);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern void llama_sample_softmax(falcon_context ctx, falcon_token_data_array[] candidates);
         //LLAMA_API void llama_sample_softmax(struct falcon_context * ctx, falcon_token_data_array * candidates);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern void llama_sample_log_softmax(falcon_context ctx, falcon_token_data_array[] candidates);
         //LLAMA_API void llama_sample_log_softmax(struct falcon_context * ctx, falcon_token_data_array * candidates);
 
@@ -447,28 +447,28 @@ namespace FalconCppLib
         }
         //LLAMA_API falcon_token llama_sample_token(struct falcon_context * ctx, falcon_token_data_array * candidates);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern void falcon_print_timings(falcon_context ctx);
         //LLAMA_API void falcon_print_timings(struct falcon_context * ctx);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern void llama_reset_timings(falcon_context ctx);
         //LLAMA_API void llama_reset_timings(struct falcon_context * ctx);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern string falcon_print_system_info(int n_threads, int n_cores);
         //LLAMA_API const char * falcon_print_system_info(int n_threads, int n_cores);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern nint falcon_cuda_get_system_gpu_status();
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern void falcon_cuda_print_gpu_status(nint status, bool print_summary);
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern void falcon_cuda_set_max_gpus();
 
-        [DllImport("falcon")]
+        [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern void falcon_cuda_set_main_device();
     }
 }

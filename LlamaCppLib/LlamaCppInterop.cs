@@ -86,34 +86,34 @@ namespace LlamaCppLib
             MOSTLY_Q6_K = 18,           // except 1d tensors
         }
 
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern llama_context_params llama_context_default_params();
 
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern bool llama_mmap_supported();
 
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern bool llama_mlock_supported();
 
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern void llama_backend_init(bool numa = false);
 
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern void llama_backend_free();
 
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern long llama_time_us();
 
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern llama_model llama_load_model_from_file(string path_model, llama_context_params cparams);
 
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern void llama_free_model(llama_model model);
 
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern llama_context llama_new_context_with_model(llama_model model, llama_context_params cparams);
 
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern void llama_free(llama_context model);
 
         /// <summary>
@@ -124,7 +124,7 @@ namespace LlamaCppLib
         /// <param name="path_base_model">Model file path</param>
         /// <param name="n_threads">nthread - how many threads to use. If <=0, will use std::thread::hardware_concurrency(), else the number given</param>
         /// <returns>Returns 0 on success</returns>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern int llama_model_quantize(string fname_inp, string fname_out, LLAMA_FTYPE ftype, int nthread);
 
         /// <summary>
@@ -137,14 +137,14 @@ namespace LlamaCppLib
         /// <param name="path_base_model">Model file path</param>
         /// <param name="n_threads">nthread - how many threads to use. If <=0, will use std::thread::hardware_concurrency(), else the number given</param>
         /// <returns>Returns 0 on success</returns>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern int llama_model_apply_lora_from_file(llama_model model, string path_lora, string? path_base_model, int n_threads);
 
         /// <summary>
         /// </summary>
         /// <param name="ctx">LlamaContext</param>
         /// <returns>Returns the number of tokens in the KV cache</returns>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern int llama_get_kv_cache_token_count(llama_context ctx);
 
         /// <summary>
@@ -152,7 +152,7 @@ namespace LlamaCppLib
         /// </summary>
         /// <param name="ctx">LlamaContext</param>
         /// <param name="seed">Seed</param>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern void llama_set_rng_seed(llama_context ctx, uint seed);
 
         /// <summary>
@@ -160,7 +160,7 @@ namespace LlamaCppLib
         /// </summary>
         /// <param name="ctx">LlamaContext</param>
         /// <returns>Returns the size in bytes of the state (rng, logits, embedding and kv_cache)</returns>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern nuint llama_get_state_size(llama_context ctx);
 
         /// <summary>
@@ -186,7 +186,7 @@ namespace LlamaCppLib
         /// <param name="ctx">LlamaContext</param>
         /// <param name="src">State source</param>
         /// <returns>Returns the number of bytes read</returns>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern int llama_set_state_data(llama_context ctx, byte[] src);
 
         /// <summary>
@@ -198,7 +198,7 @@ namespace LlamaCppLib
         /// <param name="n_token_capacity"></param>
         /// <param name="n_token_count_out"></param>
         /// <returns></returns>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern bool llama_load_session_file(llama_context ctx, string path_session, llama_token[] tokens_out, int n_token_capacity, out int n_token_count_out);
 
         /// <summary>
@@ -209,7 +209,7 @@ namespace LlamaCppLib
         /// <param name="tokens"></param>
         /// <param name="n_token_count"></param>
         /// <returns></returns>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern bool llama_save_session_file(llama_context ctx, string path_session, llama_token[] tokens, int n_token_count);
 
         /// <summary>
@@ -221,7 +221,7 @@ namespace LlamaCppLib
         /// <param name="n_past">n_past is the number of tokens to use from previous eval calls</param>
         /// <param name="n_threads">nthread - how many threads to use. If <=0, will use std::thread::hardware_concurrency(), else the number given</param>
         /// <returns>Returns 0 on success</returns>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern int llama_eval(llama_context ctx, llama_token[] tokens, int n_tokens, int n_past, int n_threads);
 
         /// <summary>
@@ -233,7 +233,7 @@ namespace LlamaCppLib
         /// <param name="n_past"></param>
         /// <param name="n_threads"></param>
         /// <returns></returns>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern int llama_eval_embd(llama_context ctx, float[] embd, int n_tokens, int n_past, int n_threads);
 
         /// <summary>
@@ -247,16 +247,16 @@ namespace LlamaCppLib
         /// <param name="n_max_tokens"></param>
         /// <param name="add_bos"></param>
         /// <returns>Returns the number of tokens on success, no more than n_max_tokens and returns a negative number on failure - the number of tokens that would have been returned</returns>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern int llama_tokenize(llama_context ctx, string text, llama_token[] tokens, int n_max_tokens, bool add_bos);
 
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern int llama_n_vocab(llama_context ctx);
 
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern int llama_n_ctx(llama_context ctx);
 
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern int llama_n_embd(llama_context ctx);
 
         [DllImport("llama", EntryPoint = "llama_get_logits")]
@@ -320,21 +320,21 @@ namespace LlamaCppLib
         /// Special tokens
         /// </summary>
         /// <returns>Beginning of stream token</returns>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern llama_token llama_token_bos();
 
         /// <summary>
         /// Special tokens
         /// </summary>
         /// <returns>End of stream token</returns>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern llama_token llama_token_eos();
 
         /// <summary>
         /// Special tokens
         /// </summary>
         /// <returns>End of stream token</returns>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern llama_token llama_token_nl();
 
         [DllImport("llama", EntryPoint = "llama_sample_repetition_penalty")]
@@ -638,14 +638,14 @@ namespace LlamaCppLib
         /// Performance information
         /// </summary>
         /// <param name="ctx">LlamaContext</param>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern void llama_print_timings(llama_context ctx);
 
         /// <summary>
         /// Performance information
         /// </summary>
         /// <param name="ctx">LlamaContext</param>
-        [DllImport("llama")]
+        [DllImport($"{nameof(LlamaCppLib)}/llama")]
         public static extern void llama_reset_timings(llama_context ctx);
 
         [DllImport("llama", EntryPoint = "llama_print_system_info")]
