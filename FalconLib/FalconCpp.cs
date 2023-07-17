@@ -11,7 +11,7 @@
 
             cparams.n_ctx = 2048;
             cparams.n_batch = 1;
-            cparams.n_gpu_layers = 28;
+            cparams.n_gpu_layers = 60;
             cparams.main_gpu = 0;
             cparams.tensor_split = new float[16];
             cparams.seed = -1;
