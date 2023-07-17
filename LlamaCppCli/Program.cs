@@ -6,7 +6,6 @@ using System.Web;
 
 using LlamaCppLib;
 using FalconCppLib;
-using System.Threading;
 
 namespace LlamaCppCli
 {
@@ -258,7 +257,7 @@ namespace LlamaCppCli
         {
             if (args.Length < 1)
             {
-                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} 2 model_path");
+                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} 2 model_path template");
                 return;
             }
 
@@ -316,7 +315,7 @@ namespace LlamaCppCli
                 if (String.IsNullOrWhiteSpace(prompt))
                     break;
 
-                var embd = FalconCpp.falcon_tokenize(ctx, $"<|prompter|>{prompt}<|endoftext|><|assistant|>");
+                var embd = FalconCpp.falcon_tokenize(ctx, String.Format(args[1], prompt));
 
                 while (!cancellationTokenSource.IsCancellationRequested)
                 {
@@ -324,7 +323,17 @@ namespace LlamaCppCli
                     {
                         var n_eval = embd.Count - i;
                         if (n_eval > cparams.n_batch) n_eval = cparams.n_batch;
-                        FalconCppInterop.falcon_eval(ctx, embd.Skip(i).ToArray(), n_eval, n_past, n_threads, 0);
+
+                        var configuration = new FalconCppInterop.falcon_evaluation_config
+                        {
+                            n_tokens = n_eval,
+                            n_past = n_past,
+                            n_threads = n_threads,
+                            debug_timings = 0,
+                        };
+
+                        FalconCppInterop.falcon_eval(ctx, embd.Skip(i).ToArray(), ref configuration);
+
                         n_past += n_eval;
                     }
 

@@ -77,8 +77,7 @@ app.MapGet("/model/predict", async (HttpContext httpContext, LlamaCppPredictOpti
         await foreach (var prediction in model.Predict(predictOptions, cts.Token))
         {
             var token = prediction.Value.Replace("\n", "\\n");
-            //await httpContext.Response.WriteAsync($"data: {token}\n\n", cts.Token);
-            await httpContext.Response.Body.WriteAsync(Encoding.UTF8.GetBytes($"data: {token}\n\n"), cts.Token);
+            await httpContext.Response.WriteAsync($"data: {token}\n\n", cts.Token);
         }
     }
     catch (OperationCanceledException)

@@ -35,6 +35,17 @@ namespace FalconCppLib
         public delegate void falcon_progress_callback(float progress, falcon_context ctx, nint status);
 
         [StructLayout(LayoutKind.Sequential)]
+        public struct falcon_evaluation_config
+        {
+            public int n_tokens;
+            public int n_past;
+            public int n_threads;
+            public nint cgraph_fname;
+            public int n_max_real_ctx;
+            public int debug_timings;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         public struct falcon_context_params
         {
             public int n_ctx;
@@ -175,8 +186,8 @@ namespace FalconCppLib
         //LLAMA_API bool llama_save_session_file(struct falcon_context * ctx, const char * path_session, const falcon_token * tokens, size_t n_token_count);
 
         [DllImport($"{nameof(FalconCppLib)}/falcon")]
-        public static extern int falcon_eval(falcon_context ctx, falcon_token[] tokens, int n_tokens, int n_past, int n_threads, int debug_timings);
-        //LLAMA_API int falcon_eval(struct falcon_context * ctx, const falcon_token * tokens, int   n_tokens, int   n_past, int   n_threads,  int debug_timings);
+        public static extern int falcon_eval(falcon_context ctx, falcon_token[] tokens, ref falcon_evaluation_config configuration);
+        //LLAMA_API int falcon_eval(struct falcon_context * ctx, const falcon_token * tokens, falcon_evaluation_config & configuration);
 
         [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern int falcon_eval_export(falcon_context ctx, string fname);
@@ -230,11 +241,11 @@ namespace FalconCppLib
         public static string falcon_token_to_str(falcon_context ctx, falcon_token token) => Marshal.PtrToStringUTF8(_falcon_token_to_str(ctx, token)) ?? String.Empty;
         //LLAMA_API const char * falcon_token_to_str(const struct falcon_context * ctx, falcon_token token);
 
-        public enum t_finetune_type { FINETUNE_UNSPECIFIED, FINETUNE_NONE, FINETUNE_ALPACA, FINETUNE_OPENASSISTANT, FINETUNE_WIZARD, FINETUNE_FALCONINSTRUCT }
-        //typedef enum { FINETUNE_UNSPECIFIED, FINETUNE_NONE, FINETUNE_ALPACA, FINETUNE_OPENASSISTANT, FINETUNE_WIZARD, FINETUNE_FALCONINSTRUCT } t_finetune_type;
+        public enum t_finetune_type { FINETUNE_UNSPECIFIED, FINETUNE_NONE, FINETUNE_ALPACA, FINETUNE_OPENASSISTANT, FINETUNE_OPENASSIST_V1, FINETUNE_WIZARD, FINETUNE_FALCONINSTRUCT }
+        //typedef enum { FINETUNE_UNSPECIFIED, FINETUNE_NONE, FINETUNE_ALPACA, FINETUNE_OPENASSISTANT, FINETUNE_OPENASSIST_V1, FINETUNE_WIZARD, FINETUNE_FALCONINSTRUCT } t_finetune_type;
 
-        public static readonly string[] FINETUNE_NAME = { "UNSPECIFIED", "NONE", "ALPACA", "OPENASSISTANT", "WIZARD", "FALCONINSTRUCT" };
-        //static const char *FINETUNE_NAME[6] = { "UNSPECIFIED", "NONE", "ALPACA", "OPENASSISTANT", "WIZARD", "FALCONINSTRUCT" };
+        public static readonly string[] FINETUNE_NAME = { "UNSPECIFIED", "NONE", "ALPACA", "OPENASSISTANT", "OPENASSIST_V1", "WIZARD", "FALCONINSTRUCT" };
+        //static const char *FINETUNE_NAME[7] = { "UNSPECIFIED", "NONE", "ALPACA", "OPENASSISTANT", "OPENASSIST_V1", "WIZARD", "FALCONINSTRUCT" };
 
         [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern t_finetune_type falcon_detect_finetune(falcon_context ctx, string model_path);
