@@ -80,6 +80,12 @@ app.MapGet("/session/create", async (HttpContext httpContext) =>
     await httpContext.Response.WriteAsync(JsonSerializer.Serialize($"{session.Id}"));
 });
 
+app.MapGet("/session/list", async (HttpContext httpContext) =>
+{
+    var sessionManager = httpContext.RequestServices.GetRequiredService<LlamaCppSessionManager>();
+    await httpContext.Response.WriteAsync(JsonSerializer.Serialize(sessionManager.Sessions.Select(session => $"{session.Key}")));
+});
+
 app.MapGet("/session/get", async (HttpContext httpContext, Guid sessionId) =>
 {
     var modelManager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
