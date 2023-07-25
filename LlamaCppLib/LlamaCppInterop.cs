@@ -40,27 +40,26 @@ namespace LlamaCppLib
             public uint seed;
             public int n_ctx;
             public int n_batch;
+            public int n_gqa;
+            public float rms_norm_eps;
             public int n_gpu_layers;
             public int main_gpu;
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
-            public float[] tensor_split;
+
+            public nint tensor_split;
+
+            public float rope_freq_base;
+            public float rope_freq_scale;
+
             public llama_progress_callback progress_callback;
             public nint progress_callback_user_data;
 
-            [MarshalAs(UnmanagedType.I1)]
-            public bool low_vram;
-            [MarshalAs(UnmanagedType.I1)]
-            public bool f16_kv;
-            [MarshalAs(UnmanagedType.I1)]
-            public bool logits_all;
-            [MarshalAs(UnmanagedType.I1)]
-            public bool vocab_only;
-            [MarshalAs(UnmanagedType.I1)]
-            public bool use_mmap;
-            [MarshalAs(UnmanagedType.I1)]
-            public bool use_mlock;
-            [MarshalAs(UnmanagedType.I1)]
-            public bool embedding;
+            [MarshalAs(UnmanagedType.I1)] public bool low_vram;
+            [MarshalAs(UnmanagedType.I1)] public bool f16_kv;
+            [MarshalAs(UnmanagedType.I1)] public bool logits_all;
+            [MarshalAs(UnmanagedType.I1)] public bool vocab_only;
+            [MarshalAs(UnmanagedType.I1)] public bool use_mmap;
+            [MarshalAs(UnmanagedType.I1)] public bool use_mlock;
+            [MarshalAs(UnmanagedType.I1)] public bool embedding;
         }
 
         public enum LLAMA_FTYPE
@@ -305,6 +304,7 @@ namespace LlamaCppLib
         }
 
         [DllImport("llama", EntryPoint = "llama_token_to_str")]
+        [return: MarshalAs(UnmanagedType.SysUInt)]
         private static extern nint _llama_token_to_str(llama_context ctx, llama_token token);
 
         /// <summary>
@@ -315,6 +315,21 @@ namespace LlamaCppLib
         /// <returns>Text token</returns>
         public static string llama_token_to_str(llama_context ctx, llama_token token) =>
             Marshal.PtrToStringUTF8(_llama_token_to_str(ctx, token)) ?? String.Empty;
+
+        /// <summary>
+        /// Token Id -> array of bytes. Uses the vocabulary in the provided context
+        /// This version can be used instead of the string version to avoid breaking multi-byte character encoding.
+        /// </summary>
+        /// <param name="ctx">LlamaContext</param>
+        /// <param name="token">Token ID to convert</param>
+        /// <returns>Token bytes</returns>
+        public static byte[] llama_token_to_bytes(llama_context ctx, llama_token token)
+        {
+            var ptr = (byte*)_llama_token_to_str(ctx, token).ToPointer();
+            var bytes = new List<byte>();
+            while (*ptr != '\0') bytes.Add(*ptr++);
+            return bytes.ToArray();
+        }
 
         /// <summary>
         /// Special tokens
@@ -408,6 +423,22 @@ namespace LlamaCppLib
             };
 
             _llama_sample_frequency_and_presence_penalties(ctx, new(&_candidates), last_tokens.ToArray(), last_tokens.Count, alpha_frequency, alpha_presence);
+        }
+
+        [DllImport("llama", EntryPoint = "llama_sample_classifier_free_guidance")]
+        private static extern void _llama_sample_classifier_free_guidance(llama_context ctx, nint candidates, llama_context guidance_ctx, float scale);
+
+        public static void llama_sample_classifier_free_guidance(llama_context ctx, llama_token_data_array candidates, llama_context guidance_ctx, float scale)
+        {
+            using var handle = candidates.data.Pin();
+            var _candidates = new LlamaCppInterop._llama_token_data_array
+            {
+                data = new(handle.Pointer),
+                size = candidates.size,
+                sorted = candidates.sorted,
+            };
+
+            _llama_sample_classifier_free_guidance(ctx, new(&_candidates), guidance_ctx, scale);
         }
 
         [DllImport("llama", EntryPoint = "llama_sample_softmax")]

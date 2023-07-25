@@ -1,5 +1,8 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Net;
+using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Web;
@@ -16,11 +19,7 @@ namespace LlamaCppCli
         static async Task Main(string[] args)
         {
 #if DEBUG
-            //args = new[] { "0", @"C:\LLM_MODELS\WizardLM\ggml-wizardlm-v1.1-13b-q8_0.bin", "60", "A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions.\n\nUSER:\n{0}\n\nASSISTANT:\n" };
-            //args = new[] { "0", @"C:\LLM_MODELS\WizardLM\wizardlm-30b.ggmlv3.q4_K_M.bin", "60", "A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions.\n\nUSER:\n{0}\n\nASSISTANT:\n" };
-            //args = new[] { "0", @"C:\LLM_MODELS\psmathur\ggml-orca-mini-v2-13b-q8_0.bin", "60", "### System:\nYou are an AI assistant that follows instruction extremely well. Help as much as you can.\n\n### User:\n{0}\n\n### Response:\n" };
-            //args = new[] { "1", "http://localhost:5021", "wizardlm-v1.1-13b-q8_0", "A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions.\n\nUSER:\n{0}\n\nASSISTANT:\n" };
-            args = new[] { "2" };
+            args = new[] { "1", "http://localhost:5021", "meta-llama2-chat-13b-v1.0-q8_0", "60", "4096", "[INST] {0} [/INST]\n" };
 #endif
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
@@ -55,6 +54,9 @@ namespace LlamaCppCli
                 return;
             }
 
+            // Required for multi-byte character encoding (e.g. emojis)
+            Console.OutputEncoding = Encoding.UTF8;
+
             await samples[sampleName].Func(args.Skip(1).ToArray());
         }
 
@@ -62,44 +64,43 @@ namespace LlamaCppCli
         {
             if (args.Length < 1)
             {
-                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} 0 model_path [gpu_layers] [template]");
+                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} 0 model_path [gpu_layers] [ctx_length] [template]");
                 return;
             }
 
             var modelPath = args[0];
             var gpuLayers = args.Length > 1 ? Int32.Parse(args[1]) : 0;
-            var template = args.Length > 2 ? args[2] : "{0}";
+            var contextLength = args.Length > 2 ? Int32.Parse(args[2]) : 2048;
+            var template = args.Length > 3 ? args[3] : "{0}";
+
+            // <s>[INST] <<SYS>>
+            // {{ system_prompt }}
+            // <</SYS>>
+            //
+            // {{ user_msg_1 }} [/INST] {{ model_answer_1 }} </s>\
+            // <s>[INST] {{ user_msg_2 }} [/INST] {{ model_answer_2 }} </s>\
+            // <s>[INST] {{ user_msg_3 }} [/INST]
+
+            var systemTemplate = "<<SYS>>\n{0}\n<</SYS>>\n\n";
+            var userTemplate = "[INST] {0}{1} [/INST]\n";
+
+            var systemPrompt = "You are a helpful assistant.";
 
             var modelOptions = new LlamaCppModelOptions
             {
                 Seed = 0,
-                ContextSize = 2048,
+                ContextSize = contextLength,
                 GpuLayers = gpuLayers,
             };
 
-            using var model = new LlamaCpp();
+            using var model = new LlamaCppModel();
             model.Load(modelPath, modelOptions);
 
             var cancellationTokenSource = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) => cancellationTokenSource.Cancel(!(e.Cancel = true));
 
-            var predictOptions = new LlamaCppPredictOptions
-            {
-                //ThreadCount = 4,
-                //TopK = 40,
-                //TopP = 0.95f,
-                //Temperature = 0.0f,
-                //RepeatPenalty = 1.1f,
-                //PenalizeNewLine = false,
-                Mirostat = Mirostat.Mirostat2,
-                //MirostatTAU = 5.0f,
-                //MirostatETA = 0.1f,
-                ResetState = true, // No context
-                Template = template,
-            };
-
-            //await Console.Out.WriteLineAsync($"\n{JsonSerializer.Serialize(modelOptions, new JsonSerializerOptions { WriteIndented = true })}");
-            //await Console.Out.WriteLineAsync($"\n{JsonSerializer.Serialize(predictOptions, new JsonSerializerOptions { WriteIndented = true })}");
+            var predictOptions = new LlamaCppGenerateOptions { Mirostat = Mirostat.Mirostat2 };
+            var session = model.CreateSession();
 
             await Console.Out.WriteLineAsync(
                 """
@@ -110,20 +111,23 @@ namespace LlamaCppCli
                 """
             );
 
+            var firstPrompt = true;
             while (true)
             {
                 await Console.Out.WriteLineAsync("\nInput:");
 
-                predictOptions.Prompt = await Console.In.ReadLineAsync() ?? String.Empty;
-                if (String.IsNullOrWhiteSpace(predictOptions.Prompt))
+                var userPrompt = await Console.In.ReadLineAsync() ?? String.Empty;
+                if (String.IsNullOrWhiteSpace(userPrompt))
                     break;
+
+                var prompt = String.Format(userTemplate, firstPrompt ? String.Format(systemTemplate, systemPrompt) : String.Empty, userPrompt);
+                firstPrompt = false;
 
                 await Console.Out.WriteLineAsync("\nOutput:");
 
-                await foreach (var prediction in model.Predict(predictOptions, cancellationTokenSource.Token))
+                await foreach (var tokenString in session.GenerateStringAsync(prompt, predictOptions, cancellationTokenSource.Token))
                 {
-                    var token = prediction.Value;
-                    await Console.Out.WriteAsync(token);
+                    await Console.Out.WriteAsync(tokenString);
                 }
 
                 if (cancellationTokenSource.IsCancellationRequested)
@@ -136,6 +140,11 @@ namespace LlamaCppCli
                 await Console.Out.WriteLineAsync();
             }
 
+            var separator = $"\n{new String('=', Console.WindowWidth)}\n";
+            await Console.Out.WriteLineAsync(separator);
+            await Console.Out.WriteLineAsync(session.GetContextAsText());
+            await Console.Out.WriteLineAsync(separator);
+
             await Console.Out.WriteLineAsync("Quitting...");
         }
 
@@ -143,16 +152,17 @@ namespace LlamaCppCli
         {
             if (args.Length < 2)
             {
-                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} 1 base_url model_name [gpu_layers] [template]");
+                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} 1 base_url model_name [gpu_layers] [ctx_length] [template]");
                 return;
             }
 
             var baseUrl = args[0];
             var modelName = args[1];
             var gpuLayers = args.Length > 2 ? Int32.Parse(args[2]) : 0;
-            var template = args.Length > 3 ? args[3] : "{0}";
+            var contextLength = args.Length > 3 ? Int32.Parse(args[3]) : 2048;
+            var template = args.Length > 4 ? args[4] : "{0}";
 
-            var modelOptions = new LlamaCppModelOptions() { ContextSize = 2048, GpuLayers = gpuLayers };
+            var modelOptions = new LlamaCppModelOptions() { ContextSize = contextLength, GpuLayers = gpuLayers };
 
             var cancellationTokenSource = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) => cancellationTokenSource.Cancel(!(e.Cancel = true));
@@ -161,51 +171,48 @@ namespace LlamaCppCli
 
             //// List model(s)
             //{
-            //    var response = await httpClient.GetAsync($"{baseUrl}/model/list");
-            //    response.EnsureSuccessStatusCode();
+            //    var response = (await httpClient.GetAsync($"{baseUrl}/model/list")).EnsureSuccessStatusCode();
             //    await Console.Out.WriteLineAsync(await response.Content.ReadAsStringAsync());
             //}
 
             // Load model
             {
                 await Console.Out.WriteAsync("Loading model...");
-                var response = await httpClient.GetAsync($"{baseUrl}/model/load?{nameof(modelName)}={modelName}&{nameof(modelOptions)}={HttpUtility.UrlEncode(JsonSerializer.Serialize(modelOptions))}");
-                response.EnsureSuccessStatusCode();
+                var response = (await httpClient.GetAsync($"{baseUrl}/model/load?{nameof(modelName)}={modelName}&{nameof(modelOptions)}={HttpUtility.UrlEncode(JsonSerializer.Serialize(modelOptions))}"))
+                    .EnsureSuccessStatusCode();
                 await Console.Out.WriteLineAsync(" OK.");
             }
 
             //// Model status
             //{
-            //    var response = await httpClient.GetAsync($"{baseUrl}/model/status");
-            //    response.EnsureSuccessStatusCode();
+            //    var response = (await httpClient.GetAsync($"{baseUrl}/model/status")).EnsureSuccessStatusCode();
             //    await Console.Out.WriteLineAsync(await response.Content.ReadAsStringAsync());
             //}
 
-            // Run prediction(s)
+            // Create session
+            Guid? sessionId;
             {
-                var predictOptions = new LlamaCppPredictOptions
-                {
-                    //ThreadCount = 4,
-                    //TopK = 40,
-                    //TopP = 0.95f,
-                    //Temperature = 0.0f,
-                    //RepeatPenalty = 1.1f,
-                    //PenalizeNewLine = false,
-                    Mirostat = Mirostat.Mirostat2,
-                    //MirostatTAU = 5.0f,
-                    //MirostatETA = 0.1f,
-                    ResetState = true, // No context
-                    Template = template,
-                };
+                await Console.Out.WriteAsync("Creating session...");
+                var response = (await httpClient.GetAsync($"{baseUrl}/session/create")).EnsureSuccessStatusCode();
+                sessionId = Guid.Parse(await response.Content.ReadFromJsonAsync<string>() ?? String.Empty);
+                await Console.Out.WriteLineAsync($" OK. [{sessionId}]");
+            }
+
+            // Generate token(s)
+            {
+                var generateOptions = new LlamaCppGenerateOptions { Mirostat = Mirostat.Mirostat2 };
 
                 await Console.Out.WriteLineAsync(
                     """
 
                     Entering interactive mode:
-                        * Press <Ctrl+C> to cancel running predictions
+                        * Press <Ctrl+C> to cancel token generation
                         * Press <Enter> on an empty input prompt to quit
                     """
                 );
+
+                // Using raw standard output to avoid breaking multi-byte encoding across tokens (e.g. emojis)
+                using var standardOutputStream = Console.OpenStandardOutput();
 
                 while (true)
                 {
@@ -213,17 +220,21 @@ namespace LlamaCppCli
                     {
                         await Console.Out.WriteLineAsync("\nInput:");
 
-                        predictOptions.Prompt = await Console.In.ReadLineAsync(cancellationTokenSource.Token) ?? String.Empty;
-                        if (String.IsNullOrWhiteSpace(predictOptions.Prompt))
+                        var prompt = await Console.In.ReadLineAsync(cancellationTokenSource.Token) ?? String.Empty;
+                        if (String.IsNullOrWhiteSpace(prompt))
                             break;
 
                         await Console.Out.WriteLineAsync("\nOutput:");
 
-                        using var request = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/model/predict?{nameof(predictOptions)}={HttpUtility.UrlEncode(JsonSerializer.Serialize(predictOptions))}");
+                        var encodedSessionId = WebUtility.UrlEncode($"{sessionId}");
+                        var encodedPrompt = WebUtility.UrlEncode(String.Format(template, prompt));
+                        var encodedGenerateOptions = WebUtility.UrlEncode(JsonSerializer.Serialize(generateOptions));
+                        var url = $"{baseUrl}/model/generate?{nameof(sessionId)}={encodedSessionId}&{nameof(prompt)}={encodedPrompt}&{nameof(generateOptions)}={encodedGenerateOptions}";
+
+                        using var request = new HttpRequestMessage(HttpMethod.Get, url);
                         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
-                        var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationTokenSource.Token);
-                        response.EnsureSuccessStatusCode();
+                        var response = (await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationTokenSource.Token)).EnsureSuccessStatusCode();
 
                         await using var stream = await response.Content.ReadAsStreamAsync(cancellationTokenSource.Token);
                         using var reader = new StreamReader(stream);
@@ -234,8 +245,8 @@ namespace LlamaCppCli
                             if (data == null)
                                 break;
 
-                            var token = Regex.Match(data, @"(?<=data:\s).*").Value.Replace("\\n", "\n");
-                            await Console.Out.WriteAsync(token);
+                            var tokenBytes = Convert.FromBase64String(Regex.Match(data, @"(?<=data:\s).*").Value);
+                            await standardOutputStream.WriteAsync(tokenBytes);
                         }
 
                         cancellationTokenSource.Token.ThrowIfCancellationRequested();
