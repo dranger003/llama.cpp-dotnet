@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using System.Web;
 
 using LlamaCppLib;
 
@@ -103,7 +104,7 @@ app.MapGet("/session/get", async (HttpContext httpContext, Guid sessionId) =>
         return;
     }
 
-    await httpContext.Response.WriteAsync(JsonSerializer.Serialize(session.GetContextAsText()));
+    await httpContext.Response.WriteAsync(HttpUtility.HtmlEncode(session.GetContextAsText()));
 });
 
 app.MapGet("/model/generate", async (HttpContext httpContext, Guid sessionId, string prompt, LlamaCppGenerateOptions? generateOptions) =>
