@@ -8,6 +8,7 @@ using System.Web;
 
 using LlamaCppLib;
 using FalconCppLib;
+using System.Net.Mime;
 
 namespace LlamaCppCli
 {
@@ -19,8 +20,8 @@ namespace LlamaCppCli
         static async Task Main(string[] args)
         {
 #if DEBUG
-            //args = new[] { "1", "http://localhost:5021", "meta-llama2-chat-13b-v1.0-q8_0", "60", "4096", "[INST] <<SYS>>\n{0}\n<<SYS>>\n\n{1} [/INST]\n" };
-            args = new[] { "3" };
+            args = new[] { "1", "http://localhost:5021", "meta-llama2-chat-13b-v1.0-q8_0", "60", "4096", "[INST] <<SYS>>\n{0}\n<<SYS>>\n\n{1} [/INST]\n" };
+            //args = new[] { "3" };
 #endif
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
@@ -203,8 +204,8 @@ namespace LlamaCppCli
             var contextLength = args.Length > 3 ? Int32.Parse(args[3]) : 2048;
             var template = args.Length > 4 ? args[4] : "{0}";
 
-            var modelOptions = new LlamaCppModelOptions() { ContextSize = contextLength, GpuLayers = gpuLayers };
-            await Console.Out.WriteLineAsync(JsonSerializer.Serialize(modelOptions, new JsonSerializerOptions { WriteIndented = true }));
+            var modelOptions = new LlamaCppModelOptions() { Seed = 0, ContextSize = contextLength, GpuLayers = gpuLayers };
+            //await Console.Out.WriteLineAsync(JsonSerializer.Serialize(modelOptions, new JsonSerializerOptions { WriteIndented = true }));
 
             var cancellationTokenSource = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) => cancellationTokenSource.Cancel(!(e.Cancel = true));
@@ -213,21 +214,21 @@ namespace LlamaCppCli
 
             //// List model(s)
             //{
-            //    var response = (await httpClient.GetAsync($"{baseUrl}/model/list")).EnsureSuccessStatusCode();
+            //    using var response = (await httpClient.GetAsync($"{baseUrl}/model/list")).EnsureSuccessStatusCode();
             //    await Console.Out.WriteLineAsync(await response.Content.ReadAsStringAsync());
             //}
 
             // Load model
             {
                 await Console.Out.WriteAsync("Loading model...");
-                var response = (await httpClient.GetAsync($"{baseUrl}/model/load?{nameof(modelName)}={modelName}&{nameof(modelOptions)}={HttpUtility.UrlEncode(JsonSerializer.Serialize(modelOptions))}"))
+                using var response = (await httpClient.GetAsync($"{baseUrl}/model/load?{nameof(modelName)}={modelName}&{nameof(modelOptions)}={HttpUtility.UrlEncode(JsonSerializer.Serialize(modelOptions))}"))
                     .EnsureSuccessStatusCode();
                 await Console.Out.WriteLineAsync(" OK.");
             }
 
             //// Model status
             //{
-            //    var response = (await httpClient.GetAsync($"{baseUrl}/model/status")).EnsureSuccessStatusCode();
+            //    using var response = (await httpClient.GetAsync($"{baseUrl}/model/status")).EnsureSuccessStatusCode();
             //    await Console.Out.WriteLineAsync(await response.Content.ReadAsStringAsync());
             //}
 
@@ -235,7 +236,7 @@ namespace LlamaCppCli
             Guid? sessionId;
             {
                 await Console.Out.WriteAsync("Creating session...");
-                var response = (await httpClient.GetAsync($"{baseUrl}/session/create")).EnsureSuccessStatusCode();
+                using var response = (await httpClient.GetAsync($"{baseUrl}/session/create")).EnsureSuccessStatusCode();
                 sessionId = Guid.Parse(await response.Content.ReadFromJsonAsync<string>() ?? String.Empty);
                 await Console.Out.WriteLineAsync($" OK. [{sessionId}]");
             }
@@ -274,15 +275,18 @@ namespace LlamaCppCli
 
                         await Console.Out.WriteLineAsync("\nOutput:");
 
-                        var encodedSessionId = HttpUtility.UrlEncode($"{sessionId}");
-                        var encodedPrompt = HttpUtility.UrlEncode(String.Format(template, systemPrompt, prompt));
-                        var encodedGenerateOptions = HttpUtility.UrlEncode(JsonSerializer.Serialize(generateOptions));
-                        var url = $"{baseUrl}/model/generate?{nameof(sessionId)}={encodedSessionId}&{nameof(prompt)}={encodedPrompt}&{nameof(generateOptions)}={encodedGenerateOptions}";
+                        var content = new
+                        {
+                            SessionId = $"{sessionId}",
+                            GenerateOptions = generateOptions,
+                            Prompt = prompt,
+                        };
 
-                        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                        var url = $"{baseUrl}/model/generate";
+                        using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = new StringContent(JsonSerializer.Serialize(content), Encoding.UTF8, MediaTypeNames.Application.Json) };
                         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
-                        var response = (await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationTokenSource.Token)).EnsureSuccessStatusCode();
+                        using var response = (await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationTokenSource.Token)).EnsureSuccessStatusCode();
 
                         await using var stream = await response.Content.ReadAsStreamAsync(cancellationTokenSource.Token);
                         using var reader = new StreamReader(stream);

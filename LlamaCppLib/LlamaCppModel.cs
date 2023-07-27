@@ -30,6 +30,8 @@ namespace LlamaCppLib
                 LlamaCppInterop.llama_free_model(_model);
                 _model = IntPtr.Zero;
             }
+
+            LlamaCppInterop.llama_backend_free();
         }
 
         public LlamaContext Handle => _context;

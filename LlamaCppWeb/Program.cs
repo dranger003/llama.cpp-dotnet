@@ -29,7 +29,13 @@ app.MapGet("/model/load", async (HttpContext httpContext, string modelName, Llam
 {
     var manager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
     if (manager.Status != LlamaCppModelStatus.Loaded || manager.ModelName != modelName)
+    {
         manager.LoadModel(modelName, modelOptions);
+    }
+    else if (manager.Model != null)
+    {
+        manager.Model.ResetState();
+    }
 
     await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
 });
@@ -124,10 +130,12 @@ app.MapGet("/session/reset", async (HttpContext httpContext, Guid sessionId) =>
     await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
 });
 
-app.MapGet("/model/generate", async (HttpContext httpContext, Guid sessionId, string prompt, LlamaCppGenerateOptions? generateOptions) =>
+app.MapPost("/model/generate", async (HttpContext httpContext) =>
 {
     var lifetime = httpContext.RequestServices.GetRequiredService<IHostApplicationLifetime>();
     using var cts = CancellationTokenSource.CreateLinkedTokenSource(httpContext.RequestAborted, lifetime.ApplicationStopping);
+
+    var content = await httpContext.Request.ReadFromJsonAsync<RequestBody>(cts.Token) ?? new();
 
     var modelManager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
     var model = modelManager.Model;
@@ -139,7 +147,7 @@ app.MapGet("/model/generate", async (HttpContext httpContext, Guid sessionId, st
     }
 
     var sessionManager = httpContext.RequestServices.GetRequiredService<LlamaCppSessionManager>();
-    if (!sessionManager.Sessions.TryGetValue(sessionId, out var session))
+    if (!sessionManager.Sessions.TryGetValue(content.SessionId, out var session))
     {
         httpContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
         await httpContext.Response.WriteAsJsonAsync($"Session not found.");
@@ -150,7 +158,7 @@ app.MapGet("/model/generate", async (HttpContext httpContext, Guid sessionId, st
 
     try
     {
-        await foreach (var tokenString in session.GenerateStringAsync(prompt, generateOptions, cts.Token))
+        await foreach (var tokenString in session.GenerateStringAsync(content.Prompt, content.GenerateOptions, cts.Token))
         {
             var encodedTokenString = tokenString.Replace("\n", "\\n").Replace("\t", "\\t");
             await httpContext.Response.WriteAsync($"data: {encodedTokenString}\n\n", cts.Token);
@@ -161,3 +169,10 @@ app.MapGet("/model/generate", async (HttpContext httpContext, Guid sessionId, st
 });
 
 await app.RunAsync();
+
+internal class RequestBody
+{
+    public Guid SessionId { get; set; }
+    public LlamaCppGenerateOptions GenerateOptions { get; set; } = new();
+    public string Prompt { get; set; } = string.Empty;
+}
