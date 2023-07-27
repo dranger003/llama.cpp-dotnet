@@ -28,7 +28,6 @@ app.MapGet("/model/list", async (HttpContext httpContext) =>
 app.MapGet("/model/load", async (HttpContext httpContext, string modelName, LlamaCppModelOptions modelOptions) =>
 {
     var manager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
-
     if (manager.Status != LlamaCppModelStatus.Loaded || manager.ModelName != modelName)
         manager.LoadModel(modelName, modelOptions);
 
@@ -39,6 +38,7 @@ app.MapGet("/model/unload", async (HttpContext httpContext) =>
 {
     var manager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
     manager.UnloadModel();
+
     await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
 });
 
@@ -51,7 +51,6 @@ app.MapGet("/model/status", async (HttpContext httpContext) =>
 app.MapGet("/model/tokenize", async (HttpContext httpContext, string prompt) =>
 {
     var manager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
-
     var model = manager.Model;
     if (model == null)
     {
@@ -60,8 +59,21 @@ app.MapGet("/model/tokenize", async (HttpContext httpContext, string prompt) =>
     }
 
     var tokens = model.Tokenize(prompt);
-
     await httpContext.Response.WriteAsync(JsonSerializer.Serialize(new { TokenCount = tokens.Count, Tokens = tokens }, new JsonSerializerOptions { WriteIndented = true }));
+});
+
+app.MapGet("/model/reset", async (HttpContext httpContext) =>
+{
+    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
+    var model = manager.Model;
+    if (model == null)
+    {
+        await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.BadRequest);
+        return;
+    }
+
+    model.ResetState();
+    await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
 });
 
 app.MapGet("/session/create", async (HttpContext httpContext) =>
@@ -89,14 +101,6 @@ app.MapGet("/session/list", async (HttpContext httpContext) =>
 
 app.MapGet("/session/get", async (HttpContext httpContext, Guid sessionId) =>
 {
-    var modelManager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
-    var model = modelManager.Model;
-    if (model == null)
-    {
-        await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.BadRequest);
-        return;
-    }
-
     var sessionManager = httpContext.RequestServices.GetRequiredService<LlamaCppSessionManager>();
     if (!sessionManager.Sessions.TryGetValue(sessionId, out var session))
     {
@@ -105,6 +109,19 @@ app.MapGet("/session/get", async (HttpContext httpContext, Guid sessionId) =>
     }
 
     await httpContext.Response.WriteAsync(HttpUtility.HtmlEncode(session.GetContextAsText()));
+});
+
+app.MapGet("/session/reset", async (HttpContext httpContext, Guid sessionId) =>
+{
+    var sessionManager = httpContext.RequestServices.GetRequiredService<LlamaCppSessionManager>();
+    if (!sessionManager.Sessions.TryGetValue(sessionId, out var session))
+    {
+        await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.BadRequest);
+        return;
+    }
+
+    session.Reset();
+    await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
 });
 
 app.MapGet("/model/generate", async (HttpContext httpContext, Guid sessionId, string prompt, LlamaCppGenerateOptions? generateOptions) =>

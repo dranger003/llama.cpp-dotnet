@@ -11,6 +11,7 @@ namespace LlamaCppLib
         public uint Seed { get; set; } = unchecked((uint)-1);
         public int PredictCount { get; set; } = -1;
         public int ContextSize { get; set; } = 512;
+        public int BatchSize { get; set; } = 512;
         public bool UseHalf { get; set; } = true;
         public bool UseMemoryMapping { get; set; } = true;
         public bool UseMemoryLocking { get; set; } = false;

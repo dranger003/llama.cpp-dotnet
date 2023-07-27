@@ -20,7 +20,7 @@
 
         public Guid Id => _id;
 
-        public void ResetContext()
+        public void Reset()
         {
             _state.TokenIds.Clear();
             _state.EvalOffset = 0;
@@ -55,7 +55,9 @@
             if (options == default)
                 options = new();
 
-            _state.TokenIds.AddRange(_model.Tokenize(prompt, !_state.TokenIds.Any()));
+            var tokens = _model.Tokenize(prompt, !_state.TokenIds.Any());
+            _state.TokenIds.AddRange(tokens);
+
             return _model.GenerateTokenStringAsync(options, _state, cancellationToken);
         }
 

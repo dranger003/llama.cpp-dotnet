@@ -155,17 +155,22 @@ namespace LlamaCppLib
 
             while (LlamaCppInterop.llama_get_kv_cache_token_count(_context) < LlamaCppInterop.llama_n_ctx(_context) && !cancellationToken.IsCancellationRequested)
             {
-                var count = state.TokenIds.Count - state.EvalOffset;
+                for (var offset = state.EvalOffset; offset < state.TokenIds.Count; offset += _options.BatchSize)
+                {
+                    var evalCount = state.TokenIds.Count - offset;
+                    if (evalCount > _options.BatchSize)
+                        evalCount = _options.BatchSize;
 
-                LlamaCppInterop.llama_eval(
-                    _context,
-                    state.TokenIds.Skip(state.EvalOffset).ToArray(),
-                    count,
-                    state.EvalOffset,
-                    options.ThreadCount
-                );
+                    LlamaCppInterop.llama_eval(
+                        _context,
+                        state.TokenIds.Skip(offset).ToArray(),
+                        evalCount,
+                        state.EvalOffset,
+                        options.ThreadCount
+                    );
 
-                state.EvalOffset += count;
+                    state.EvalOffset += evalCount;
+                }
 
                 var logits = LlamaCppInterop.llama_get_logits(_context);
                 var n_vocab = LlamaCppInterop.llama_n_vocab(_context);
