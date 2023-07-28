@@ -1,6 +1,4 @@
-﻿using LlamaCppLib;
-
-namespace LlamaCppWeb
+﻿namespace LlamaCppWeb
 {
     public class LlamaCppConfiguration
     {
@@ -15,7 +13,7 @@ namespace LlamaCppWeb
         public IConfiguration Configuration;
         public LlamaCppConfiguration(IConfiguration configuration) => Configuration = configuration;
 
-        public void Load() => Configuration.GetSection(nameof(LlamaCpp)).Bind(this);
+        public void Load() => Configuration.GetSection("LlamaCpp").Bind(this);
         public void Reload() => Load();
     }
 }

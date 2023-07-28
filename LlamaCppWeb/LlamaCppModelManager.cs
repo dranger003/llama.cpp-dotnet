@@ -4,13 +4,13 @@ namespace LlamaCppLib
 {
     public enum LlamaCppModelStatus { Unloaded, Loaded }
 
-    public class LlamaCppManager
+    public class LlamaCppModelManager
     {
         private LlamaCppConfiguration _configuration;
-        private LlamaCpp? _model;
+        private LlamaCppModel? _model;
         private string? _modelName;
 
-        public LlamaCppManager(IConfiguration configuration)
+        public LlamaCppModelManager(IConfiguration configuration)
         {
             _configuration = new LlamaCppConfiguration(configuration);
             _configuration.Load();
@@ -20,7 +20,7 @@ namespace LlamaCppLib
 
         public LlamaCppModelStatus Status { get => _model == null ? LlamaCppModelStatus.Unloaded : LlamaCppModelStatus.Loaded; }
 
-        public LlamaCpp? Model => _model;
+        public LlamaCppModel? Model => _model;
         public string? ModelName => _modelName;
 
         public void LoadModel(string modelName, LlamaCppModelOptions options)

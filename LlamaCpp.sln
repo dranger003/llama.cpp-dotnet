@@ -16,6 +16,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FalconCppLib", "FalconLib\FalconCppLib.csproj", "{C53D151C-4358-44F3-A4A1-D2B6EF46CC0A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BertCppLib", "BertCppLib\BertCppLib.csproj", "{59159D33-CD95-4225-9EC5-5FF0D4937367}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -34,6 +38,14 @@ Global
 		{9C1B4C2E-F84D-421E-B924-C5C394288AC5}.Debug|x64.Build.0 = Debug|x64
 		{9C1B4C2E-F84D-421E-B924-C5C394288AC5}.Release|x64.ActiveCfg = Release|x64
 		{9C1B4C2E-F84D-421E-B924-C5C394288AC5}.Release|x64.Build.0 = Release|x64
+		{C53D151C-4358-44F3-A4A1-D2B6EF46CC0A}.Debug|x64.ActiveCfg = Debug|x64
+		{C53D151C-4358-44F3-A4A1-D2B6EF46CC0A}.Debug|x64.Build.0 = Debug|x64
+		{C53D151C-4358-44F3-A4A1-D2B6EF46CC0A}.Release|x64.ActiveCfg = Release|x64
+		{C53D151C-4358-44F3-A4A1-D2B6EF46CC0A}.Release|x64.Build.0 = Release|x64
+		{59159D33-CD95-4225-9EC5-5FF0D4937367}.Debug|x64.ActiveCfg = Debug|x64
+		{59159D33-CD95-4225-9EC5-5FF0D4937367}.Debug|x64.Build.0 = Debug|x64
+		{59159D33-CD95-4225-9EC5-5FF0D4937367}.Release|x64.ActiveCfg = Release|x64
+		{59159D33-CD95-4225-9EC5-5FF0D4937367}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
