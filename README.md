@@ -20,29 +20,26 @@ dotnet build -c Release
 Windows:
 ```
 cd x64\Release
-LlamaCppCli.exe 0 ggml-vicuna-13b-1.1-q8_0.bin
+LlamaCppCli.exe 0 <model_path>
 ```
 
 Linux:
 ```
 cd x64/Release
-./LlamaCppCli 0 ggml-vicuna-13b-1.1-q8_0.bin
+./LlamaCppCli 0 <model_path>
 ```
 
 ## Samples
 ```
 Usage: LlamaCppCli.dll <SampleIndex> <SampleArgs>
-Available sample(s):
-    [0] = LocalSample
-    [1] = RemoteSample
 ```
 ## Local
 ```
-Usage: LlamaCppCli.dll 0 model_path [gpu_layers] [template]
+Usage: LlamaCppCli.dll 0 model_path [gpu_layers] [ctx_length] [template]
 ```
 ## Remote
 ```
-Usage: LlamaCppCli.dll 1 base_url model_name [template]
+Usage: LlamaCppCli.dll 1 base_url model_name [gpu_layers] [ctx_length] [template]
 ```
 
 ## Models
@@ -59,28 +56,31 @@ A lot of models can be found below.
 using LlamaCppLib;
 
 // Configure some model options
-var options = new LlamaCppModelOptions
+var modelOptions = new LlamaCppModelOptions
 {
     ContextSize = 2048,
     GpuLayers = 24,
-    Template = "You are a helpful assistant.\n\nUSER:\n{0}\n\nASSISTANT:\n",
+    // ...
 };
 
 // Load model file
-using var model = new LlamaCpp();
-model.Load(@"ggml-vicuna-13b-v1.1-q8_0.bin", options);
+using var model = new LlamaCppModel();
+model.Load(@"ggml-model-13b-Q8_0.bin", modelOptions);
 
 // Configure some prediction options
-var predictOptions = new LlamaCppPredictOptions
+var generateOptions = new LlamaCppGenerateOptions
 {
     ThreadCount = 4,
     TopK = 40,
     TopP = 0.95f,
     Temperature = 0.1f,
     RepeatPenalty = 1.1f,
-    PenalizeNewLine = false,
     Mirostat = Mirostat.Mirostat2,
+    // ...
 };
+
+// Create conversation session
+var session = model.CreateSession();
 
 while (true)
 {
@@ -93,11 +93,11 @@ while (true)
         break;
 
     // Set-up prompt using template
-    predictOptions.Prompt = String.Format(modelOptions.Template, prompt);
+    prompt = String.Format(template, prompt);
 
-    // Run the predictions
-    await foreach (var prediction in model.Predict(predictOptions))
-        Console.Write(prediction.Value);
+    // Generate tokens
+    await foreach (var token in session.GenerateTokenStringAsync(prompt, generateOptions))
+        Console.Write(token);
 }
 ```
 
@@ -107,7 +107,13 @@ GET /model/list
 GET /model/load?modelName={modelName}&modelOptions={modelOptions}
 GET /model/unload
 GET /model/status
-GET /model/predict?predictOptions={predictOptions}
+GET /model/tokenize?prompt={prompt}
+GET /model/reset
+GET /session/create
+GET /session/list
+GET /session/get
+GET /session/reset
+POST /model/generate [RequestBody]
 ```
 
 ### TODO
@@ -120,3 +126,5 @@ GET /model/predict?predictOptions={predictOptions}
 
 ### Acknowledgments
 [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) for the LLaMA implementation in C++
+[cmp-nct/ggllm.cpp](https://github.com/cmp-nct/ggllm.cpp) for Falcon support
+[skeskinen/bert.cpp](https://github.com/skeskinen/bert.cpp) for BERT support
