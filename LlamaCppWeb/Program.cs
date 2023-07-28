@@ -158,7 +158,7 @@ app.MapPost("/model/generate", async (HttpContext httpContext) =>
 
     try
     {
-        await foreach (var tokenString in session.GenerateStringAsync(content.Prompt, content.GenerateOptions, cts.Token))
+        await foreach (var tokenString in session.GenerateTokenStringAsync(content.Prompt, content.GenerateOptions, cts.Token))
         {
             var encodedTokenString = tokenString.Replace("\n", "\\n").Replace("\t", "\\t");
             await httpContext.Response.WriteAsync($"data: {encodedTokenString}\n\n", cts.Token);

@@ -182,7 +182,7 @@ namespace LlamaCppCli
 
                 await Console.Out.WriteLineAsync("\nOutput:");
 
-                await foreach (var tokenString in session.GenerateStringAsync(prompt, generateOptions, cancellationTokenSource.Token))
+                await foreach (var tokenString in session.GenerateTokenStringAsync(prompt, generateOptions, cancellationTokenSource.Token))
                 {
                     await Console.Out.WriteAsync(tokenString);
                 }

@@ -29,7 +29,7 @@
 
         public string GetContextAsText() => _model.UntokenizeToText(_state.TokenIds);
 
-        public IAsyncEnumerable<byte[]> GenerateBytesAsync(string prompt, LlamaCppGenerateOptions? options = default, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<byte[]> GenerateTokenBytesAsync(string prompt, LlamaCppGenerateOptions? options = default, CancellationToken cancellationToken = default)
         {
             if (_lastSessionToGenerate != null && _lastSessionToGenerate != this)
                 _state.EvalOffset = 0;
@@ -43,10 +43,10 @@
             return _model.GenerateTokenBytesAsync(options, _state, cancellationToken);
         }
 
-        public IAsyncEnumerable<byte[]> GenerateBytesAsync(string prompt, CancellationToken cancellationToken = default) =>
-            GenerateBytesAsync(prompt, default, cancellationToken);
+        public IAsyncEnumerable<byte[]> GenerateTokenBytesAsync(string prompt, CancellationToken cancellationToken = default) =>
+            GenerateTokenBytesAsync(prompt, default, cancellationToken);
 
-        public IAsyncEnumerable<string> GenerateStringAsync(string prompt, LlamaCppGenerateOptions? options = default, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<string> GenerateTokenStringAsync(string prompt, LlamaCppGenerateOptions? options = default, CancellationToken cancellationToken = default)
         {
             if (_lastSessionToGenerate != null && _lastSessionToGenerate != this)
                 _state.EvalOffset = 0;
@@ -62,7 +62,7 @@
             return _model.GenerateTokenStringAsync(options, _state, cancellationToken);
         }
 
-        public IAsyncEnumerable<string> GenerateStringAsync(string prompt, CancellationToken cancellationToken = default) =>
-            GenerateStringAsync(prompt, default, cancellationToken);
+        public IAsyncEnumerable<string> GenerateTokenStringAsync(string prompt, CancellationToken cancellationToken = default) =>
+            GenerateTokenStringAsync(prompt, default, cancellationToken);
     }
 }
