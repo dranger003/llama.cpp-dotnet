@@ -4,3 +4,6 @@
 [submodule "ggllm.cpp"]
 	path = ggllm.cpp
 	url = https://github.com/dranger003/ggllm.cpp.git
+[submodule "bert.cpp"]
+	path = bert.cpp
+	url = https://github.com/dranger003/bert.cpp.git
