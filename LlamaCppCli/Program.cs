@@ -20,7 +20,8 @@ namespace LlamaCppCli
         static async Task Main(string[] args)
         {
 #if DEBUG
-            args = new[] { "1", "http://localhost:5021", "meta-llama2-chat-13b-v1.0-q8_0", "60", "4096", "[INST] <<SYS>>\n{0}\n<<SYS>>\n\n{1} [/INST]\n" };
+            args = new[] { "1", "http://localhost:5021", "meta-llama2-chat-13b-v1.0-q8_0", "60", "4096", "" };
+            //args = new[] { "1", "http://localhost:5021", "wizardlm-13b-v1.2-q8_0", "60", "4096", "" };
             //args = new[] { "3" };
 #endif
             var samples = new (string Name, Func<string[], Task> Func)[]
@@ -214,7 +215,10 @@ namespace LlamaCppCli
             // Load model
             {
                 await Console.Out.WriteAsync("Loading model...");
-                using var response = (await httpClient.GetAsync($"{baseUrl}/model/load?{nameof(modelName)}={modelName}&{nameof(modelOptions)}={HttpUtility.UrlEncode(JsonSerializer.Serialize(modelOptions))}"))
+                var query = HttpUtility.ParseQueryString(String.Empty);
+                query["modelName"] = modelName;
+                query["modelOptions"] = JsonSerializer.Serialize(modelOptions);
+                using var response = (await httpClient.GetAsync($"{baseUrl}/model/load?{query}"))
                     .EnsureSuccessStatusCode();
                 await Console.Out.WriteLineAsync(" OK.");
             }
@@ -230,7 +234,7 @@ namespace LlamaCppCli
 
             // Generate token(s)
             {
-                var generateOptions = new LlamaCppGenerateOptions { Mirostat = Mirostat.Mirostat2 };
+                var generateOptions = new LlamaCppGenerateOptions { Temperature = 0.0f, Mirostat = Mirostat.Mirostat2 };
 
                 await Console.Out.WriteLineAsync(
                     """
@@ -289,7 +293,9 @@ namespace LlamaCppCli
                         await Console.Out.WriteLineAsync();
                         cancellationTokenSource.Token.ThrowIfCancellationRequested();
 
-                        (await httpClient.GetAsync($"{baseUrl}/session/reset?{nameof(sessionId)}={HttpUtility.UrlEncode($"{sessionId}")}")).EnsureSuccessStatusCode();
+                        var query = HttpUtility.ParseQueryString(String.Empty);
+                        query["sessionId"] = $"{sessionId}";
+                        (await httpClient.GetAsync($"{baseUrl}/session/reset?{query}")).EnsureSuccessStatusCode();
                         (await httpClient.GetAsync($"{baseUrl}/model/reset")).EnsureSuccessStatusCode();
                     }
                     catch (Exception ex) when (ex is TaskCanceledException || ex is OperationCanceledException)
