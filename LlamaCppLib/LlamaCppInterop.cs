@@ -155,7 +155,7 @@ namespace LlamaCppLib
         public static extern void llama_set_rng_seed(llama_context ctx, uint seed);
 
         /// <summary>
-        /// Returns the size in bytes of the state (rng, logits, embedding and kv_cache)
+        /// Returns the maximum size in bytes of the state (rng, logits, embedding and kv_cache)
         /// </summary>
         /// <param name="ctx">LlamaContext</param>
         /// <returns>Returns the size in bytes of the state (rng, logits, embedding and kv_cache)</returns>
@@ -169,13 +169,15 @@ namespace LlamaCppLib
         /// <param name="dest">Destination needs to have allocated enough memory.</param>
         /// <returns>Returns the number of bytes copied</returns>
         [DllImport("llama", EntryPoint = "llama_copy_state_data")]
-        private static extern int _llama_copy_state_data(llama_context ctx, byte[] dest);
+        private static extern nuint _llama_copy_state_data(llama_context ctx, byte[] dest);
 
         public static byte[] llama_copy_state_data(llama_context ctx)
         {
-            var size = Math.Min(llama_get_state_size(ctx).ToUInt32(), 0x7FEFFFFF);
-            var state = new byte[size];
-            var count = _llama_copy_state_data(ctx, state);
+            // This is a hack because llama_get_state_size() returns the maximum state size (>2GB for 8192 n_ctx)
+            // Hardcoding 1M as this is used exclusively for saving the initial state which is always <1MB
+            // WARNING -- Using this method to save a non-intial state will most likely crash (i.e. when kv cache is larger)
+            var state = new byte[1024 * 1024];
+            var count = (int)_llama_copy_state_data(ctx, state);
             return state.Take(count).ToArray();
         }
 
@@ -186,7 +188,7 @@ namespace LlamaCppLib
         /// <param name="src">State source</param>
         /// <returns>Returns the number of bytes read</returns>
         [DllImport($"{nameof(LlamaCppLib)}/llama")]
-        public static extern int llama_set_state_data(llama_context ctx, byte[] src);
+        public static extern nuint llama_set_state_data(llama_context ctx, byte[] src);
 
         /// <summary>
         /// Load session file
