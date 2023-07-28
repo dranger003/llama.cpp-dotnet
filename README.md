@@ -115,7 +115,8 @@ GET /model/predict?predictOptions={predictOptions}
 - [X] Dynamic model loading
 - [X] Expose minimal API
 - [X] Support Windows/Linux
-- [ ] Support [Falcon LLM](https://github.com/cmp-nct/ggllm.cpp)
+- [X] Support [Falcon](https://github.com/cmp-nct/ggllm.cpp)
+- [X] Support [BERT](https://github.com/skeskinen/bert.cpp)
 
 ### Acknowledgments
 [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) for the LLaMA implementation in C++
