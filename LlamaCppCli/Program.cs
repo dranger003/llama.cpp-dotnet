@@ -1,6 +1,4 @@
 ﻿using System.Net.Http.Json;
-using System.Net.Http.Headers;
-using System.Net.Mime;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -9,6 +7,7 @@ using System.Web;
 
 using LlamaCppLib;
 using FalconCppLib;
+using BertCppLib;
 
 namespace LlamaCppCli
 {
@@ -20,15 +19,16 @@ namespace LlamaCppCli
         static async Task Main(string[] args)
         {
 #if DEBUG
-            args = new[] { "1", "http://localhost:5021", "meta-llama2-chat-13b-v1.0-q8_0", "60", "4096", "" };
-            //args = new[] { "1", "http://localhost:5021", "wizardlm-13b-v1.2-q8_0", "60", "4096", "" };
-            //args = new[] { "3" };
+            //args = new[] { "1", "http://localhost:5021", "meta-llama2-chat-13b-v1.0-q8_0", "60", "4096" };
+            //args = new[] { "1", "http://localhost:5021", "openassistant-llama2-13b-orca-8k-3319-q8_0", "60", "8192" };
+            args = new[] { "3" };
 #endif
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
                 (nameof(RunLocalSampleAsync), RunLocalSampleAsync),     // Run locally
                 (nameof(RunRemoteSampleAsync), RunRemoteSampleAsync),   // Run via API
-                (nameof(RunFalconSampleAsync), RunFalconSampleAsync),   // Falcon LLM
+                (nameof(RunFalconSampleAsync), RunFalconSampleAsync),   // Falcon
+                (nameof(RunBertSampleAsync), RunBertSampleAsync),       // BERT
                 (nameof(RunDebugSampleAsync), RunDebugSampleAsync),
             }
                 .Select((sample, index) => (sample, index))
@@ -77,23 +77,13 @@ namespace LlamaCppCli
             var contextLength = args.Length > 2 ? Int32.Parse(args[2]) : 2048;
             var template = args.Length > 3 ? args[3] : "{0}";
 
-            // <s>[INST] <<SYS>>
-            // {{ system_prompt }}
-            // <</SYS>>
-            //
-            // {{ user_msg_1 }} [/INST] {{ model_answer_1 }} </s>\
-            // <s>[INST] {{ user_msg_2 }} [/INST] {{ model_answer_2 }} </s>\
-            // <s>[INST] {{ user_msg_3 }} [/INST]
-
-            var systemTemplate = "<<SYS>>\n{0}\n<</SYS>>\n\n";
-            var userTemplate = "[INST] {0}{1} [/INST]";
-            var systemPrompt = "You are a helpful assistant.";
-
             var modelOptions = new LlamaCppModelOptions
             {
-                //Seed = 0,
+                Seed = 0,
                 ContextSize = contextLength,
                 GpuLayers = gpuLayers,
+                RopeFrequencyBase = 10000.0f,
+                RopeFrequencyScale = 0.5f,
             };
 
             using var model = new LlamaCppModel();
@@ -102,7 +92,7 @@ namespace LlamaCppCli
             var cancellationTokenSource = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) => cancellationTokenSource.Cancel(!(e.Cancel = true));
 
-            var predictOptions = new LlamaCppGenerateOptions { Mirostat = Mirostat.Mirostat2 };
+            var generateOptions = new LlamaCppGenerateOptions { Mirostat = Mirostat.Mirostat2 };
             var session = model.CreateSession();
 
             await Console.Out.WriteLineAsync(
@@ -114,6 +104,29 @@ namespace LlamaCppCli
                 """
             );
 
+            var first = true;
+
+            // <s>[INST] <<SYS>>
+            // {{ system_prompt }}
+            // <</SYS>>
+            //
+            // {{ user_msg_1 }} [/INST] {{ model_answer_1 }} </s>\
+            // <s>[INST] {{ user_msg_2 }} [/INST] {{ model_answer_2 }} </s>\
+            // <s>[INST] {{ user_msg_3 }} [/INST]
+            //
+            // https://github.com/facebookresearch/llama/blob/6c7fe276574e78057f917549435a2554000a876d/llama/generation.py#L250
+            //
+            // self.tokenizer.encode(
+            //     f"{B_INST} {(prompt['content']).strip()} {E_INST} {(answer['content']).strip()} ",
+            //     bos=True,
+            //     eos=True,
+            // )
+            const string B_INST = "[INST]";
+            const string E_INST = "[/INST]";
+            const string B_SYS = "<<SYS>>\n";
+            const string E_SYS = "\n<</SYS>>\n\n";
+            const string SYS_PROMPT = "You are a helpful assistant.";
+
             while (true)
             {
                 await Console.Out.WriteLineAsync("\nInput:");
@@ -122,7 +135,7 @@ namespace LlamaCppCli
                 if (String.IsNullOrWhiteSpace(userPrompt))
                     break;
 
-                var prompt = String.Format(userTemplate, String.Format(systemTemplate, systemPrompt), userPrompt);
+                var prompt = $"{B_INST} {(first ? $"{B_SYS}{SYS_PROMPT}{E_SYS}" : "")}{userPrompt} {E_INST} ";
 
                 var match = Regex.Match(userPrompt, @"^\/(?<Command>\w+)\s?""?(?<Arg>.*?)""?$");
                 if (match.Success)
@@ -147,12 +160,8 @@ namespace LlamaCppCli
                             await Console.Out.WriteLineAsync($"Context limit reached ({contextLength}).");
                             continue;
                         }
-                    }
-                    else if (command == "system")
-                    {
-                        systemPrompt = arg;
-                        await Console.Out.WriteLineAsync($"System prompt updated to \"{arg}\".");
-                        continue;
+                        session.Reset();
+                        model.ResetState();
                     }
                     else if (command == "reset")
                     {
@@ -173,7 +182,7 @@ namespace LlamaCppCli
 
                 await Console.Out.WriteLineAsync("\nOutput:");
 
-                await foreach (var tokenString in session.GenerateStringAsync(prompt, predictOptions, cancellationTokenSource.Token))
+                await foreach (var tokenString in session.GenerateStringAsync(prompt, generateOptions, cancellationTokenSource.Token))
                 {
                     await Console.Out.WriteAsync(tokenString);
                 }
@@ -186,7 +195,12 @@ namespace LlamaCppCli
                 }
 
                 await Console.Out.WriteLineAsync();
+                first = false;
             }
+
+            //Console.WriteLine(new String('=', Console.WindowWidth));
+            //Console.WriteLine(session.GetContextAsText());
+            //Console.WriteLine(new String('=', Console.WindowWidth));
 
             await Console.Out.WriteLineAsync("Quitting...");
         }
@@ -205,7 +219,7 @@ namespace LlamaCppCli
             var contextLength = args.Length > 3 ? Int32.Parse(args[3]) : 2048;
             var template = args.Length > 4 ? args[4] : "{0}";
 
-            var modelOptions = new LlamaCppModelOptions() { Seed = 0, ContextSize = contextLength, GpuLayers = gpuLayers };
+            var modelOptions = new LlamaCppModelOptions() { Seed = 0, ContextSize = contextLength, GpuLayers = gpuLayers, RopeFrequencyBase = 10000.0f, RopeFrequencyScale = 0.5f };
 
             var cancellationTokenSource = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) => cancellationTokenSource.Cancel(!(e.Cancel = true));
@@ -232,81 +246,88 @@ namespace LlamaCppCli
                 await Console.Out.WriteLineAsync($" OK. [{sessionId}]");
             }
 
-            // Generate token(s)
             {
-                var generateOptions = new LlamaCppGenerateOptions { Temperature = 0.0f, Mirostat = Mirostat.Mirostat2 };
-
-                await Console.Out.WriteLineAsync(
-                    """
-
-                    Entering interactive mode:
-                        * Press <Ctrl+C> to cancel token generation
-                        * Press <Enter> on an empty input prompt to quit
-                    """
-                );
-
-                while (true)
-                {
-                    try
-                    {
-                        await Console.Out.WriteLineAsync("\nInput:");
-
-                        var prompt = await Console.In.ReadLineAsync(cancellationTokenSource.Token) ?? String.Empty;
-                        if (String.IsNullOrWhiteSpace(prompt))
-                            break;
-
-                        var match = Regex.Match(prompt, @"/load\s""?(.*[^""])?""?");
-                        if (match.Success)
-                        {
-                            var path = Path.GetFullPath(match.Groups[1].Value);
-                            prompt = File.ReadAllText(match.Groups[1].Value);
-                        }
-
-                        await Console.Out.WriteLineAsync("\nOutput:");
-
-                        var content = new
-                        {
-                            SessionId = $"{sessionId}",
-                            GenerateOptions = generateOptions,
-                            Prompt = prompt,
-                        };
-
-                        var url = $"{baseUrl}/model/generate";
-                        using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = new StringContent(JsonSerializer.Serialize(content), Encoding.UTF8, MediaTypeNames.Application.Json) };
-                        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
-
-                        using var response = (await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationTokenSource.Token)).EnsureSuccessStatusCode();
-
-                        await using var stream = await response.Content.ReadAsStreamAsync(cancellationTokenSource.Token);
-                        using var reader = new StreamReader(stream);
-
-                        while (!reader.EndOfStream && !cancellationTokenSource.IsCancellationRequested)
-                        {
-                            var data = await reader.ReadLineAsync(cancellationTokenSource.Token);
-                            if (data == null)
-                                break;
-
-                            var decodedToken = Regex.Match(data, @"(?<=data:\s).*").Value.Replace("\\n", "\n").Replace("\\t", "\t");
-                            await Console.Out.WriteAsync(decodedToken);
-                        }
-
-                        await Console.Out.WriteLineAsync();
-                        cancellationTokenSource.Token.ThrowIfCancellationRequested();
-
-                        var query = HttpUtility.ParseQueryString(String.Empty);
-                        query["sessionId"] = $"{sessionId}";
-                        (await httpClient.GetAsync($"{baseUrl}/session/reset?{query}")).EnsureSuccessStatusCode();
-                        (await httpClient.GetAsync($"{baseUrl}/model/reset")).EnsureSuccessStatusCode();
-                    }
-                    catch (Exception ex) when (ex is TaskCanceledException || ex is OperationCanceledException)
-                    {
-                        await Console.Out.WriteLineAsync(" [Cancelled]");
-
-                        cancellationTokenSource.Dispose();
-                        cancellationTokenSource = new();
-                    }
-                }
+                //var query = HttpUtility.ParseQueryString(String.Empty);
+                //query["sessionId"] = $"{sessionId}";
+                //(await httpClient.GetAsync($"{baseUrl}/session/reset?{query}")).EnsureSuccessStatusCode();
+                //(await httpClient.GetAsync($"{baseUrl}/model/reset")).EnsureSuccessStatusCode();
             }
+
+            //// Generate token(s)
+            //{
+            //    var generateOptions = new LlamaCppGenerateOptions { Temperature = 0.0f, Mirostat = Mirostat.Mirostat2 };
+
+            //    await Console.Out.WriteLineAsync(
+            //        """
+
+            //        Entering interactive mode:
+            //            * Press <Ctrl+C> to cancel token generation
+            //            * Press <Enter> on an empty input prompt to quit
+            //        """
+            //    );
+
+            //    while (true)
+            //    {
+            //        try
+            //        {
+            //            await Console.Out.WriteLineAsync("\nInput:");
+
+            //            var prompt = await Console.In.ReadLineAsync(cancellationTokenSource.Token) ?? String.Empty;
+            //            if (String.IsNullOrWhiteSpace(prompt))
+            //                break;
+
+            //            var match = Regex.Match(prompt, @"/load\s""?(.*[^""])?""?");
+            //            if (match.Success)
+            //            {
+            //                var path = Path.GetFullPath(match.Groups[1].Value);
+            //                prompt = File.ReadAllText(match.Groups[1].Value);
+            //            }
+
+            //            await Console.Out.WriteLineAsync("\nOutput:");
+
+            //            var content = new
+            //            {
+            //                SessionId = $"{sessionId}",
+            //                GenerateOptions = generateOptions,
+            //                Prompt = prompt,
+            //            };
+
+            //            var url = $"{baseUrl}/model/generate";
+            //            using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = new StringContent(JsonSerializer.Serialize(content), Encoding.UTF8, MediaTypeNames.Application.Json) };
+            //            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+
+            //            using var response = (await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationTokenSource.Token)).EnsureSuccessStatusCode();
+
+            //            await using var stream = await response.Content.ReadAsStreamAsync(cancellationTokenSource.Token);
+            //            using var reader = new StreamReader(stream);
+
+            //            while (!reader.EndOfStream && !cancellationTokenSource.IsCancellationRequested)
+            //            {
+            //                var data = await reader.ReadLineAsync(cancellationTokenSource.Token);
+            //                if (data == null)
+            //                    break;
+
+            //                var decodedToken = Regex.Match(data, @"(?<=data:\s).*").Value.Replace("\\n", "\n").Replace("\\t", "\t");
+            //                await Console.Out.WriteAsync(decodedToken);
+            //            }
+
+            //            await Console.Out.WriteLineAsync();
+            //            cancellationTokenSource.Token.ThrowIfCancellationRequested();
+
+            //            var query = HttpUtility.ParseQueryString(String.Empty);
+            //            query["sessionId"] = $"{sessionId}";
+            //            (await httpClient.GetAsync($"{baseUrl}/session/reset?{query}")).EnsureSuccessStatusCode();
+            //            (await httpClient.GetAsync($"{baseUrl}/model/reset")).EnsureSuccessStatusCode();
+            //        }
+            //        catch (Exception ex) when (ex is TaskCanceledException || ex is OperationCanceledException)
+            //        {
+            //            await Console.Out.WriteLineAsync(" [Cancelled]");
+
+            //            cancellationTokenSource.Dispose();
+            //            cancellationTokenSource = new();
+            //        }
+            //    }
+            //}
         }
 
         static async Task RunDebugSampleAsync(string[] args)
@@ -601,6 +622,63 @@ namespace LlamaCppCli
 
                 await Console.Out.WriteLineAsync();
             }
+        }
+
+        static async Task RunBertSampleAsync(string[] args)
+        {
+            //var path = @"D:\LLM_MODELS\sentence-transformers\ggml-all-MiniLM-L12-v2-f32.bin";
+            var path = @"D:\LLM_MODELS\intfloat\ggml-e5-large-v2-f16.bin";
+            BertCppInterop.bert_params_parse(new[] { "-t", $"8", "-p", "What is the capital of the United States?", "-m", path }, out var bparams);
+
+            var documents = new[]
+            {
+                "Carson City is the capital city of the American state of Nevada. At the  2010 United States Census, Carson City had a population of 55,274.",
+                "The Commonwealth of the Northern Mariana Islands is a group of islands in the Pacific Ocean that are a political division controlled by the United States. Its capital is Saipan.",
+                "Charlotte Amalie is the capital and largest city of the United States Virgin Islands. It has about 20,000 people. The city is on the island of Saint Thomas.",
+                "Washington, D.C. (also known as simply Washington or D.C., and officially as the District of Columbia) is the capital of the United States. It is a federal district.",
+                "Capital punishment (the death penalty) has existed in the United States since before the United States was a country. As of 2017, capital punishment is legal in 30 of the 50 states.",
+                "North Dakota is a state in the United States. 672,591 people lived in North Dakota in the year 2010. The capital and seat of government is Bismarck.",
+            };
+
+            var ctx = BertCppInterop.bert_load_from_file(path);
+
+            var documentsEmbeddings = documents
+                .Select(x => BertCppInterop.bert_tokenize(ctx, x))
+                .Select(x => BertCppInterop.bert_eval(ctx, bparams.n_threads, x))
+                .ToList();
+
+            var queryEmbeddings = BertCppInterop.bert_eval(ctx, bparams.n_threads, BertCppInterop.bert_tokenize(ctx, bparams.prompt));
+
+            var cosineSimilarities = documentsEmbeddings
+                .Select(document => CosineSimilarity(queryEmbeddings, document))
+                .ToList();
+
+            var results = documents
+                .Zip(cosineSimilarities, (x, similarity) => new { Document = x, CosineSimilarity = similarity })
+                .OrderByDescending(x => x.CosineSimilarity)
+                .ToList();
+
+            Console.WriteLine($"[{bparams.prompt}]");
+            results.ForEach(x => Console.WriteLine($"[{x.CosineSimilarity}][{x.Document}]"));
+
+            BertCppInterop.bert_free(ctx);
+
+            await Task.CompletedTask;
+        }
+
+        static float CosineSimilarity(float[] vec1, float[] vec2)
+        {
+            if (vec1.Length != vec2.Length)
+                throw new ArgumentException("Vectors must be of the same size.");
+
+            var dotProduct = vec1.Zip(vec2, (a, b) => a * b).Sum();
+            var normA = Math.Sqrt(vec1.Sum(a => Math.Pow(a, 2)));
+            var normB = Math.Sqrt(vec2.Sum(b => Math.Pow(b, 2)));
+
+            if (normA == 0.0 || normB == 0.0)
+                throw new ArgumentException("Vectors must not be zero vectors.");
+
+            return (float)(dotProduct / (normA * normB));
         }
     }
 }

@@ -12,7 +12,7 @@ namespace LlamaCppLib
         private LlamaModel _model;
         private LlamaContext _context;
         private LlamaCppModelOptions _options = new();
-        private byte[]? _blankRawState;
+        private byte[]? _initialState;
 
         public LlamaCppModel()
         { }
@@ -38,11 +38,13 @@ namespace LlamaCppLib
 
         public LlamaCppModelOptions Options { get => _options; }
 
-        public List<LlamaToken> Tokenize(string text, bool addBos = false)
+        public List<LlamaToken> Tokenize(string text, bool addBos = false, bool addEos = false)
         {
-            var tokens = new LlamaToken[LlamaCppInterop.llama_n_ctx(_context)];
-            var count = LlamaCppInterop.llama_tokenize(_context, text, tokens, tokens.Length, addBos);
-            return new(tokens.Take(count));
+            var tokenBuffer = new LlamaToken[LlamaCppInterop.llama_n_ctx(_context)];
+            var count = LlamaCppInterop.llama_tokenize(_context, text, tokenBuffer, tokenBuffer.Length, addBos);
+            var tokens = tokenBuffer.Take(count).ToList();
+            if (addEos) tokens.Add(LlamaCppInterop.llama_token_eos());
+            return tokens;
         }
 
         public string UntokenizeToText(IEnumerable<LlamaToken> tokenIds)
@@ -64,16 +66,16 @@ namespace LlamaCppLib
             return Encoding.UTF8.GetString(bytes.SelectMany(x => x).ToArray());
         }
 
-        internal byte[] GetBlankRawState() => _blankRawState ?? new byte[0];
+        internal byte[] GetInitialState() => _initialState ?? new byte[0];
         internal byte[] GetRawState() => LlamaCppInterop.llama_copy_state_data(_context);
         internal void SetRawState(byte[] state) => LlamaCppInterop.llama_set_state_data(_context, state);
 
         public void ResetState()
         {
-            if (_blankRawState == null)
+            if (_initialState == null)
                 return;
 
-            SetRawState(_blankRawState);
+            SetRawState(_initialState);
         }
 
         /// <summary>
@@ -104,13 +106,14 @@ namespace LlamaCppLib
             cparams.n_ctx = options.ContextSize;
             cparams.n_gpu_layers = options.GpuLayers;
             cparams.seed = options.Seed;
-            cparams.f16_kv = options.UseHalf;
             cparams.use_mmap = useLora ? false : options.UseMemoryMapping;
             cparams.use_mlock = options.UseMemoryLocking;
+            cparams.rope_freq_base = options.RopeFrequencyBase;
+            cparams.rope_freq_scale = options.RopeFrequencyScale;
 
             _model = LlamaCppInterop.llama_load_model_from_file(modelPath, cparams);
             _context = LlamaCppInterop.llama_new_context_with_model(_model, cparams);
-            _blankRawState = LlamaCppInterop.llama_copy_state_data(_context);
+            _initialState = LlamaCppInterop.llama_copy_state_data(_context);
             _options = options;
 
             if (useLora)

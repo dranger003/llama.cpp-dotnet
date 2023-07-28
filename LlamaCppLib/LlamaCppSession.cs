@@ -1,5 +1,6 @@
 ﻿namespace LlamaCppLib
 {
+    using System.Reflection;
     using LlamaToken = System.Int32;
 
     internal class LlamaCppSessionState

@@ -9,13 +9,13 @@ namespace LlamaCppLib
     public class LlamaCppModelOptions
     {
         public uint Seed { get; set; } = unchecked((uint)-1);
-        public int PredictCount { get; set; } = -1;
         public int ContextSize { get; set; } = 512;
         public int BatchSize { get; set; } = 512;
-        public bool UseHalf { get; set; } = true;
         public bool UseMemoryMapping { get; set; } = true;
         public bool UseMemoryLocking { get; set; } = false;
         public int GpuLayers { get; set; } = 0;
+        public float RopeFrequencyBase { get; set; } = 10000.0f;
+        public float RopeFrequencyScale { get; set; } = 1.0f;
 
         public static bool TryParse(string input, out LlamaCppModelOptions options)
         {

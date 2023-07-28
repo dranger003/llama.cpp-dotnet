@@ -50,9 +50,4 @@
 		<Copy SourceFiles="@(LibraryFiles)" DestinationFolder="$(SolutionDir)/$(Platform)/$(Configuration)/$(MSBuildProjectName)" />
 	</Target>
 
-	<Target Name="CMakeClean" AfterTargets="Clean">
-		<Message Importance="high" Text="[$(CMakeProject)]" />
-		<Exec Command='$(CMakeBin) --build "$(CMakeProject)" --target clean' />
-	</Target>
-
 </Project>
