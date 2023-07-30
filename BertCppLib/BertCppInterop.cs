@@ -25,7 +25,13 @@ namespace BertCppLib
             public string prompt;
         }
 
-        [DllImport($"{nameof(BertCppLib)}/bert", EntryPoint = "bert_params_parse")]
+#if WINDOWS
+        private const string LibName = $"{nameof(BertCppLib)}/bert";
+#elif LINUX
+        private const string LibName = $"{nameof(BertCppLib)}/libbert";
+#endif
+
+        [DllImport(LibName, EntryPoint = "bert_params_parse")]
         private static extern bool _bert_params_parse(int argc, nint[] argv, ref _bert_params bparams);
 
         public static bool bert_params_parse(string[] args, out bert_params bparams)
@@ -51,13 +57,13 @@ namespace BertCppLib
             return result;
         }
 
-        [DllImport($"{nameof(BertCppLib)}/bert")]
+        [DllImport(LibName)]
         public static extern bert_ctx bert_load_from_file(string fname);
 
-        [DllImport($"{nameof(BertCppLib)}/bert")]
+        [DllImport(LibName)]
         public static extern void bert_free(bert_ctx ctx);
 
-        [DllImport($"{nameof(BertCppLib)}/bert")]
+        [DllImport(LibName)]
         public static extern void bert_encode(bert_ctx ctx, int n_threads, string texts, float[] embeddings);
 
         /// <summary>
@@ -69,7 +75,7 @@ namespace BertCppLib
         /// <param name="n_inputs">total size of texts and embeddings arrays</param>
         /// <param name="texts"></param>
         /// <param name="embeddings"></param>
-        [DllImport($"{nameof(BertCppLib)}/bert")]
+        [DllImport(LibName)]
         public static extern void bert_encode_batch(bert_ctx ctx, int n_threads, int n_batch_size, int n_inputs, string[] texts, float[][] embeddings);
 
         /// <summary>
@@ -80,7 +86,7 @@ namespace BertCppLib
         /// <param name="tokens"></param>
         /// <param name="n_tokens"></param>
         /// <param name="n_max_tokens"></param>
-        [DllImport($"{nameof(BertCppLib)}/bert", EntryPoint = "bert_tokenize")]
+        [DllImport(LibName, EntryPoint = "bert_tokenize")]
         private static extern void _bert_tokenize(bert_ctx ctx, string text, bert_vocab_id[] tokens, ref int n_tokens, int n_max_tokens);
 
         public static bert_vocab_id[] bert_tokenize(bert_ctx ctx, string text)
@@ -92,7 +98,7 @@ namespace BertCppLib
             return _tokens.Take(n_tokens).ToArray();
         }
 
-        [DllImport($"{nameof(BertCppLib)}/bert", EntryPoint = "bert_eval")]
+        [DllImport(LibName, EntryPoint = "bert_eval")]
         private static extern void _bert_eval(bert_ctx ctx, int n_threads, bert_vocab_id[] tokens, int n_tokens, float[] embeddings);
 
         public static float[] bert_eval(bert_ctx ctx, int n_threads, bert_vocab_id[] tokens, int? n_tokens = null)
@@ -112,16 +118,16 @@ namespace BertCppLib
         /// <param name="batch_tokens"></param>
         /// <param name="n_tokens"></param>
         /// <param name="batch_embeddings"></param>
-        [DllImport($"{nameof(BertCppLib)}/bert")]
+        [DllImport(LibName)]
         public static extern void bert_eval_batch(bert_ctx ctx, int n_threads, int n_batch_size, bert_vocab_id[][] batch_tokens, ref int n_tokens, float[][] batch_embeddings);
 
-        [DllImport($"{nameof(BertCppLib)}/bert")]
+        [DllImport(LibName)]
         public static extern int bert_n_embd(bert_ctx ctx);
 
-        [DllImport($"{nameof(BertCppLib)}/bert")]
+        [DllImport(LibName)]
         public static extern int bert_n_max_tokens(bert_ctx ctx);
 
-        [DllImport($"{nameof(BertCppLib)}/bert")]
+        [DllImport(LibName)]
         public static extern string bert_vocab_id_to_token(bert_ctx ctx, bert_vocab_id id);
     }
 }

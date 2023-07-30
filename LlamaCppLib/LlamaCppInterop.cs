@@ -85,34 +85,40 @@ namespace LlamaCppLib
             MOSTLY_Q6_K = 18,           // except 1d tensors
         }
 
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+#if WINDOWS
+        private const string LibName = $"{nameof(LlamaCppLib)}/llama";
+#elif LINUX
+        private const string LibName = $"{nameof(LlamaCppLib)}/libllama";
+#endif
+
+        [DllImport(LibName)]
         public static extern llama_context_params llama_context_default_params();
 
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern bool llama_mmap_supported();
 
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern bool llama_mlock_supported();
 
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern void llama_backend_init(bool numa = false);
 
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern void llama_backend_free();
 
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern long llama_time_us();
 
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern llama_model llama_load_model_from_file(string path_model, llama_context_params cparams);
 
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern void llama_free_model(llama_model model);
 
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern llama_context llama_new_context_with_model(llama_model model, llama_context_params cparams);
 
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern void llama_free(llama_context model);
 
         /// <summary>
@@ -123,7 +129,7 @@ namespace LlamaCppLib
         /// <param name="path_base_model">Model file path</param>
         /// <param name="n_threads">nthread - how many threads to use. If <=0, will use std::thread::hardware_concurrency(), else the number given</param>
         /// <returns>Returns 0 on success</returns>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern int llama_model_quantize(string fname_inp, string fname_out, LLAMA_FTYPE ftype, int nthread);
 
         /// <summary>
@@ -136,14 +142,14 @@ namespace LlamaCppLib
         /// <param name="path_base_model">Model file path</param>
         /// <param name="n_threads">nthread - how many threads to use. If <=0, will use std::thread::hardware_concurrency(), else the number given</param>
         /// <returns>Returns 0 on success</returns>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern int llama_model_apply_lora_from_file(llama_model model, string path_lora, string? path_base_model, int n_threads);
 
         /// <summary>
         /// </summary>
         /// <param name="ctx">LlamaContext</param>
         /// <returns>Returns the number of tokens in the KV cache</returns>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern int llama_get_kv_cache_token_count(llama_context ctx);
 
         /// <summary>
@@ -151,7 +157,7 @@ namespace LlamaCppLib
         /// </summary>
         /// <param name="ctx">LlamaContext</param>
         /// <param name="seed">Seed</param>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern void llama_set_rng_seed(llama_context ctx, uint seed);
 
         /// <summary>
@@ -159,7 +165,7 @@ namespace LlamaCppLib
         /// </summary>
         /// <param name="ctx">LlamaContext</param>
         /// <returns>Returns the size in bytes of the state (rng, logits, embedding and kv_cache)</returns>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern nuint llama_get_state_size(llama_context ctx);
 
         /// <summary>
@@ -168,7 +174,7 @@ namespace LlamaCppLib
         /// <param name="ctx">LlamaContext</param>
         /// <param name="dest">Destination needs to have allocated enough memory.</param>
         /// <returns>Returns the number of bytes copied</returns>
-        [DllImport("llama", EntryPoint = "llama_copy_state_data")]
+        [DllImport(LibName, EntryPoint = "llama_copy_state_data")]
         private static extern nuint _llama_copy_state_data(llama_context ctx, byte[] dest);
 
         public static byte[] llama_copy_state_data(llama_context ctx)
@@ -187,7 +193,7 @@ namespace LlamaCppLib
         /// <param name="ctx">LlamaContext</param>
         /// <param name="src">State source</param>
         /// <returns>Returns the number of bytes read</returns>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern nuint llama_set_state_data(llama_context ctx, byte[] src);
 
         /// <summary>
@@ -199,7 +205,7 @@ namespace LlamaCppLib
         /// <param name="n_token_capacity"></param>
         /// <param name="n_token_count_out"></param>
         /// <returns></returns>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern bool llama_load_session_file(llama_context ctx, string path_session, llama_token[] tokens_out, int n_token_capacity, out int n_token_count_out);
 
         /// <summary>
@@ -210,7 +216,7 @@ namespace LlamaCppLib
         /// <param name="tokens"></param>
         /// <param name="n_token_count"></param>
         /// <returns></returns>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern bool llama_save_session_file(llama_context ctx, string path_session, llama_token[] tokens, int n_token_count);
 
         /// <summary>
@@ -222,7 +228,7 @@ namespace LlamaCppLib
         /// <param name="n_past">n_past is the number of tokens to use from previous eval calls</param>
         /// <param name="n_threads">nthread - how many threads to use. If <=0, will use std::thread::hardware_concurrency(), else the number given</param>
         /// <returns>Returns 0 on success</returns>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern int llama_eval(llama_context ctx, llama_token[] tokens, int n_tokens, int n_past, int n_threads);
 
         /// <summary>
@@ -234,7 +240,7 @@ namespace LlamaCppLib
         /// <param name="n_past"></param>
         /// <param name="n_threads"></param>
         /// <returns></returns>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern int llama_eval_embd(llama_context ctx, float[] embd, int n_tokens, int n_past, int n_threads);
 
         /// <summary>
@@ -248,19 +254,19 @@ namespace LlamaCppLib
         /// <param name="n_max_tokens"></param>
         /// <param name="add_bos"></param>
         /// <returns>Returns the number of tokens on success, no more than n_max_tokens and returns a negative number on failure - the number of tokens that would have been returned</returns>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern int llama_tokenize(llama_context ctx, string text, llama_token[] tokens, int n_max_tokens, bool add_bos);
 
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern int llama_n_vocab(llama_context ctx);
 
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern int llama_n_ctx(llama_context ctx);
 
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern int llama_n_embd(llama_context ctx);
 
-        [DllImport("llama", EntryPoint = "llama_get_logits")]
+        [DllImport(LibName, EntryPoint = "llama_get_logits")]
         private static extern nint _llama_get_logits(llama_context ctx);
 
         /// <summary>
@@ -282,7 +288,7 @@ namespace LlamaCppLib
             return new(logits);
         }
 
-        [DllImport("llama", EntryPoint = "llama_get_embeddings")]
+        [DllImport(LibName, EntryPoint = "llama_get_embeddings")]
         private static extern nint _llama_get_embeddings(llama_context ctx);
 
         /// <summary>
@@ -305,7 +311,7 @@ namespace LlamaCppLib
             return new(embeddings);
         }
 
-        [DllImport("llama", EntryPoint = "llama_token_to_str")]
+        [DllImport(LibName, EntryPoint = "llama_token_to_str")]
         [return: MarshalAs(UnmanagedType.SysUInt)]
         private static extern nint _llama_token_to_str(llama_context ctx, llama_token token);
 
@@ -337,24 +343,24 @@ namespace LlamaCppLib
         /// Special tokens
         /// </summary>
         /// <returns>Beginning of stream token</returns>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern llama_token llama_token_bos();
 
         /// <summary>
         /// Special tokens
         /// </summary>
         /// <returns>End of stream token</returns>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern llama_token llama_token_eos();
 
         /// <summary>
         /// Special tokens
         /// </summary>
         /// <returns>End of stream token</returns>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern llama_token llama_token_nl();
 
-        [DllImport("llama", EntryPoint = "llama_sample_repetition_penalty")]
+        [DllImport(LibName, EntryPoint = "llama_sample_repetition_penalty")]
         private static extern void _llama_sample_repetition_penalty(
             llama_context ctx,
             nint candidates,
@@ -389,7 +395,7 @@ namespace LlamaCppLib
             _llama_sample_repetition_penalty(ctx, new(&_candidates), last_tokens.ToArray(), last_tokens.Count, penalty);
         }
 
-        [DllImport("llama", EntryPoint = "llama_sample_frequency_and_presence_penalties")]
+        [DllImport(LibName, EntryPoint = "llama_sample_frequency_and_presence_penalties")]
         private static extern void _llama_sample_frequency_and_presence_penalties(
             llama_context ctx,
             nint candidates,
@@ -427,7 +433,7 @@ namespace LlamaCppLib
             _llama_sample_frequency_and_presence_penalties(ctx, new(&_candidates), last_tokens.ToArray(), last_tokens.Count, alpha_frequency, alpha_presence);
         }
 
-        [DllImport("llama", EntryPoint = "llama_sample_classifier_free_guidance")]
+        [DllImport(LibName, EntryPoint = "llama_sample_classifier_free_guidance")]
         private static extern void _llama_sample_classifier_free_guidance(llama_context ctx, nint candidates, llama_context guidance_ctx, float scale);
 
         public static void llama_sample_classifier_free_guidance(llama_context ctx, llama_token_data_array candidates, llama_context guidance_ctx, float scale)
@@ -443,7 +449,7 @@ namespace LlamaCppLib
             _llama_sample_classifier_free_guidance(ctx, new(&_candidates), guidance_ctx, scale);
         }
 
-        [DllImport("llama", EntryPoint = "llama_sample_softmax")]
+        [DllImport(LibName, EntryPoint = "llama_sample_softmax")]
         private static extern void _llama_sample_softmax(llama_context ctx, nint candidates);
 
         /// <summary>
@@ -464,7 +470,7 @@ namespace LlamaCppLib
             _llama_sample_softmax(ctx, new(&_candidates));
         }
 
-        [DllImport("llama", EntryPoint = "llama_sample_top_k")]
+        [DllImport(LibName, EntryPoint = "llama_sample_top_k")]
         private static extern void _llama_sample_top_k(llama_context ctx, nint candidates, int k, int min_keep = 1);
 
         /// <summary>
@@ -487,7 +493,7 @@ namespace LlamaCppLib
             _llama_sample_top_k(ctx, new(&_candidates), k, min_keep);
         }
 
-        [DllImport("llama", EntryPoint = "llama_sample_top_p")]
+        [DllImport(LibName, EntryPoint = "llama_sample_top_p")]
         private static extern void _llama_sample_top_p(llama_context ctx, nint candidates, float p, int min_keep = 1);
 
         /// <summary>
@@ -510,7 +516,7 @@ namespace LlamaCppLib
             _llama_sample_top_p(ctx, new(&_candidates), p, min_keep);
         }
 
-        [DllImport("llama", EntryPoint = "llama_sample_tail_free")]
+        [DllImport(LibName, EntryPoint = "llama_sample_tail_free")]
         private static extern void _llama_sample_tail_free(llama_context ctx, nint candidates, float z, int min_keep = 1);
 
         /// <summary>
@@ -533,7 +539,7 @@ namespace LlamaCppLib
             _llama_sample_tail_free(ctx, new(&_candidates), z, min_keep);
         }
 
-        [DllImport("llama", EntryPoint = "llama_sample_typical")]
+        [DllImport(LibName, EntryPoint = "llama_sample_typical")]
         private static extern void _llama_sample_typical(llama_context ctx, nint candidates, float p, int min_keep = 1);
 
         /// <summary>
@@ -556,7 +562,7 @@ namespace LlamaCppLib
             _llama_sample_typical(ctx, new(&_candidates), p, min_keep);
         }
 
-        [DllImport("llama", EntryPoint = "llama_sample_temperature")]
+        [DllImport(LibName, EntryPoint = "llama_sample_temperature")]
         private static extern void _llama_sample_temperature(llama_context ctx, nint candidates, float temp);
 
         public static void llama_sample_temperature(llama_context ctx, llama_token_data_array candidates, float temp)
@@ -572,7 +578,7 @@ namespace LlamaCppLib
             _llama_sample_temperature(ctx, new(&_candidates), temp);
         }
 
-        [DllImport("llama", EntryPoint = "llama_sample_token_mirostat")]
+        [DllImport(LibName, EntryPoint = "llama_sample_token_mirostat")]
         private static extern llama_token _llama_sample_token_mirostat(llama_context ctx, nint candidates, float tau, float eta, int m, ref float mu);
 
         /// <summary>
@@ -598,7 +604,7 @@ namespace LlamaCppLib
             return _llama_sample_token_mirostat(ctx, new(&_candidates), tau, eta, m, ref mu);
         }
 
-        [DllImport("llama", EntryPoint = "llama_sample_token_mirostat_v2")]
+        [DllImport(LibName, EntryPoint = "llama_sample_token_mirostat_v2")]
         private static extern llama_token _llama_sample_token_mirostat_v2(llama_context ctx, nint candidates, float tau, float eta, ref float mu);
 
         /// <summary>
@@ -623,7 +629,7 @@ namespace LlamaCppLib
             return _llama_sample_token_mirostat_v2(ctx, new(&_candidates), tau, eta, ref mu);
         }
 
-        [DllImport("llama", EntryPoint = "llama_sample_token_greedy")]
+        [DllImport(LibName, EntryPoint = "llama_sample_token_greedy")]
         private static extern llama_token _llama_sample_token_greedy(llama_context ctx, nint candidates);
 
         /// <summary>
@@ -645,7 +651,7 @@ namespace LlamaCppLib
             return _llama_sample_token_greedy(ctx, new(&_candidates));
         }
 
-        [DllImport("llama", EntryPoint = "llama_sample_token")]
+        [DllImport(LibName, EntryPoint = "llama_sample_token")]
         private static extern llama_token _llama_sample_token(llama_context ctx, nint candidates);
 
         /// <summary>
@@ -671,17 +677,17 @@ namespace LlamaCppLib
         /// Performance information
         /// </summary>
         /// <param name="ctx">LlamaContext</param>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern void llama_print_timings(llama_context ctx);
 
         /// <summary>
         /// Performance information
         /// </summary>
         /// <param name="ctx">LlamaContext</param>
-        [DllImport($"{nameof(LlamaCppLib)}/llama")]
+        [DllImport(LibName)]
         public static extern void llama_reset_timings(llama_context ctx);
 
-        [DllImport("llama", EntryPoint = "llama_print_system_info")]
+        [DllImport(LibName, EntryPoint = "llama_print_system_info")]
         private static extern nint _llama_print_system_info();
 
         /// <summary>

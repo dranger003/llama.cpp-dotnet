@@ -109,6 +109,12 @@ namespace FalconCppLib
             public bool quantize_output_tensor;
         }
 
+#if WINDOWS
+        private const string LibName = $"{nameof(FalconCppLib)}/falcon";
+#elif LINUX
+        private const string LibName = $"{nameof(FalconCppLib)}/libfalcon";
+#endif
+
         [DllImport($"{nameof(FalconCppLib)}/falcon")]
         public static extern falcon_context_params falcon_context_default_params();
         //LLAMA_API struct falcon_context_params falcon_context_default_params();

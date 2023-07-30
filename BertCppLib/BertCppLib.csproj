@@ -10,6 +10,9 @@
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+		<DefineConstants Condition="'$(OS)' == 'Windows_NT'">WINDOWS</DefineConstants>
+		<DefineConstants Condition="$([System.String]::new('$(OS)').StartsWith('Unix'))">LINUX</DefineConstants>
 	</PropertyGroup>
 
 	<Target Name="CMakePrepareForBuild" BeforeTargets="PrepareForBuild;Clean">

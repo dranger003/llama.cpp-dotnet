@@ -10,6 +10,9 @@
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+		<DefineConstants Condition="'$(OS)' == 'Windows_NT'">WINDOWS</DefineConstants>
+		<DefineConstants Condition="$([System.String]::new('$(OS)').StartsWith('Unix'))">LINUX</DefineConstants>
 	</PropertyGroup>
 
 	<Target Name="CMakePrepareForBuild" BeforeTargets="PrepareForBuild;Clean">
@@ -32,7 +35,7 @@
 			<CMakeCompilerFlags Condition="$([System.String]::new('$(OS)').StartsWith('Unix'))">-DCMAKE_CXX_FLAGS=-w -DCMAKE_C_FLAGS=-w</CMakeCompilerFlags>
 		</PropertyGroup>
 		<!-- https://github.com/ggerganov/llama.cpp/pull/1827#issuecomment-1588722643 -->
-		<Exec Command='$(CMakeBin) -DLLAMA_CUBLAS=ON -DLLAMA_ALL_WARNINGS=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_CUDA_DMMV_X=64 -DLLAMA_CUDA_MMV_Y=2 -DLLAMA_FMA=ON -DLLAMA_AVX2=ON -DBUILD_SHARED_LIBS=ON -S "$(CMakeProject)" -B "$(CMakeProject)" $(CMakeCompilerFlags)' />
+		<Exec Command='$(CMakeBin) -DLLAMA_CUBLAS=ON -DLLAMA_CUDA_CUBLAS=ON -DLLAMA_CUDA_DMMV_X=64 -DLLAMA_CUDA_MMV_Y=2 -DLLAMA_CUDA_DMMV_F16=ON -DLLAMA_ALL_WARNINGS=OFF -DLLAMA_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=ON -S "$(CMakeProject)" -B "$(CMakeProject)" $(CMakeCompilerFlags)' />
 	</Target>
 
 	<Target Name="CMakeBuild" AfterTargets="CMakeConfigure">
