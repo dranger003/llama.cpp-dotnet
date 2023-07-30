@@ -125,6 +125,6 @@ POST /model/generate [RequestBody]
 - [X] Support [BERT](https://github.com/skeskinen/bert.cpp)
 
 ### Acknowledgments
-[ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) for the LLaMA implementation in C++
-[cmp-nct/ggllm.cpp](https://github.com/cmp-nct/ggllm.cpp) for Falcon support
+[ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) for the LLaMA implementation in C++  
+[cmp-nct/ggllm.cpp](https://github.com/cmp-nct/ggllm.cpp) for Falcon support  
 [skeskinen/bert.cpp](https://github.com/skeskinen/bert.cpp) for BERT support
