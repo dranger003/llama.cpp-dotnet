@@ -82,8 +82,10 @@ namespace LlamaCppCli
                 Seed = 0,
                 ContextSize = contextLength,
                 GpuLayers = gpuLayers,
-                RopeFrequencyBase = 10000.0f,
-                RopeFrequencyScale = 0.5f,
+                //UseMemoryLocking = false,
+                //UseMemoryMapping = false,
+                //RopeFrequencyBase = 10000.0f,
+                //RopeFrequencyScale = 0.5f,
             };
 
             using var model = new LlamaCppModel();
@@ -104,8 +106,9 @@ namespace LlamaCppCli
                 """
             );
 
-            var first = true;
-
+            // ------------------------------------------------------------------------------------------------------------------------------
+            // Llama-2
+            // ------------------------------------------------------------------------------------------------------------------------------
             // <s>[INST] <<SYS>>
             // {{ system_prompt }}
             // <</SYS>>
@@ -121,11 +124,15 @@ namespace LlamaCppCli
             //     bos=True,
             //     eos=True,
             // )
+            // ------------------------------------------------------------------------------------------------------------------------------
             const string B_INST = "[INST]";
             const string E_INST = "[/INST]";
             const string B_SYS = "<<SYS>>\n";
             const string E_SYS = "\n<</SYS>>\n\n";
             const string SYS_PROMPT = "You are a helpful assistant.";
+            // ------------------------------------------------------------------------------------------------------------------------------
+
+            var first = true;
 
             while (true)
             {
@@ -197,10 +204,6 @@ namespace LlamaCppCli
                 await Console.Out.WriteLineAsync();
                 first = false;
             }
-
-            //Console.WriteLine(new String('=', Console.WindowWidth));
-            //Console.WriteLine(session.GetContextAsText());
-            //Console.WriteLine(new String('=', Console.WindowWidth));
 
             await Console.Out.WriteLineAsync("Quitting...");
         }
