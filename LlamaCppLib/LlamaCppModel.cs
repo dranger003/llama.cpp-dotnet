@@ -110,6 +110,8 @@ namespace LlamaCppLib
             cparams.use_mlock = options.UseMemoryLocking;
             cparams.rope_freq_base = options.RopeFrequencyBase;
             cparams.rope_freq_scale = options.RopeFrequencyScale;
+            cparams.n_gqa = options.GroupedQueryAttentionCount;     // Grouped-query attention (TEMPORARY)
+            cparams.rms_norm_eps = options.RmsNormEpsilon;          // RMS norm epsilon (TEMPORARY)
 
             _model = LlamaCppInterop.llama_load_model_from_file(modelPath, cparams);
             _context = LlamaCppInterop.llama_new_context_with_model(_model, cparams);
