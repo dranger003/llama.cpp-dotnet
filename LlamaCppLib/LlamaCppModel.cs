@@ -162,7 +162,7 @@ namespace LlamaCppLib
 
             while (LlamaCppInterop.llama_get_kv_cache_token_count(_context) < LlamaCppInterop.llama_n_ctx(_context) && !cancellationToken.IsCancellationRequested)
             {
-                for (var offset = state.EvalOffset; offset < state.TokenIds.Count; offset += _options.BatchSize)
+                for (var offset = state.EvalOffset; offset < state.TokenIds.Count && !cancellationToken.IsCancellationRequested; offset += _options.BatchSize)
                 {
                     var evalCount = state.TokenIds.Count - offset;
                     if (evalCount > _options.BatchSize)
