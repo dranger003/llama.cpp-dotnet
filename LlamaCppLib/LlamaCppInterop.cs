@@ -53,7 +53,7 @@ namespace LlamaCppLib
             public llama_progress_callback progress_callback;
             public nint progress_callback_user_data;
 
-            [MarshalAs(UnmanagedType.I1)] bool mul_mat_q;
+            [MarshalAs(UnmanagedType.I1)] public bool mul_mat_q;
             [MarshalAs(UnmanagedType.I1)] public bool low_vram;
             [MarshalAs(UnmanagedType.I1)] public bool f16_kv;
             [MarshalAs(UnmanagedType.I1)] public bool logits_all;
