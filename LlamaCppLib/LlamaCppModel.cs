@@ -158,6 +158,8 @@ namespace LlamaCppLib
 
         internal async IAsyncEnumerable<byte[]> GenerateTokenBytesAsync(LlamaCppGenerateOptions options, LlamaCppSessionState state, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
+            //Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(options, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+
             var mirostatMU = 2.0f * options.MirostatTAU;
 
             while (LlamaCppInterop.llama_get_kv_cache_token_count(_context) < LlamaCppInterop.llama_n_ctx(_context) && !cancellationToken.IsCancellationRequested)
@@ -189,6 +191,7 @@ namespace LlamaCppLib
                 var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates.ToArray(), size = (ulong)candidates.Count, sorted = false };
 
                 // Apply penalties
+                var newLineLogit = logits[LlamaCppInterop.llama_token_nl()];
                 var lastRepeatCount = Math.Min(Math.Min(state.TokenIds.Count, options.LastTokenCountPenalty), LlamaCppInterop.llama_n_ctx(_context));
 
                 LlamaCppInterop.llama_sample_repetition_penalty(
@@ -207,7 +210,7 @@ namespace LlamaCppLib
                 );
 
                 if (!options.PenalizeNewLine)
-                    logits[LlamaCppInterop.llama_token_nl()] = logits[LlamaCppInterop.llama_token_nl()];
+                    logits[LlamaCppInterop.llama_token_nl()] = newLineLogit;
 
                 var id = default(LlamaToken);
 
