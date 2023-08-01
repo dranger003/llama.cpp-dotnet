@@ -158,8 +158,6 @@ namespace LlamaCppLib
 
         internal async IAsyncEnumerable<byte[]> GenerateTokenBytesAsync(LlamaCppGenerateOptions options, LlamaCppSessionState state, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            //Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(options, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
-
             var mirostatMU = 2.0f * options.MirostatTAU;
 
             while (LlamaCppInterop.llama_get_kv_cache_token_count(_context) < LlamaCppInterop.llama_n_ctx(_context) && !cancellationToken.IsCancellationRequested)
