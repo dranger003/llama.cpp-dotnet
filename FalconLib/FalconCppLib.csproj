@@ -34,7 +34,7 @@
 			<CMakeCompilerFlags Condition="'$(OS)' == 'Windows_NT'">-DCMAKE_CXX_FLAGS="/W0 /EHsc /w" -DCMAKE_C_FLAGS="/W0 /w"</CMakeCompilerFlags>
 			<CMakeCompilerFlags Condition="$([System.String]::new('$(OS)').StartsWith('Unix'))">-DCMAKE_CXX_FLAGS=-w -DCMAKE_C_FLAGS=-w</CMakeCompilerFlags>
 		</PropertyGroup>
-		<Exec Command='$(CMakeBin) -DLLAMA_CUBLAS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DBUILD_SHARED_LIBS=ON -S "$(CMakeProject)" -B "$(CMakeProject)" $(CMakeCompilerFlags)' />
+		<Exec Command='$(CMakeBin) -DLLAMA_CUBLAS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DBUILD_SHARED_LIBS=ON -DLLAMA_CUDA_DMMV_X=64 -DLLAMA_CUDA_DMMV_Y=2 -S "$(CMakeProject)" -B "$(CMakeProject)" $(CMakeCompilerFlags)' />
 	</Target>
 
 	<Target Name="CMakeBuild" AfterTargets="CMakeConfigure">
