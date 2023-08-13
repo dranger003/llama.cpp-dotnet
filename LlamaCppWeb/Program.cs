@@ -126,7 +126,7 @@ app.MapGet("/session/reset", async (HttpContext httpContext, Guid sessionId) =>
         return;
     }
 
-    session.ResetState();
+    session.Reset();
     await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
 });
 
