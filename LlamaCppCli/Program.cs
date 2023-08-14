@@ -630,7 +630,9 @@ namespace LlamaCppCli
         static async Task RunBertSampleAsync(string[] args)
         {
             //var path = @"D:\LLM_MODELS\sentence-transformers\ggml-all-MiniLM-L12-v2-f32.bin";
-            var path = @"D:\LLM_MODELS\intfloat\ggml-e5-large-v2-f16.bin";
+            //var path = @"D:\LLM_MODELS\intfloat\ggml-e5-large-v2-f16.bin";
+            var path = @"D:\LLM_MODELS\BAAI\ggml-bge-large-en-f32.bin";
+
             BertCppInterop.bert_params_parse(new[] { "-t", $"8", "-p", "What is the capital of the United States?", "-m", path }, out var bparams);
 
             var documents = new[]
