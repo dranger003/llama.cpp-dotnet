@@ -5,6 +5,7 @@ namespace LlamaCppLib
     using llama_context = System.IntPtr;
     using llama_model = System.IntPtr;
     using llama_token = System.Int32;
+    using llama_grammar = System.IntPtr;
 
     public static unsafe class LlamaCppInterop
     {
@@ -33,6 +34,15 @@ namespace LlamaCppLib
         }
 
         public delegate void llama_progress_callback(float progress, llama_context ctx);
+
+        public enum llama_log_level
+        {
+            LLAMA_LOG_LEVEL_ERROR = 2,
+            LLAMA_LOG_LEVEL_WARN = 3,
+            LLAMA_LOG_LEVEL_INFO = 4
+        }
+
+        public delegate void llama_log_callback(llama_log_level level, string text, object user_data);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct llama_context_params
@@ -63,27 +73,69 @@ namespace LlamaCppLib
             [MarshalAs(UnmanagedType.I1)] public bool embedding;
         }
 
-        public enum LLAMA_FTYPE
+        public enum llama_ftype
         {
-            ALL_F32 = 0,
-            MOSTLY_F16 = 1,             // except 1d tensors
-            MOSTLY_Q4_0 = 2,            // except 1d tensors
-            MOSTLY_Q4_1 = 3,            // except 1d tensors
-            MOSTLY_Q4_1_SOME_F16 = 4,   // tok_embeddings.weight and output.weight are F16
-            // MOSTLY_Q4_2 = 5,         // support has been removed
-            // MOSTLY_Q4_3 = 6,         // support has been removed
-            MOSTLY_Q8_0 = 7,            // except 1d tensors
-            MOSTLY_Q5_0 = 8,            // except 1d tensors
-            MOSTLY_Q5_1 = 9,            // except 1d tensors
-            MOSTLY_Q2_K = 10,           // except 1d tensors
-            MOSTLY_Q3_K_S = 11,         // except 1d tensors
-            MOSTLY_Q3_K_M = 12,         // except 1d tensors
-            MOSTLY_Q3_K_L = 13,         // except 1d tensors
-            MOSTLY_Q4_K_S = 14,         // except 1d tensors
-            MOSTLY_Q4_K_M = 15,         // except 1d tensors
-            MOSTLY_Q5_K_S = 16,         // except 1d tensors
-            MOSTLY_Q5_K_M = 17,         // except 1d tensors
-            MOSTLY_Q6_K = 18,           // except 1d tensors
+            LLAMA_FTYPE_ALL_F32 = 0,
+            LLAMA_FTYPE_MOSTLY_F16 = 1,             // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q4_0 = 2,            // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q4_1 = 3,            // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q4_1_SOME_F16 = 4,   // tok_embeddings.weight and output.weight are F16
+            // LLAMA_FTYPE_MOSTLY_Q4_2 = 5,         // support has been removed
+            // LLAMA_FTYPE_MOSTLY_Q4_3 = 6,         // support has been removed
+            LLAMA_FTYPE_MOSTLY_Q8_0 = 7,            // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q5_0 = 8,            // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q5_1 = 9,            // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q2_K = 10,           // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q3_K_S = 11,         // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q3_K_M = 12,         // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q3_K_L = 13,         // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q4_K_S = 14,         // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q4_K_M = 15,         // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q5_K_S = 16,         // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q5_K_M = 17,         // except 1d tensors
+            LLAMA_FTYPE_MOSTLY_Q6_K = 18,           // except 1d tensors
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct llama_model_quantize_params
+        {
+            public int nthread;
+            public llama_ftype ftype;
+            public bool allow_requantize;
+            public bool quantize_output_tensor;
+        }
+
+        public enum llama_gretype
+        {
+            LLAMA_GRETYPE_END = 0,
+            LLAMA_GRETYPE_ALT = 1,
+            LLAMA_GRETYPE_RULE_REF = 2,
+            LLAMA_GRETYPE_CHAR = 3,
+            LLAMA_GRETYPE_CHAR_NOT = 4,
+            LLAMA_GRETYPE_CHAR_RNG_UPPER = 5,
+            LLAMA_GRETYPE_CHAR_ALT = 6,
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct llama_grammar_element
+        {
+            public llama_gretype type;
+            public uint value;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct llama_timings
+        {
+            public double t_start_ms;
+            public double t_end_ms;
+            public double t_load_ms;
+            public double t_sample_ms;
+            public double t_p_eval_ms;
+            public double t_eval_ms;
+
+            public int n_sample;
+            public int n_p_eval;
+            public int n_eval;
         }
 
 #if WINDOWS
@@ -93,7 +145,16 @@ namespace LlamaCppLib
 #endif
 
         [DllImport(LibName)]
+        public static extern void llama_log_set(llama_log_callback log_callback, void* user_data);
+
+        [DllImport(LibName)]
+        public static extern int llama_max_devices();
+
+        [DllImport(LibName)]
         public static extern llama_context_params llama_context_default_params();
+
+        [DllImport(LibName)]
+        public static extern llama_model_quantize_params llama_model_quantize_default_params();
 
         [DllImport(LibName)]
         public static extern bool llama_mmap_supported();
@@ -122,59 +183,21 @@ namespace LlamaCppLib
         [DllImport(LibName)]
         public static extern void llama_free(llama_context model);
 
-        /// <summary>
-        /// TODO: not great API - very likely to change (from llama.cpp)
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
-        /// <param name="path_lora">Lora adapter file path</param>
-        /// <param name="path_base_model">Model file path</param>
-        /// <param name="n_threads">nthread - how many threads to use. If <=0, will use std::thread::hardware_concurrency(), else the number given</param>
-        /// <returns>Returns 0 on success</returns>
         [DllImport(LibName)]
-        public static extern int llama_model_quantize(string fname_inp, string fname_out, LLAMA_FTYPE ftype, int nthread);
+        public static extern int llama_model_quantize(string fname_inp, string fname_out, ref llama_model_quantize_params qparams);
 
-        /// <summary>
-        /// Apply a LoRA adapter to a loaded model
-        /// The model needs to be reloaded before applying a new adapter, otherwise the adapter
-        /// will be applied on top of the previous one
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
-        /// <param name="path_lora">path_base_model is the path to a higher quality model to use as a base for the layers modified by the adapter. Can be NULL to use the current loaded model.</param>
-        /// <param name="path_base_model">Model file path</param>
-        /// <param name="n_threads">nthread - how many threads to use. If <=0, will use std::thread::hardware_concurrency(), else the number given</param>
-        /// <returns>Returns 0 on success</returns>
         [DllImport(LibName)]
         public static extern int llama_model_apply_lora_from_file(llama_model model, string path_lora, string? path_base_model, int n_threads);
 
-        /// <summary>
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
-        /// <returns>Returns the number of tokens in the KV cache</returns>
         [DllImport(LibName)]
         public static extern int llama_get_kv_cache_token_count(llama_context ctx);
 
-        /// <summary>
-        /// Sets the current rng seed.
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
-        /// <param name="seed">Seed</param>
         [DllImport(LibName)]
         public static extern void llama_set_rng_seed(llama_context ctx, uint seed);
 
-        /// <summary>
-        /// Returns the maximum size in bytes of the state (rng, logits, embedding and kv_cache)
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
-        /// <returns>Returns the size in bytes of the state (rng, logits, embedding and kv_cache)</returns>
         [DllImport(LibName)]
         public static extern nuint llama_get_state_size(llama_context ctx);
 
-        /// <summary>
-        /// Copies the state to the specified destination address.
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
-        /// <param name="dest">Destination needs to have allocated enough memory.</param>
-        /// <returns>Returns the number of bytes copied</returns>
         [DllImport(LibName, EntryPoint = "llama_copy_state_data")]
         private static extern nuint _llama_copy_state_data(llama_context ctx, byte[] dest);
 
@@ -188,75 +211,29 @@ namespace LlamaCppLib
             return state.Take(count).ToArray();
         }
 
-        /// <summary>
-        /// Set the state reading from the specified address
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
-        /// <param name="src">State source</param>
-        /// <returns>Returns the number of bytes read</returns>
         [DllImport(LibName)]
         public static extern nuint llama_set_state_data(llama_context ctx, byte[] src);
 
-        /// <summary>
-        /// Load session file
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="path_session"></param>
-        /// <param name="tokens_out"></param>
-        /// <param name="n_token_capacity"></param>
-        /// <param name="n_token_count_out"></param>
-        /// <returns></returns>
         [DllImport(LibName)]
         public static extern bool llama_load_session_file(llama_context ctx, string path_session, llama_token[] tokens_out, int n_token_capacity, out int n_token_count_out);
 
-        /// <summary>
-        /// Save session file
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="path_session"></param>
-        /// <param name="tokens"></param>
-        /// <param name="n_token_count"></param>
-        /// <returns></returns>
         [DllImport(LibName)]
         public static extern bool llama_save_session_file(llama_context ctx, string path_session, llama_token[] tokens, int n_token_count);
 
-        /// <summary>
-        /// Run the llama inference to obtain the logits and probabilities for the next token.
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="tokens">tokens + n_tokens is the provided batch of new tokens to process</param>
-        /// <param name="n_tokens"></param>
-        /// <param name="n_past">n_past is the number of tokens to use from previous eval calls</param>
-        /// <param name="n_threads">nthread - how many threads to use. If <=0, will use std::thread::hardware_concurrency(), else the number given</param>
-        /// <returns>Returns 0 on success</returns>
         [DllImport(LibName)]
         public static extern int llama_eval(llama_context ctx, llama_token[] tokens, int n_tokens, int n_past, int n_threads);
 
-        /// <summary>
-        /// Same as llama_eval, but use float matrix input directly.
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="embd"></param>
-        /// <param name="n_tokens"></param>
-        /// <param name="n_past"></param>
-        /// <param name="n_threads"></param>
-        /// <returns></returns>
         [DllImport(LibName)]
         public static extern int llama_eval_embd(llama_context ctx, float[] embd, int n_tokens, int n_past, int n_threads);
 
-        /// <summary>
-        /// Convert the provided text into tokens.
-        /// The tokens pointer must be large enough to hold the resulting tokens.
-        /// TODO: not sure if correct (from llama.cpp)
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="text"></param>
-        /// <param name="tokens"></param>
-        /// <param name="n_max_tokens"></param>
-        /// <param name="add_bos"></param>
-        /// <returns>Returns the number of tokens on success, no more than n_max_tokens and returns a negative number on failure - the number of tokens that would have been returned</returns>
+        [DllImport(LibName)]
+        public static extern int llama_eval_export(llama_context ctx, string fname);
+
         [DllImport(LibName)]
         public static extern int llama_tokenize(llama_context ctx, string text, llama_token[] tokens, int n_max_tokens, bool add_bos);
+
+        [DllImport(LibName)]
+        public static extern int llama_tokenize_with_model(llama_model model, string text, llama_token[] tokens, int n_max_tokens, bool add_bos);
 
         [DllImport(LibName)]
         public static extern int llama_n_vocab(llama_context ctx);
@@ -267,18 +244,24 @@ namespace LlamaCppLib
         [DllImport(LibName)]
         public static extern int llama_n_embd(llama_context ctx);
 
+        [DllImport(LibName)]
+        public static extern int llama_n_vocab_from_model(llama_model model);
+
+        [DllImport(LibName)]
+        public static extern int llama_n_ctx_from_model(llama_model model);
+
+        [DllImport(LibName)]
+        public static extern int llama_n_embd_from_model(llama_model model);
+
+        [DllImport(LibName)]
+        public static extern int llama_get_vocab(llama_context ctx, string[] strings, float[] scores, int capacity);
+
+        [DllImport(LibName)]
+        public static extern int llama_get_vocab_from_model(llama_model model, string[] strings, float[] scores, int capacity);
+
         [DllImport(LibName, EntryPoint = "llama_get_logits")]
         private static extern nint _llama_get_logits(llama_context ctx);
 
-        /// <summary>
-        /// Token logits obtained from the last call to llama_eval()
-        /// The logits for the last token are stored in the last row
-        /// Can be mutated in order to change the probabilities of the next token
-        /// Rows: n_tokens
-        /// Cols: n_vocab
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
-        /// <returns>List of floats (logits)</returns>
         public static List<float> llama_get_logits(llama_context ctx)
         {
             var count = llama_n_vocab(ctx);
@@ -292,12 +275,6 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_get_embeddings")]
         private static extern nint _llama_get_embeddings(llama_context ctx);
 
-        /// <summary>
-        /// Get the embeddings for the input
-        /// shape: [n_embd] (1-dimensional)
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
-        /// <returns>List of floats (embeddings)</returns>
         public static List<float> llama_get_embeddings(llama_context ctx)
         {
             var count = llama_n_embd(ctx);
@@ -316,22 +293,19 @@ namespace LlamaCppLib
         [return: MarshalAs(UnmanagedType.SysUInt)]
         private static extern nint _llama_token_to_str(llama_context ctx, llama_token token);
 
-        /// <summary>
-        /// Token Id -> String. Uses the vocabulary in the provided context
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
-        /// <param name="token">Token ID to convert</param>
-        /// <returns>Text token</returns>
-        public static string llama_token_to_str(llama_context ctx, llama_token token) =>
-            Marshal.PtrToStringUTF8(_llama_token_to_str(ctx, token)) ?? String.Empty;
+        public static string llama_token_to_str(llama_context ctx, llama_token token)
+        {
+            return Marshal.PtrToStringUTF8(_llama_token_to_str(ctx, token)) ?? String.Empty;
+        }
 
-        /// <summary>
-        /// Token Id -> array of bytes. Uses the vocabulary in the provided context
-        /// This version can be used instead of the string version to avoid breaking multi-byte character encoding.
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
-        /// <param name="token">Token ID to convert</param>
-        /// <returns>Token bytes</returns>
+        [DllImport(LibName, EntryPoint = "llama_token_to_str_with_model")]
+        public static extern nint _llama_token_to_str_with_model(llama_model model, llama_token token);
+
+        public static string llama_token_to_str_with_model(llama_model model, llama_token token)
+        {
+            return Marshal.PtrToStringUTF8(_llama_token_to_str_with_model(model, token)) ?? String.Empty;
+        }
+
         public static byte[] llama_token_to_bytes(llama_context ctx, llama_token token)
         {
             var ptr = (byte*)_llama_token_to_str(ctx, token).ToPointer();
@@ -340,50 +314,25 @@ namespace LlamaCppLib
             return bytes.ToArray();
         }
 
-        /// <summary>
-        /// Special tokens
-        /// </summary>
-        /// <returns>Beginning of stream token</returns>
         [DllImport(LibName)]
         public static extern llama_token llama_token_bos();
 
-        /// <summary>
-        /// Special tokens
-        /// </summary>
-        /// <returns>End of stream token</returns>
         [DllImport(LibName)]
         public static extern llama_token llama_token_eos();
 
-        /// <summary>
-        /// Special tokens
-        /// </summary>
-        /// <returns>End of stream token</returns>
         [DllImport(LibName)]
         public static extern llama_token llama_token_nl();
 
-        [DllImport(LibName, EntryPoint = "llama_sample_repetition_penalty")]
-        private static extern void _llama_sample_repetition_penalty(
-            llama_context ctx,
-            nint candidates,
-            llama_token[] last_tokens,
-            int last_tokens_size,
-            float penalty
-        );
+        [DllImport(LibName)]
+        public static extern llama_grammar llama_grammar_init(llama_grammar_element[] rules, nuint n_rules, nuint start_rule_index);
 
-        /// <summary>
-        /// Repetition penalty described in CTRL academic paper https://arxiv.org/abs/1909.05858, with negative logit fix.
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="candidates"></param>
-        /// <param name="last_tokens"></param>
-        /// <param name="last_tokens_size"></param>
-        /// <param name="penalty"></param>
-        public static void llama_sample_repetition_penalty(
-            llama_context ctx,
-            llama_token_data_array candidates,
-            List<llama_token> last_tokens,
-            float penalty
-        )
+        [DllImport(LibName)]
+        public static extern void llama_grammar_free(llama_grammar grammar);
+
+        [DllImport(LibName, EntryPoint = "llama_sample_repetition_penalty")]
+        private static extern void _llama_sample_repetition_penalty(llama_context ctx, nint candidates, llama_token[] last_tokens, int last_tokens_size, float penalty);
+
+        public static void llama_sample_repetition_penalty(llama_context ctx, llama_token_data_array candidates, List<llama_token> last_tokens, float penalty)
         {
             using var handle = candidates.data.Pin();
             var _candidates = new LlamaCppInterop._llama_token_data_array
@@ -397,31 +346,9 @@ namespace LlamaCppLib
         }
 
         [DllImport(LibName, EntryPoint = "llama_sample_frequency_and_presence_penalties")]
-        private static extern void _llama_sample_frequency_and_presence_penalties(
-            llama_context ctx,
-            nint candidates,
-            llama_token[] last_tokens,
-            int last_tokens_size,
-            float alpha_frequency,
-            float alpha_presence
-        );
+        private static extern void _llama_sample_frequency_and_presence_penalties(llama_context ctx, nint candidates, llama_token[] last_tokens, int last_tokens_size, float alpha_frequency, float alpha_presence);
 
-        /// <summary>
-        /// Frequency and presence penalties described in OpenAI API https://platform.openai.com/docs/api-reference/parameter-details.
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="candidates"></param>
-        /// <param name="last_tokens"></param>
-        /// <param name="last_tokens_size"></param>
-        /// <param name="alpha_frequency"></param>
-        /// <param name="alpha_presence"></param>
-        public static void llama_sample_frequency_and_presence_penalties(
-            llama_context ctx,
-            llama_token_data_array candidates,
-            List<llama_token> last_tokens,
-            float alpha_frequency,
-            float alpha_presence
-        )
+        public static void llama_sample_frequency_and_presence_penalties(llama_context ctx, llama_token_data_array candidates, List<llama_token> last_tokens, float alpha_frequency, float alpha_presence)
         {
             using var handle = candidates.data.Pin();
             var _candidates = new LlamaCppInterop._llama_token_data_array
@@ -453,11 +380,6 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_sample_softmax")]
         private static extern void _llama_sample_softmax(llama_context ctx, nint candidates);
 
-        /// <summary>
-        /// Sorts candidate tokens by their logits in descending order and calculate probabilities based on logits.
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="candidates"></param>
         public static void llama_sample_softmax(llama_context ctx, llama_token_data_array candidates)
         {
             using var handle = candidates.data.Pin();
@@ -474,13 +396,6 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_sample_top_k")]
         private static extern void _llama_sample_top_k(llama_context ctx, nint candidates, int k, int min_keep = 1);
 
-        /// <summary>
-        /// Top-K sampling described in academic paper "The Curious Case of Neural Text Degeneration" https://arxiv.org/abs/1904.09751
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="candidates"></param>
-        /// <param name="k"></param>
-        /// <param name="min_keep"></param>
         public static void llama_sample_top_k(llama_context ctx, llama_token_data_array candidates, int k, int min_keep = 1)
         {
             using var handle = candidates.data.Pin();
@@ -497,13 +412,6 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_sample_top_p")]
         private static extern void _llama_sample_top_p(llama_context ctx, nint candidates, float p, int min_keep = 1);
 
-        /// <summary>
-        /// Nucleus sampling described in academic paper "The Curious Case of Neural Text Degeneration" https://arxiv.org/abs/1904.09751
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="candidates"></param>
-        /// <param name="p"></param>
-        /// <param name="min_keep"></param>
         public static void llama_sample_top_p(llama_context ctx, llama_token_data_array candidates, float p, int min_keep = 1)
         {
             using var handle = candidates.data.Pin();
@@ -520,13 +428,6 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_sample_tail_free")]
         private static extern void _llama_sample_tail_free(llama_context ctx, nint candidates, float z, int min_keep = 1);
 
-        /// <summary>
-        /// Tail Free Sampling described in https://www.trentonbricken.com/Tail-Free-Sampling/.
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="candidates"></param>
-        /// <param name="z"></param>
-        /// <param name="min_keep"></param>
         public static void llama_sample_tail_free(llama_context ctx, llama_token_data_array candidates, float z, int min_keep = 1)
         {
             using var handle = candidates.data.Pin();
@@ -543,13 +444,6 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_sample_typical")]
         private static extern void _llama_sample_typical(llama_context ctx, nint candidates, float p, int min_keep = 1);
 
-        /// <summary>
-        /// Locally Typical Sampling implementation described in the paper https://arxiv.org/abs/2202.00666.
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="candidates"></param>
-        /// <param name="p"></param>
-        /// <param name="min_keep"></param>
         public static void llama_sample_typical(llama_context ctx, llama_token_data_array candidates, float p, int min_keep = 1)
         {
             using var handle = candidates.data.Pin();
@@ -579,19 +473,25 @@ namespace LlamaCppLib
             _llama_sample_temperature(ctx, new(&_candidates), temp);
         }
 
+        [DllImport(LibName, EntryPoint = "llama_sample_grammar")]
+        private static extern void _llama_sample_grammar(llama_context ctx, nint candidates, llama_grammar grammar);
+
+        private static void llama_sample_grammar(llama_context ctx, llama_token_data_array candidates, llama_grammar grammar)
+        {
+            using var handle = candidates.data.Pin();
+            var _candidates = new LlamaCppInterop._llama_token_data_array
+            {
+                data = new(handle.Pointer),
+                size = candidates.size,
+                sorted = candidates.sorted,
+            };
+
+            _llama_sample_grammar(ctx, new(&_candidates), grammar);
+        }
+
         [DllImport(LibName, EntryPoint = "llama_sample_token_mirostat")]
         private static extern llama_token _llama_sample_token_mirostat(llama_context ctx, nint candidates, float tau, float eta, int m, ref float mu);
 
-        /// <summary>
-        /// Mirostat 1.0 algorithm described in the paper https://arxiv.org/abs/2007.14966. Uses tokens instead of words.
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="candidates">A vector of `llama_token_data` containing the candidate tokens, their probabilities (p), and log-odds (logit) for the current position in the generated text.</param>
-        /// <param name="tau">The target cross-entropy (or surprise) value you want to achieve for the generated text. A higher value corresponds to more surprising or less predictable text, while a lower value corresponds to less surprising or more predictable text.</param>
-        /// <param name="eta">The learning rate used to update `mu` based on the error between the target and observed surprisal of the sampled word. A larger learning rate will cause `mu` to be updated more quickly, while a smaller learning rate will result in slower updates.</param>
-        /// <param name="m">The number of tokens considered in the estimation of `s_hat`. This is an arbitrary value that is used to calculate `s_hat`, which in turn helps to calculate the value of `k`. In the paper, they use `m = 100`, but you can experiment with different values to see how it affects the performance of the algorithm.</param>
-        /// <param name="mu">Maximum cross-entropy. This value is initialized to be twice the target cross-entropy (`2 * tau`) and is updated in the algorithm based on the error between the target and observed surprisal.</param>
-        /// <returns></returns>
         public static llama_token llama_sample_token_mirostat(llama_context ctx, llama_token_data_array candidates, float tau, float eta, int m, ref float mu)
         {
             using var handle = candidates.data.Pin();
@@ -608,15 +508,6 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_sample_token_mirostat_v2")]
         private static extern llama_token _llama_sample_token_mirostat_v2(llama_context ctx, nint candidates, float tau, float eta, ref float mu);
 
-        /// <summary>
-        /// Mirostat 2.0 algorithm described in the paper https://arxiv.org/abs/2007.14966. Uses tokens instead of words.
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="candidates">A vector of `llama_token_data` containing the candidate tokens, their probabilities (p), and log-odds (logit) for the current position in the generated text.</param>
-        /// <param name="tau">The target cross-entropy (or surprise) value you want to achieve for the generated text. A higher value corresponds to more surprising or less predictable text, while a lower value corresponds to less surprising or more predictable text.</param>
-        /// <param name="eta">The learning rate used to update `mu` based on the error between the target and observed surprisal of the sampled word. A larger learning rate will cause `mu` to be updated more quickly, while a smaller learning rate will result in slower updates.</param>
-        /// <param name="mu">Maximum cross-entropy. This value is initialized to be twice the target cross-entropy (`2 * tau`) and is updated in the algorithm based on the error between the target and observed surprisal.</param>
-        /// <returns></returns>
         public static llama_token llama_sample_token_mirostat_v2(llama_context ctx, llama_token_data_array candidates, float tau, float eta, ref float mu)
         {
             using var handle = candidates.data.Pin();
@@ -633,12 +524,6 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_sample_token_greedy")]
         private static extern llama_token _llama_sample_token_greedy(llama_context ctx, nint candidates);
 
-        /// <summary>
-        /// Selects the token with the highest probability.
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="candidates"></param>
-        /// <returns></returns>
         public static llama_token llama_sample_token_greedy(llama_context ctx, llama_token_data_array candidates)
         {
             using var handle = candidates.data.Pin();
@@ -655,12 +540,6 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_sample_token")]
         private static extern llama_token _llama_sample_token(llama_context ctx, nint candidates);
 
-        /// <summary>
-        /// Randomly selects a token from the candidates based on their probabilities.
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="candidates"></param>
-        /// <returns></returns>
         public static llama_token llama_sample_token(llama_context ctx, llama_token_data_array candidates)
         {
             using var handle = candidates.data.Pin();
@@ -674,28 +553,21 @@ namespace LlamaCppLib
             return _llama_sample_token(ctx, new(&_candidates));
         }
 
-        /// <summary>
-        /// Performance information
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
+        [DllImport(LibName)]
+        public static extern void llama_grammar_accept_token(llama_context ctx, llama_grammar grammar, llama_token token);
+
         [DllImport(LibName)]
         public static extern void llama_print_timings(llama_context ctx);
 
-        /// <summary>
-        /// Performance information
-        /// </summary>
-        /// <param name="ctx">LlamaContext</param>
         [DllImport(LibName)]
         public static extern void llama_reset_timings(llama_context ctx);
 
         [DllImport(LibName, EntryPoint = "llama_print_system_info")]
         private static extern nint _llama_print_system_info();
 
-        /// <summary>
-        /// Print system information
-        /// </summary>
-        /// <returns>System information</returns>
-        public static string llama_print_system_info() =>
-            Marshal.PtrToStringUTF8(_llama_print_system_info()) ?? String.Empty;
+        public static string llama_print_system_info()
+        {
+            return Marshal.PtrToStringUTF8(_llama_print_system_info()) ?? String.Empty;
+        }
     }
 }
