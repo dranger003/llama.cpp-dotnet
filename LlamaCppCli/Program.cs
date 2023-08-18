@@ -1,4 +1,6 @@
-﻿using System.Net.Http.Json;
+﻿using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Net.Mime;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -219,7 +221,7 @@ namespace LlamaCppCli
             var baseUrl = args[0];
             var modelName = args[1];
             var gpuLayers = args.Length > 2 ? Int32.Parse(args[2]) : 0;
-            var contextLength = args.Length > 3 ? Int32.Parse(args[3]) : 2048;
+            var contextLength = args.Length > 3 ? Int32.Parse(args[3]) : 4096;
             var template = args.Length > 4 ? args[4] : "{0}";
 
             var modelOptions = new LlamaCppModelOptions() { Seed = 0, ContextSize = contextLength, GpuLayers = gpuLayers, RopeFrequencyBase = 10000.0f, RopeFrequencyScale = 0.5f };
@@ -235,8 +237,7 @@ namespace LlamaCppCli
                 var query = HttpUtility.ParseQueryString(String.Empty);
                 query["modelName"] = modelName;
                 query["modelOptions"] = JsonSerializer.Serialize(modelOptions);
-                using var response = (await httpClient.GetAsync($"{baseUrl}/model/load?{query}"))
-                    .EnsureSuccessStatusCode();
+                using var response = (await httpClient.GetAsync($"{baseUrl}/model/load?{query}")).EnsureSuccessStatusCode();
                 await Console.Out.WriteLineAsync(" OK.");
             }
 
@@ -256,81 +257,81 @@ namespace LlamaCppCli
                 //(await httpClient.GetAsync($"{baseUrl}/model/reset")).EnsureSuccessStatusCode();
             }
 
-            //// Generate token(s)
-            //{
-            //    var generateOptions = new LlamaCppGenerateOptions { Temperature = 0.0f, Mirostat = Mirostat.Mirostat2 };
+            // Generate token(s)
+            {
+                var generateOptions = new LlamaCppGenerateOptions { Temperature = 0.0f, Mirostat = Mirostat.Mirostat2 };
 
-            //    await Console.Out.WriteLineAsync(
-            //        """
+                await Console.Out.WriteLineAsync(
+                    """
 
-            //        Entering interactive mode:
-            //            * Press <Ctrl+C> to cancel token generation
-            //            * Press <Enter> on an empty input prompt to quit
-            //        """
-            //    );
+                    Entering interactive mode:
+                        * Press <Ctrl+C> to cancel token generation
+                        * Press <Enter> on an empty input prompt to quit
+                    """
+                );
 
-            //    while (true)
-            //    {
-            //        try
-            //        {
-            //            await Console.Out.WriteLineAsync("\nInput:");
+                while (true)
+                {
+                    try
+                    {
+                        await Console.Out.WriteLineAsync("\nInput:");
 
-            //            var prompt = await Console.In.ReadLineAsync(cancellationTokenSource.Token) ?? String.Empty;
-            //            if (String.IsNullOrWhiteSpace(prompt))
-            //                break;
+                        var prompt = await Console.In.ReadLineAsync(cancellationTokenSource.Token) ?? String.Empty;
+                        if (String.IsNullOrWhiteSpace(prompt))
+                            break;
 
-            //            var match = Regex.Match(prompt, @"/load\s""?(.*[^""])?""?");
-            //            if (match.Success)
-            //            {
-            //                var path = Path.GetFullPath(match.Groups[1].Value);
-            //                prompt = File.ReadAllText(match.Groups[1].Value);
-            //            }
+                        var match = Regex.Match(prompt, @"/load\s""?(.*[^""])?""?");
+                        if (match.Success)
+                        {
+                            var path = Path.GetFullPath(match.Groups[1].Value);
+                            prompt = File.ReadAllText(match.Groups[1].Value);
+                        }
 
-            //            await Console.Out.WriteLineAsync("\nOutput:");
+                        await Console.Out.WriteLineAsync("\nOutput:");
 
-            //            var content = new
-            //            {
-            //                SessionId = $"{sessionId}",
-            //                GenerateOptions = generateOptions,
-            //                Prompt = prompt,
-            //            };
+                        var content = new
+                        {
+                            SessionId = $"{sessionId}",
+                            GenerateOptions = generateOptions,
+                            Prompt = prompt,
+                        };
 
-            //            var url = $"{baseUrl}/model/generate";
-            //            using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = new StringContent(JsonSerializer.Serialize(content), Encoding.UTF8, MediaTypeNames.Application.Json) };
-            //            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+                        var url = $"{baseUrl}/model/generate";
+                        using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = new StringContent(JsonSerializer.Serialize(content), Encoding.UTF8, MediaTypeNames.Application.Json) };
+                        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
-            //            using var response = (await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationTokenSource.Token)).EnsureSuccessStatusCode();
+                        using var response = (await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationTokenSource.Token)).EnsureSuccessStatusCode();
 
-            //            await using var stream = await response.Content.ReadAsStreamAsync(cancellationTokenSource.Token);
-            //            using var reader = new StreamReader(stream);
+                        await using var stream = await response.Content.ReadAsStreamAsync(cancellationTokenSource.Token);
+                        using var reader = new StreamReader(stream);
 
-            //            while (!reader.EndOfStream && !cancellationTokenSource.IsCancellationRequested)
-            //            {
-            //                var data = await reader.ReadLineAsync(cancellationTokenSource.Token);
-            //                if (data == null)
-            //                    break;
+                        while (!reader.EndOfStream && !cancellationTokenSource.IsCancellationRequested)
+                        {
+                            var data = await reader.ReadLineAsync(cancellationTokenSource.Token);
+                            if (data == null)
+                                break;
 
-            //                var decodedToken = Regex.Match(data, @"(?<=data:\s).*").Value.Replace("\\n", "\n").Replace("\\t", "\t");
-            //                await Console.Out.WriteAsync(decodedToken);
-            //            }
+                            var decodedToken = Regex.Match(data, @"(?<=data:\s).*").Value.Replace("\\n", "\n").Replace("\\t", "\t");
+                            await Console.Out.WriteAsync(decodedToken);
+                        }
 
-            //            await Console.Out.WriteLineAsync();
-            //            cancellationTokenSource.Token.ThrowIfCancellationRequested();
+                        await Console.Out.WriteLineAsync();
+                        cancellationTokenSource.Token.ThrowIfCancellationRequested();
 
-            //            var query = HttpUtility.ParseQueryString(String.Empty);
-            //            query["sessionId"] = $"{sessionId}";
-            //            (await httpClient.GetAsync($"{baseUrl}/session/reset?{query}")).EnsureSuccessStatusCode();
-            //            (await httpClient.GetAsync($"{baseUrl}/model/reset")).EnsureSuccessStatusCode();
-            //        }
-            //        catch (Exception ex) when (ex is TaskCanceledException || ex is OperationCanceledException)
-            //        {
-            //            await Console.Out.WriteLineAsync(" [Cancelled]");
+                        var query = HttpUtility.ParseQueryString(String.Empty);
+                        query["sessionId"] = $"{sessionId}";
+                        (await httpClient.GetAsync($"{baseUrl}/session/reset?{query}")).EnsureSuccessStatusCode();
+                        (await httpClient.GetAsync($"{baseUrl}/model/reset")).EnsureSuccessStatusCode();
+                    }
+                    catch (Exception ex) when (ex is TaskCanceledException || ex is OperationCanceledException)
+                    {
+                        await Console.Out.WriteLineAsync(" [Cancelled]");
 
-            //            cancellationTokenSource.Dispose();
-            //            cancellationTokenSource = new();
-            //        }
-            //    }
-            //}
+                        cancellationTokenSource.Dispose();
+                        cancellationTokenSource = new();
+                    }
+                }
+            }
         }
 
         static async Task RunDebugSampleAsync(string[] args)
