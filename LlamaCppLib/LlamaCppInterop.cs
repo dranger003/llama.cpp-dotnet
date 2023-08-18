@@ -335,7 +335,7 @@ namespace LlamaCppLib
         public static void llama_sample_repetition_penalty(llama_context ctx, llama_token_data_array candidates, List<llama_token> last_tokens, float penalty)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
@@ -351,7 +351,7 @@ namespace LlamaCppLib
         public static void llama_sample_frequency_and_presence_penalties(llama_context ctx, llama_token_data_array candidates, List<llama_token> last_tokens, float alpha_frequency, float alpha_presence)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
@@ -367,7 +367,7 @@ namespace LlamaCppLib
         public static void llama_sample_classifier_free_guidance(llama_context ctx, llama_token_data_array candidates, llama_context guidance_ctx, float scale)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
@@ -383,7 +383,7 @@ namespace LlamaCppLib
         public static void llama_sample_softmax(llama_context ctx, llama_token_data_array candidates)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
@@ -399,7 +399,7 @@ namespace LlamaCppLib
         public static void llama_sample_top_k(llama_context ctx, llama_token_data_array candidates, int k, int min_keep = 1)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
@@ -415,7 +415,7 @@ namespace LlamaCppLib
         public static void llama_sample_top_p(llama_context ctx, llama_token_data_array candidates, float p, int min_keep = 1)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
@@ -431,7 +431,7 @@ namespace LlamaCppLib
         public static void llama_sample_tail_free(llama_context ctx, llama_token_data_array candidates, float z, int min_keep = 1)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
@@ -447,7 +447,7 @@ namespace LlamaCppLib
         public static void llama_sample_typical(llama_context ctx, llama_token_data_array candidates, float p, int min_keep = 1)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
@@ -463,7 +463,7 @@ namespace LlamaCppLib
         public static void llama_sample_temperature(llama_context ctx, llama_token_data_array candidates, float temp)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
@@ -479,7 +479,7 @@ namespace LlamaCppLib
         private static void llama_sample_grammar(llama_context ctx, llama_token_data_array candidates, llama_grammar grammar)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
@@ -495,7 +495,7 @@ namespace LlamaCppLib
         public static llama_token llama_sample_token_mirostat(llama_context ctx, llama_token_data_array candidates, float tau, float eta, int m, ref float mu)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
@@ -511,7 +511,7 @@ namespace LlamaCppLib
         public static llama_token llama_sample_token_mirostat_v2(llama_context ctx, llama_token_data_array candidates, float tau, float eta, ref float mu)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
@@ -527,7 +527,7 @@ namespace LlamaCppLib
         public static llama_token llama_sample_token_greedy(llama_context ctx, llama_token_data_array candidates)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
@@ -543,7 +543,7 @@ namespace LlamaCppLib
         public static llama_token llama_sample_token(llama_context ctx, llama_token_data_array candidates)
         {
             using var handle = candidates.data.Pin();
-            var _candidates = new LlamaCppInterop._llama_token_data_array
+            var _candidates = new _llama_token_data_array
             {
                 data = new(handle.Pointer),
                 size = candidates.size,
