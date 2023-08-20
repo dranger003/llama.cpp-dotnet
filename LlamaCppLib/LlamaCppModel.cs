@@ -186,7 +186,7 @@ namespace LlamaCppLib
                 for (LlamaToken tokenId = 0; tokenId < n_vocab; tokenId++)
                     candidates.Add(new LlamaCppInterop.llama_token_data { id = tokenId, logit = logits[tokenId], p = 0.0f });
 
-                var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates.ToArray(), size = (ulong)candidates.Count, sorted = false };
+                var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates.ToArray(), size = (nuint)candidates.Count, sorted = false };
 
                 // Apply penalties
                 var newLineLogit = logits[LlamaCppInterop.llama_token_nl()];
@@ -195,14 +195,14 @@ namespace LlamaCppLib
                 LlamaCppInterop.llama_sample_repetition_penalty(
                     _context,
                     candidates_p,
-                    state.TokenIds.Skip(state.TokenIds.Count - lastRepeatCount).Take(lastRepeatCount).ToList(),
+                    state.TokenIds.Skip(state.TokenIds.Count - lastRepeatCount).Take(lastRepeatCount).ToArray(),
                     options.RepeatPenalty
                 );
 
                 LlamaCppInterop.llama_sample_frequency_and_presence_penalties(
                     _context,
                     candidates_p,
-                    state.TokenIds.Skip(state.TokenIds.Count - lastRepeatCount).Take(lastRepeatCount).ToList(),
+                    state.TokenIds.Skip(state.TokenIds.Count - lastRepeatCount).Take(lastRepeatCount).ToArray(),
                     options.FrequencyPenalty,
                     options.PresencePenalty
                 );

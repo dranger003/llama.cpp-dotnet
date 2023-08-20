@@ -21,7 +21,7 @@ namespace LlamaCppLib
         internal struct _llama_token_data_array
         {
             public nint data;
-            public ulong size;
+            public nuint size;
             [MarshalAs(UnmanagedType.I1)]
             public bool sorted;
         }
@@ -29,7 +29,7 @@ namespace LlamaCppLib
         public struct llama_token_data_array
         {
             public Memory<llama_token_data> data;
-            public ulong size;
+            public nuint size;
             public bool sorted;
         }
 
@@ -204,8 +204,8 @@ namespace LlamaCppLib
         public static byte[] llama_copy_state_data(llama_context ctx)
         {
             // This is a hack because llama_get_state_size() returns the maximum state size (>2GB for 8192 n_ctx)
-            // Hardcoding 1M as this is used exclusively for saving the initial state which is always <1MB
-            // WARNING -- Using this method to save a non-intial state will most likely crash (i.e. when kv cache is larger)
+            // Hardcoding 1MiB as this is used exclusively for saving the initial state which is always < 1MiB
+            // WARNING -- Using this method to save a non-intial state will most likely crash (i.e. when kv cache is larger than 1 MiB)
             var state = new byte[1024 * 1024];
             var count = (int)_llama_copy_state_data(ctx, state);
             return state.Take(count).ToArray();
@@ -262,31 +262,31 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_get_logits")]
         private static extern nint _llama_get_logits(llama_context ctx);
 
-        public static List<float> llama_get_logits(llama_context ctx)
+        public static float[] llama_get_logits(llama_context ctx)
         {
             var count = llama_n_vocab(ctx);
             var native_mem = _llama_get_logits(ctx);
             var logits = new float[count];
             Marshal.Copy(native_mem, logits, 0, count);
 
-            return new(logits);
+            return logits;
         }
 
         [DllImport(LibName, EntryPoint = "llama_get_embeddings")]
         private static extern nint _llama_get_embeddings(llama_context ctx);
 
-        public static List<float> llama_get_embeddings(llama_context ctx)
+        public static float[] llama_get_embeddings(llama_context ctx)
         {
             var count = llama_n_embd(ctx);
             var native_mem = _llama_get_embeddings(ctx);
 
             if (native_mem == nint.Zero)
-                return new();
+                return new float[0];
 
             var embeddings = new float[count];
             Marshal.Copy(native_mem, embeddings, 0, count);
 
-            return new(embeddings);
+            return embeddings;
         }
 
         [DllImport(LibName, EntryPoint = "llama_token_to_str")]
@@ -332,7 +332,7 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_sample_repetition_penalty")]
         private static extern void _llama_sample_repetition_penalty(llama_context ctx, nint candidates, llama_token[] last_tokens, int last_tokens_size, float penalty);
 
-        public static void llama_sample_repetition_penalty(llama_context ctx, llama_token_data_array candidates, List<llama_token> last_tokens, float penalty)
+        public static void llama_sample_repetition_penalty(llama_context ctx, llama_token_data_array candidates, llama_token[] last_tokens, float penalty)
         {
             using var handle = candidates.data.Pin();
             var _candidates = new _llama_token_data_array
@@ -342,13 +342,13 @@ namespace LlamaCppLib
                 sorted = candidates.sorted,
             };
 
-            _llama_sample_repetition_penalty(ctx, new(&_candidates), last_tokens.ToArray(), last_tokens.Count, penalty);
+            _llama_sample_repetition_penalty(ctx, new(&_candidates), last_tokens, last_tokens.Length, penalty);
         }
 
         [DllImport(LibName, EntryPoint = "llama_sample_frequency_and_presence_penalties")]
         private static extern void _llama_sample_frequency_and_presence_penalties(llama_context ctx, nint candidates, llama_token[] last_tokens, int last_tokens_size, float alpha_frequency, float alpha_presence);
 
-        public static void llama_sample_frequency_and_presence_penalties(llama_context ctx, llama_token_data_array candidates, List<llama_token> last_tokens, float alpha_frequency, float alpha_presence)
+        public static void llama_sample_frequency_and_presence_penalties(llama_context ctx, llama_token_data_array candidates, llama_token[] last_tokens, float alpha_frequency, float alpha_presence)
         {
             using var handle = candidates.data.Pin();
             var _candidates = new _llama_token_data_array
@@ -358,7 +358,7 @@ namespace LlamaCppLib
                 sorted = candidates.sorted,
             };
 
-            _llama_sample_frequency_and_presence_penalties(ctx, new(&_candidates), last_tokens.ToArray(), last_tokens.Count, alpha_frequency, alpha_presence);
+            _llama_sample_frequency_and_presence_penalties(ctx, new(&_candidates), last_tokens, last_tokens.Length, alpha_frequency, alpha_presence);
         }
 
         [DllImport(LibName, EntryPoint = "llama_sample_classifier_free_guidance")]

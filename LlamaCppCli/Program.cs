@@ -420,7 +420,7 @@ namespace LlamaCppCli
                         candidates.Add(new LlamaCppInterop.llama_token_data { id = token_id, logit = logits[token_id], p = 0.0f });
                     }
 
-                    var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates.ToArray(), size = (ulong)candidates.Count, sorted = false };
+                    var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates.ToArray(), size = (nuint)candidates.Count, sorted = false };
 
                     var new_token_id = LlamaCppInterop.llama_sample_token_greedy(ctx, candidates_p);
                     if (new_token_id == LlamaCppInterop.llama_token_eos())
