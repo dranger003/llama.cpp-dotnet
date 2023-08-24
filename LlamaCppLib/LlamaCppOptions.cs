@@ -17,10 +17,6 @@ namespace LlamaCppLib
         public float RopeFrequencyBase { get; set; } = 10000.0f;
         public float RopeFrequencyScale { get; set; } = 1.0f;
 
-        // LLAMA-2 (TEMPORARY)
-        public int GroupedQueryAttentionCount { get; set; } = 1;    // Grouped-query attention (TEMPORARY)
-        public float RmsNormEpsilon { get; set; } = 5e-6f;          // RMS norm epsilon (TEMPORARY)
-
         public static bool TryParse(string input, out LlamaCppModelOptions options)
         {
             options = JsonSerializer.Deserialize<LlamaCppModelOptions>(input) ?? new();

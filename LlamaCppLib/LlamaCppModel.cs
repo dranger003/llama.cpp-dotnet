@@ -43,7 +43,7 @@ namespace LlamaCppLib
             var tokenBuffer = new LlamaToken[LlamaCppInterop.llama_n_ctx(_context)];
             var count = LlamaCppInterop.llama_tokenize(_context, text, tokenBuffer, tokenBuffer.Length, addBos);
             var tokens = tokenBuffer.Take(count).ToList();
-            if (addEos) tokens.Add(LlamaCppInterop.llama_token_eos());
+            if (addEos) tokens.Add(LlamaCppInterop.llama_token_eos(_context));
             return tokens;
         }
 
@@ -55,9 +55,9 @@ namespace LlamaCppLib
             var bytes = new List<byte[]>();
             foreach (var tokenId in tokenIds)
             {
-                if (tokenId == LlamaCppInterop.llama_token_bos())
+                if (tokenId == LlamaCppInterop.llama_token_bos(_context))
                     bytes.Add(Encoding.UTF8.GetBytes("<s>"));
-                else if (tokenId == LlamaCppInterop.llama_token_eos())
+                else if (tokenId == LlamaCppInterop.llama_token_eos(_context))
                     bytes.Add(Encoding.UTF8.GetBytes("</s>"));
                 else
                     bytes.Add(LlamaCppInterop.llama_token_to_bytes(_context, tokenId));
@@ -110,8 +110,6 @@ namespace LlamaCppLib
             cparams.use_mlock = options.UseMemoryLocking;
             cparams.rope_freq_base = options.RopeFrequencyBase;
             cparams.rope_freq_scale = options.RopeFrequencyScale;
-            cparams.n_gqa = options.GroupedQueryAttentionCount;     // Grouped-query attention (TEMPORARY)
-            cparams.rms_norm_eps = options.RmsNormEpsilon;          // RMS norm epsilon (TEMPORARY)
 
             _model = LlamaCppInterop.llama_load_model_from_file(modelPath, cparams);
             _context = LlamaCppInterop.llama_new_context_with_model(_model, cparams);
@@ -189,7 +187,7 @@ namespace LlamaCppLib
                 var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates.ToArray(), size = (nuint)candidates.Count, sorted = false };
 
                 // Apply penalties
-                var newLineLogit = logits[LlamaCppInterop.llama_token_nl()];
+                var newLineLogit = logits[LlamaCppInterop.llama_token_nl(_context)];
                 var lastRepeatCount = Math.Min(Math.Min(state.TokenIds.Count, options.LastTokenCountPenalty), LlamaCppInterop.llama_n_ctx(_context));
 
                 LlamaCppInterop.llama_sample_repetition_penalty(
@@ -208,7 +206,7 @@ namespace LlamaCppLib
                 );
 
                 if (!options.PenalizeNewLine)
-                    logits[LlamaCppInterop.llama_token_nl()] = newLineLogit;
+                    logits[LlamaCppInterop.llama_token_nl(_context)] = newLineLogit;
 
                 var id = default(LlamaToken);
 
@@ -246,7 +244,7 @@ namespace LlamaCppLib
 
                 yield return LlamaCppInterop.llama_token_to_bytes(_context, id);
 
-                if (id == LlamaCppInterop.llama_token_eos())
+                if (id == LlamaCppInterop.llama_token_eos(_context))
                     break;
             }
 
