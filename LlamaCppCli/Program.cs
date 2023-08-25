@@ -9,6 +9,8 @@ using System.Web;
 
 using LlamaCppLib;
 using BertCppLib;
+using System.IO;
+using System.Threading;
 
 namespace LlamaCppCli
 {
@@ -21,14 +23,15 @@ namespace LlamaCppCli
 #if DEBUG
             //args = new[] { "1", "http://localhost:5021", "meta-llama2-chat-13b-v1.0-q8_0", "60", "4096" };
             //args = new[] { "1", "http://localhost:5021", "openassistant-llama2-13b-orca-8k-3319-q8_0", "60", "8192" };
-            args = new[] { "3" };
+            args = new[] { "4" };
 #endif
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
-                (nameof(RunLocalSampleAsync), RunLocalSampleAsync),     // Run locally
-                (nameof(RunRemoteSampleAsync), RunRemoteSampleAsync),   // Run via API
-                (nameof(RunBertSampleAsync), RunBertSampleAsync),       // BERT
-                (nameof(RunDebugSampleAsync), RunDebugSampleAsync),     // Simple (used for debugging)
+                (nameof(RunLocalSampleAsync), RunLocalSampleAsync),             // Run locally
+                (nameof(RunRemoteSampleAsync), RunRemoteSampleAsync),           // Run via API
+                (nameof(RunBertSampleAsync), RunBertSampleAsync),               // BERT
+                (nameof(RunEmbeddingsSampleAsync), RunEmbeddingsSampleAsync),
+                (nameof(RunDebugSampleAsync), RunDebugSampleAsync),             // Simple (used for debugging)
             }
                 .Select((sample, index) => (sample, index))
                 .ToDictionary(k => k.sample.Name, v => (Index: v.index, v.sample.Func));
@@ -331,6 +334,82 @@ namespace LlamaCppCli
             }
         }
 
+        static async Task RunEmbeddingsSampleAsync(string[] args)
+        {
+            _RunEmbeddingsSampleAsync(args);
+            await Task.CompletedTask;
+        }
+
+        static void _RunEmbeddingsSampleAsync(string[] args)
+        {
+            var path = @"D:\LLM_MODELS\codellama\ggml-codellama-7b-instruct-Q8_0.gguf";
+
+            LlamaCppInterop.llama_backend_init();
+            {
+                var cparams = LlamaCppInterop.llama_context_default_params();
+                cparams.n_ctx = 4096;
+                cparams.n_gpu_layers = 64;
+                cparams.embedding = true;
+
+                var model = LlamaCppInterop.llama_load_model_from_file(path, cparams);
+                var ctx = LlamaCppInterop.llama_new_context_with_model(model, cparams);
+
+                var documents = new[]
+                {
+                    "Carson City is the capital city of the American state of Nevada. At the  2010 United States Census, Carson City had a population of 55,274.",
+                    "The Commonwealth of the Northern Mariana Islands is a group of islands in the Pacific Ocean that are a political division controlled by the United States. Its capital is Saipan.",
+                    "Charlotte Amalie is the capital and largest city of the United States Virgin Islands. It has about 20,000 people. The city is on the island of Saint Thomas.",
+                    "Washington, D.C. (also known as simply Washington or D.C., and officially as the District of Columbia) is the capital of the United States. It is a federal district.",
+                    "Capital punishment (the death penalty) has existed in the United States since before the United States was a country. As of 2017, capital punishment is legal in 30 of the 50 states.",
+                    "North Dakota is a state in the United States. 672,591 people lived in North Dakota in the year 2010. The capital and seat of government is Bismarck.",
+                };
+
+                var query = "What is the capital of the United States?";
+
+                var documentsEmbeddings = documents
+                    .Select(x => { LlamaCppInterop.llama_tokenize(ctx, $" {x}", out var tokens, true); return tokens.ToArray(); })
+                    .Select(x => LlamaCppInterop.llama_eval(ctx, x, x.Length, 0, 1))
+                    .Select(x => LlamaCppInterop.llama_get_embeddings(ctx).ToArray())
+                    .ToList();
+
+                LlamaCppInterop.llama_tokenize(ctx, $" {query}", out var tokens, true);
+                LlamaCppInterop.llama_eval(ctx, tokens.ToArray(), tokens.Length, 0, 1);
+                var queryEmbeddings = LlamaCppInterop.llama_get_embeddings(ctx).ToArray();
+
+                var cosineSimilarities = documentsEmbeddings
+                    .Select(document => CosineSimilarity(queryEmbeddings, document))
+                    .ToList();
+
+                var results = documents
+                    .Zip(cosineSimilarities, (x, similarity) => new { Document = x, CosineSimilarity = similarity })
+                    .OrderByDescending(x => x.CosineSimilarity)
+                    .ToList();
+
+                results.ForEach(x => Console.WriteLine($"[{x.CosineSimilarity}][{x.Document}]"));
+
+                //LlamaCppInterop.llama_tokenize(ctx, " Hello, World!", out var tokens, true);
+                //var embd_inp = tokens.ToArray().ToList();
+
+                //while (embd_inp.Any())
+                //{
+                //    var n_tokens = Math.Min(cparams.n_batch, embd_inp.Count);
+                //    LlamaCppInterop.llama_eval(ctx, embd_inp.ToArray(), n_tokens, LlamaCppInterop.llama_get_kv_cache_token_count(ctx), 1);
+                //    embd_inp.RemoveRange(0, n_tokens);
+                //}
+
+                //var embeddings = LlamaCppInterop.llama_get_embeddings(ctx);
+                //foreach (var embedding in embeddings)
+                //    Console.Write($"{embedding:F6} ");
+                //Console.WriteLine();
+
+                LlamaCppInterop.llama_print_timings(ctx);
+
+                LlamaCppInterop.llama_free(ctx);
+                LlamaCppInterop.llama_free_model(model);
+            }
+            LlamaCppInterop.llama_backend_free();
+        }
+
         static async Task RunDebugSampleAsync(string[] args)
         {
             _RunDebugSampleAsync(args);
@@ -339,7 +418,7 @@ namespace LlamaCppCli
 
         static void _RunDebugSampleAsync(string[] args)
         {
-            //var path = @"D:\LLM_MODELS\meta-llama\llama-2-13b-chat.ggmlv3.q8_0.bin";
+            //var path = @"D:\LLM_MODELS\meta-llama\ggml-llama-2-13b-chat-Q8_0.gguf";
             var path = @"D:\LLM_MODELS\codellama\ggml-codellama-34b-instruct-Q4_K.gguf";
             //var path = @"D:\LLM_MODELS\tiiuae\ggml-falcon-40b-instruct-Q4_K.gguf";
             var prompt = File.ReadAllText(@"..\..\..\PROMPT.txt");

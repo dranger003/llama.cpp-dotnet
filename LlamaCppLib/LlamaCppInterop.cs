@@ -228,18 +228,9 @@ namespace LlamaCppLib
         }
 
         [DllImport(LibName, EntryPoint = "llama_get_embeddings")] private static extern nint _llama_get_embeddings(llama_context ctx);
-        public static float[] llama_get_embeddings(llama_context ctx)
+        public static unsafe ReadOnlySpan<float> llama_get_embeddings(llama_context ctx)
         {
-            var count = llama_n_embd(ctx);
-            var native_mem = _llama_get_embeddings(ctx);
-
-            if (native_mem == nint.Zero)
-                return new float[0];
-
-            var embeddings = new float[count];
-            Marshal.Copy(native_mem, embeddings, 0, count);
-
-            return embeddings;
+            return new(_llama_get_embeddings(ctx).ToPointer(), llama_n_embd(ctx));
         }
 
         //
