@@ -8,7 +8,6 @@ using System.Text.RegularExpressions;
 using System.Web;
 
 using LlamaCppLib;
-using FalconCppLib;
 using BertCppLib;
 
 namespace LlamaCppCli
@@ -29,7 +28,6 @@ namespace LlamaCppCli
             {
                 (nameof(RunLocalSampleAsync), RunLocalSampleAsync),     // Run locally
                 (nameof(RunRemoteSampleAsync), RunRemoteSampleAsync),   // Run via API
-                (nameof(RunFalconSampleAsync), RunFalconSampleAsync),   // Falcon
                 (nameof(RunBertSampleAsync), RunBertSampleAsync),       // BERT
                 (nameof(RunDebugSampleAsync), RunDebugSampleAsync),
             }
@@ -450,187 +448,6 @@ namespace LlamaCppCli
                 LlamaCppInterop.llama_free(ctx);
                 LlamaCppInterop.llama_free_model(model);
                 LlamaCppInterop.llama_backend_free();
-            }
-        }
-
-        static async Task RunFalconSampleAsync(string[] args)
-        {
-            if (args.Length < 1)
-            {
-                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} 2 model_path template");
-                return;
-            }
-
-            FalconCppInterop.falcon_cuda_set_max_gpus();
-            FalconCppInterop.falcon_cuda_set_main_device();
-
-            FalconCppInterop.falcon_init_backend();
-
-            var cparams = FalconCpp.falcon_context_params_create();
-
-            var ctx = FalconCppInterop.falcon_init_from_file(args[0], cparams);
-            //var main_model = FalconCppInterop.falcon_get_falcon_model(ctx);
-
-            //{
-            //    var sys_context_params = FalconCpp.falcon_context_params_create();
-            //    var ctx_system = FalconCppInterop.falcon_context_prepare(sys_context_params, main_model, "system_ctx", true);
-            //}
-
-            FalconCppInterop.falcon_cuda_print_gpu_status(FalconCppInterop.falcon_cuda_get_system_gpu_status(), true);
-
-            var n_ctx = FalconCppInterop.falcon_n_ctx(ctx);
-            var last_n_tokens = new List<falcon_token>(n_ctx);
-            var n_threads = 4;
-            var n_past = 0;
-
-            var top_k = 40;
-            var top_p = 0.95f;
-            var tfs_z = 1.0f;
-            var typical_p = 1.0f;
-            var temp = 0.8f;
-            var repeat_penalty = 1.1f;
-            var repeat_last_n = 64;
-            var frequency_penalty = 0.0f;
-            var presence_penalty = 0.0f;
-            var penalize_nl = false;
-            var mirostat = Mirostat.Disabled;
-            var mirostat_tau = 5.0f;
-            var mirostat_eta = 0.1f;
-
-            var mirostat_mu = 2.0f * mirostat_tau;
-
-            //{ // warm-up
-            //    var tmp = new List<falcon_token> { FalconCppInterop.falcon_token_bos() };
-            //    FalconCppInterop.falcon_eval(ctx, tmp.ToArray(), tmp.Count, 0, n_threads, 0);
-            //    FalconCppInterop.llama_reset_timings(ctx);
-            //}
-
-            var cancellationTokenSource = new CancellationTokenSource();
-            Console.CancelKeyPress += (s, e) => cancellationTokenSource.Cancel(!(e.Cancel = true));
-
-            while (true)
-            {
-                await Console.Out.WriteAsync("> ");
-                var prompt = await Console.In.ReadLineAsync();
-                if (String.IsNullOrWhiteSpace(prompt))
-                    break;
-
-                var embd = FalconCpp.falcon_tokenize(ctx, String.Format(args[1], prompt));
-
-                while (!cancellationTokenSource.IsCancellationRequested)
-                {
-                    for (var i = 0; i < embd.Count; i += cparams.n_batch)
-                    {
-                        var n_eval = embd.Count - i;
-                        if (n_eval > cparams.n_batch) n_eval = cparams.n_batch;
-
-                        var configuration = new FalconCppInterop.falcon_evaluation_config
-                        {
-                            n_tokens = n_eval,
-                            n_past = n_past,
-                            n_threads = n_threads,
-                            debug_timings = 0,
-                        };
-
-                        FalconCppInterop.falcon_eval(ctx, embd.Skip(i).ToArray(), ref configuration);
-
-                        n_past += n_eval;
-                    }
-
-                    embd.Clear();
-
-                    var n_vocab = FalconCppInterop.falcon_n_vocab(ctx);
-                    var logits = FalconCppInterop.falcon_get_logits(ctx);
-
-                    var candidates = new List<FalconCppInterop.falcon_token_data>(n_vocab);
-                    for (falcon_token token_id = 0; token_id < n_vocab; token_id++)
-                        candidates.Add(new FalconCppInterop.falcon_token_data { id = token_id, logit = logits[token_id], p = 0.0f });
-
-                    var candidates_p = new FalconCppInterop.falcon_token_data_array { data = candidates.ToArray(), size = (ulong)candidates.Count, sorted = false };
-
-                    // Apply penalties
-                    {
-                        var nl_logit = logits[FalconCppInterop.falcon_token_nl()];
-                        var last_n_repeat = Math.Min(Math.Min(last_n_tokens.Count, repeat_last_n), n_ctx);
-
-                        FalconCppInterop.llama_sample_repetition_penalty(
-                            ctx,
-                            candidates_p,
-                            last_n_tokens.Skip(last_n_tokens.Count - last_n_repeat).Take(last_n_repeat).ToList(),
-                            repeat_penalty
-                        );
-
-                        FalconCppInterop.llama_sample_frequency_and_presence_penalties(
-                            ctx,
-                            candidates_p,
-                            last_n_tokens.Skip(last_n_tokens.Count - last_n_repeat).Take(last_n_repeat).ToList(),
-                            frequency_penalty,
-                            presence_penalty
-                        );
-
-                        if (!penalize_nl)
-                            logits[FalconCppInterop.falcon_token_nl()] = nl_logit;
-                    }
-
-                    var id = default(falcon_token);
-
-                    // Sampling
-                    {
-                        if (temp <= 0.0f)
-                        {
-                            // Greedy
-                            id = FalconCppInterop.llama_sample_token_greedy(ctx, candidates_p);
-                        }
-                        else
-                        {
-                            // Mirostat
-                            if (mirostat == Mirostat.Mirostat)
-                            {
-                                var mirostat_m = 100;
-                                FalconCppInterop.llama_sample_temperature(ctx, candidates_p, temp);
-                                id = FalconCppInterop.llama_sample_token_mirostat(ctx, candidates_p, mirostat_tau, mirostat_eta, mirostat_m, ref mirostat_mu);
-                            }
-                            // Mirostat2
-                            else if (mirostat == Mirostat.Mirostat2)
-                            {
-                                FalconCppInterop.llama_sample_temperature(ctx, candidates_p, temp);
-                                id = FalconCppInterop.llama_sample_token_mirostat_v2(ctx, candidates_p, mirostat_tau, mirostat_eta, ref mirostat_mu);
-                            }
-                            // Temperature
-                            else
-                            {
-                                FalconCppInterop.llama_sample_top_k(ctx, candidates_p, top_k, 1);
-                                FalconCppInterop.llama_sample_tail_free(ctx, candidates_p, tfs_z, 1);
-                                FalconCppInterop.llama_sample_typical(ctx, candidates_p, typical_p, 1);
-                                FalconCppInterop.llama_sample_top_p(ctx, candidates_p, top_p, 1);
-                                FalconCppInterop.llama_sample_temperature(ctx, candidates_p, temp);
-                                id = FalconCppInterop.llama_sample_token(ctx, candidates_p);
-                            }
-                        }
-                    }
-
-                    if (id == FalconCppInterop.falcon_token_eos())
-                        break;
-
-                    if (last_n_tokens.Any())
-                        last_n_tokens.RemoveAt(0);
-
-                    last_n_tokens.Add(id);
-                    embd.Add(id);
-
-                    var token = FalconCppInterop.falcon_token_to_str(ctx, id);
-                    await Console.Out.WriteAsync(token);
-                }
-
-                if (cancellationTokenSource.IsCancellationRequested)
-                {
-                    cancellationTokenSource.Dispose();
-                    cancellationTokenSource = new();
-
-                    await Console.Out.WriteAsync(" [Cancelled]");
-                }
-
-                await Console.Out.WriteLineAsync();
             }
         }
 

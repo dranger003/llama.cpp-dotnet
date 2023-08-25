@@ -12,7 +12,6 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\FalconLib\FalconCppLib.csproj" />
 		<ProjectReference Include="..\LlamaCppLib\LlamaCppLib.csproj" />
 	</ItemGroup>
 

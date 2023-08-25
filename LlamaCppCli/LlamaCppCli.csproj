@@ -14,7 +14,6 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\BertCppLib\BertCppLib.csproj" />
-		<ProjectReference Include="..\FalconLib\FalconCppLib.csproj" />
 		<ProjectReference Include="..\LlamaCppLib\LlamaCppLib.csproj" />
 	</ItemGroup>
 
