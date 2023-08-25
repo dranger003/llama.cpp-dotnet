@@ -378,7 +378,7 @@ namespace LlamaCppCli
                 Console.WriteLine($"sampling: repeat_last_n = 64, repeat_penalty = 1.1, presence_penalty = 0.0, frequency_penalty = 0.0, top_k = 40, tfs_z = 1.0, top_p = 0.95, typical_p = 1.0, temp = 0.8, mirostat = 2, mirostat_lr = 0.1, mirostat_ent = 5.0");
                 Console.WriteLine($"generate: n_ctx = {cparams.n_ctx}, n_batch = {cparams.n_batch}, n_predict = -1, n_keep = 0");
 
-                var is_spm = LlamaCppInterop.llama_vocab_type_(ctx) == LlamaCppInterop.llama_vocab_type.LLAMA_VOCAB_TYPE_SPM;
+                var is_spm = LlamaCppInterop.llama_vocab_type(ctx) == LlamaCppInterop.llama_vocab_type_.LLAMA_VOCAB_TYPE_SPM;
                 LlamaCppInterop.llama_tokenize(ctx, prompt, out var tokens, is_spm);
 
                 var tokens_list = new List<llama_token>();

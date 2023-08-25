@@ -19,7 +19,7 @@ namespace LlamaCppLib
             LLAMA_LOG_LEVEL_INFO = 4
         }
 
-        public enum llama_vocab_type
+        public enum llama_vocab_type_
         {
             LLAMA_VOCAB_TYPE_SPM = 0,
             LLAMA_VOCAB_TYPE_BPE = 1,
@@ -182,7 +182,7 @@ namespace LlamaCppLib
         [DllImport(LibName)] public static extern int llama_n_ctx(llama_context ctx);
         [DllImport(LibName)] public static extern int llama_n_embd(llama_context ctx);
 
-        [DllImport(LibName, EntryPoint = "llama_vocab_type")] public static extern llama_vocab_type llama_vocab_type_(llama_context ctx);
+        [DllImport(LibName, EntryPoint = "llama_vocab_type")] public static extern llama_vocab_type_ llama_vocab_type(llama_context ctx);
 
         [DllImport(LibName)] public static extern int llama_model_n_vocab(llama_model model);
         [DllImport(LibName)] public static extern int llama_model_n_ctx(llama_model model);
@@ -249,7 +249,7 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_token_get_text")] private static extern nint _llama_token_get_text(llama_context ctx, llama_token token);
         public static string llama_token_get_text(llama_context ctx, llama_token token)
         {
-            return Marshal.PtrToStringUTF8(_llama_token_get_text(ctx, token)) ?? String.Empty;
+            return Marshal.PtrToStringAnsi(_llama_token_get_text(ctx, token)) ?? String.Empty;
         }
 
         [DllImport(LibName)] private static extern float llama_token_get_score(llama_context ctx, llama_token token);
@@ -286,8 +286,7 @@ namespace LlamaCppLib
 
         [DllImport(LibName)] public static extern int llama_tokenize_with_model(llama_model model, string text, llama_token[] tokens, int n_max_tokens, bool add_bos);
 
-        [DllImport(LibName, EntryPoint = "llama_token_to_str")]
-        private static extern int _llama_token_to_str(llama_context ctx, llama_token token, byte[] buf, int length);
+        [DllImport(LibName, EntryPoint = "llama_token_to_str")] private static extern int _llama_token_to_str(llama_context ctx, llama_token token, byte[] buf, int length);
         public static string llama_token_to_str(llama_context ctx, llama_token token)
         {
             var result = new byte[8];
@@ -333,7 +332,8 @@ namespace LlamaCppLib
             _llama_sample_frequency_and_presence_penalties(ctx, new(&_candidates), last_tokens, last_tokens.Length, alpha_frequency, alpha_presence);
         }
 
-        [DllImport(LibName, EntryPoint = "llama_sample_classifier_free_guidance")] private static extern void _llama_sample_classifier_free_guidance(llama_context ctx, nint candidates, llama_context guidance_ctx, float scale);
+        [DllImport(LibName, EntryPoint = "llama_sample_classifier_free_guidance")]
+        private static extern void _llama_sample_classifier_free_guidance(llama_context ctx, nint candidates, llama_context guidance_ctx, float scale);
         public static unsafe void llama_sample_classifier_free_guidance(llama_context ctx, llama_token_data_array candidates, llama_context guidance_ctx, float scale)
         {
             using var handle = candidates.data.Pin();
@@ -397,7 +397,8 @@ namespace LlamaCppLib
             _llama_sample_grammar(ctx, new(&_candidates), grammar);
         }
 
-        [DllImport(LibName, EntryPoint = "llama_sample_token_mirostat")] private static extern llama_token _llama_sample_token_mirostat(llama_context ctx, nint candidates, float tau, float eta, int m, ref float mu);
+        [DllImport(LibName, EntryPoint = "llama_sample_token_mirostat")]
+        private static extern llama_token _llama_sample_token_mirostat(llama_context ctx, nint candidates, float tau, float eta, int m, ref float mu);
         public static unsafe llama_token llama_sample_token_mirostat(llama_context ctx, llama_token_data_array candidates, float tau, float eta, int m, ref float mu)
         {
             using var handle = candidates.data.Pin();
@@ -405,7 +406,8 @@ namespace LlamaCppLib
             return _llama_sample_token_mirostat(ctx, new(&_candidates), tau, eta, m, ref mu);
         }
 
-        [DllImport(LibName, EntryPoint = "llama_sample_token_mirostat_v2")] private static extern llama_token _llama_sample_token_mirostat_v2(llama_context ctx, nint candidates, float tau, float eta, ref float mu);
+        [DllImport(LibName, EntryPoint = "llama_sample_token_mirostat_v2")]
+        private static extern llama_token _llama_sample_token_mirostat_v2(llama_context ctx, nint candidates, float tau, float eta, ref float mu);
         public static unsafe llama_token llama_sample_token_mirostat_v2(llama_context ctx, llama_token_data_array candidates, float tau, float eta, ref float mu)
         {
             using var handle = candidates.data.Pin();
@@ -442,7 +444,7 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_print_system_info")] private static extern nint _llama_print_system_info();
         public static string llama_print_system_info()
         {
-            return Marshal.PtrToStringUTF8(_llama_print_system_info()) ?? String.Empty;
+            return Marshal.PtrToStringAnsi(_llama_print_system_info()) ?? String.Empty;
         }
 
         [DllImport(LibName)] public static extern void llama_log_set(llama_log_callback log_callback, object user_data);
