@@ -13,7 +13,6 @@ using BertCppLib;
 namespace LlamaCppCli
 {
     using llama_token = System.Int32;
-    using falcon_token = System.Int32;
 
     internal class Program
     {
@@ -22,14 +21,14 @@ namespace LlamaCppCli
 #if DEBUG
             //args = new[] { "1", "http://localhost:5021", "meta-llama2-chat-13b-v1.0-q8_0", "60", "4096" };
             //args = new[] { "1", "http://localhost:5021", "openassistant-llama2-13b-orca-8k-3319-q8_0", "60", "8192" };
-            args = new[] { "4" };
+            args = new[] { "3" };
 #endif
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
                 (nameof(RunLocalSampleAsync), RunLocalSampleAsync),     // Run locally
                 (nameof(RunRemoteSampleAsync), RunRemoteSampleAsync),   // Run via API
                 (nameof(RunBertSampleAsync), RunBertSampleAsync),       // BERT
-                (nameof(RunDebugSampleAsync), RunDebugSampleAsync),
+                (nameof(RunDebugSampleAsync), RunDebugSampleAsync),     // Simple (used for debugging)
             }
                 .Select((sample, index) => (sample, index))
                 .ToDictionary(k => k.sample.Name, v => (Index: v.index, v.sample.Func));
@@ -334,8 +333,15 @@ namespace LlamaCppCli
 
         static async Task RunDebugSampleAsync(string[] args)
         {
+            _RunDebugSampleAsync(args);
+            await Task.CompletedTask;
+        }
+
+        static void _RunDebugSampleAsync(string[] args)
+        {
             //var path = @"D:\LLM_MODELS\meta-llama\llama-2-13b-chat.ggmlv3.q8_0.bin";
-            var path = @"D:\LLM_MODELS\tiiuae\ggml-falcon-40b-instruct-Q4_K.gguf";
+            var path = @"D:\LLM_MODELS\codellama\ggml-codellama-34b-instruct-Q4_K.gguf";
+            //var path = @"D:\LLM_MODELS\tiiuae\ggml-falcon-40b-instruct-Q4_K.gguf";
             var prompt = File.ReadAllText(@"..\..\..\PROMPT.txt");
 
             var cancellationTokenSource = new CancellationTokenSource();
@@ -345,54 +351,56 @@ namespace LlamaCppCli
                 LlamaCppInterop.llama_backend_init();
 
                 var cparams = LlamaCppInterop.llama_context_default_params();
-                cparams.n_ctx = 2048;
-                cparams.n_gpu_layers = 50;
+                cparams.n_ctx = 16384;
+                cparams.n_gpu_layers = 42;
 
-                await Console.Out.WriteLineAsync($"lparams.n_ctx = {cparams.n_ctx}");
-                await Console.Out.WriteLineAsync($"lparams.n_batch = {cparams.n_batch}");
-                await Console.Out.WriteLineAsync($"lparams.n_gpu_layers = {cparams.n_gpu_layers}");
-                await Console.Out.WriteLineAsync($"lparams.main_gpu = {cparams.main_gpu}");
-                await Console.Out.WriteLineAsync($"lparams.tensor_split = {cparams.tensor_split}");
-                await Console.Out.WriteLineAsync($"lparams.low_vram = {cparams.low_vram}");
-                await Console.Out.WriteLineAsync($"lparams.seed = {cparams.seed}");
-                await Console.Out.WriteLineAsync($"lparams.f16_kv = {cparams.f16_kv}");
-                await Console.Out.WriteLineAsync($"lparams.use_mmap = {cparams.use_mmap}");
-                await Console.Out.WriteLineAsync($"lparams.use_mlock = {cparams.use_mlock}");
-                await Console.Out.WriteLineAsync($"lparams.logits_all = {cparams.logits_all}");
-                await Console.Out.WriteLineAsync($"lparams.embedding = {cparams.embedding}");
-                await Console.Out.WriteLineAsync($"lparams.rope_freq_base = {cparams.rope_freq_base}");
-                await Console.Out.WriteLineAsync($"lparams.rope_freq_scale = {cparams.rope_freq_scale}");
+                var n_threads = 12;
+
+                Console.WriteLine($"lparams.n_ctx = {cparams.n_ctx}");
+                Console.WriteLine($"lparams.n_batch = {cparams.n_batch}");
+                Console.WriteLine($"lparams.n_gpu_layers = {cparams.n_gpu_layers}");
+                Console.WriteLine($"lparams.main_gpu = {cparams.main_gpu}");
+                Console.WriteLine($"lparams.tensor_split = {cparams.tensor_split}");
+                Console.WriteLine($"lparams.low_vram = {cparams.low_vram}");
+                Console.WriteLine($"lparams.seed = {cparams.seed}");
+                Console.WriteLine($"lparams.f16_kv = {cparams.f16_kv}");
+                Console.WriteLine($"lparams.use_mmap = {cparams.use_mmap}");
+                Console.WriteLine($"lparams.use_mlock = {cparams.use_mlock}");
+                Console.WriteLine($"lparams.logits_all = {cparams.logits_all}");
+                Console.WriteLine($"lparams.embedding = {cparams.embedding}");
+                Console.WriteLine($"lparams.rope_freq_base = {cparams.rope_freq_base}");
+                Console.WriteLine($"lparams.rope_freq_scale = {cparams.rope_freq_scale}");
 
                 var model = LlamaCppInterop.llama_load_model_from_file(path, cparams);
                 var ctx = LlamaCppInterop.llama_new_context_with_model(model, cparams);
 
-                await Console.Out.WriteLineAsync($"\nsystem_info: n_threads = 8 / {Environment.ProcessorCount} | {LlamaCppInterop.llama_print_system_info()}");
-                await Console.Out.WriteLineAsync($"sampling: repeat_last_n = 64, repeat_penalty = 1.1, presence_penalty = 0.0, frequency_penalty = 0.0, top_k = 40, tfs_z = 1.0, top_p = 0.95, typical_p = 1.0, temp = 0.8, mirostat = 2, mirostat_lr = 0.1, mirostat_ent = 5.0");
-                await Console.Out.WriteLineAsync($"generate: n_ctx = {cparams.n_ctx}, n_batch = {cparams.n_batch}, n_predict = -1, n_keep = 0");
+                Console.WriteLine($"\nsystem_info: n_threads = {n_threads} / {Environment.ProcessorCount} | {LlamaCppInterop.llama_print_system_info()}");
+                Console.WriteLine($"sampling: repeat_last_n = 64, repeat_penalty = 1.1, presence_penalty = 0.0, frequency_penalty = 0.0, top_k = 40, tfs_z = 1.0, top_p = 0.95, typical_p = 1.0, temp = 0.8, mirostat = 2, mirostat_lr = 0.1, mirostat_ent = 5.0");
+                Console.WriteLine($"generate: n_ctx = {cparams.n_ctx}, n_batch = {cparams.n_batch}, n_predict = -1, n_keep = 0");
+
+                var is_spm = LlamaCppInterop.llama_vocab_type_(ctx) == LlamaCppInterop.llama_vocab_type.LLAMA_VOCAB_TYPE_SPM;
+                LlamaCppInterop.llama_tokenize(ctx, prompt, out var tokens, is_spm);
 
                 var tokens_list = new List<llama_token>();
-                {
-                    var buffer = new llama_token[LlamaCppInterop.llama_n_ctx(ctx)];
-                    var count = LlamaCppInterop.llama_tokenize(ctx, prompt, buffer, buffer.Length, false);
-                    tokens_list.AddRange(buffer.Take(count));
-                }
+                for (var i = 0; i < tokens.Length; i++)
+                    tokens_list.Add(tokens[i]);
 
                 var max_context_size = LlamaCppInterop.llama_n_ctx(ctx);
                 var max_tokens_list_size = max_context_size - 4;
                 if (tokens_list.Count > max_tokens_list_size)
                 {
-                    await Console.Out.WriteLineAsync($"error: prompt too long ({tokens_list.Count} tokens, max {max_tokens_list_size})");
+                    Console.WriteLine($"error: prompt too long ({tokens_list.Count} tokens, max {max_tokens_list_size})");
                     return;
                 }
 
                 var tokens_context = new List<llama_token>();
                 tokens_context.AddRange(tokens_list);
 
-                await Console.Out.WriteLineAsync(new String('=', Console.WindowWidth));
-                await Console.Out.WriteLineAsync($"tokens_context = {tokens_context.Count}");
-                await Console.Out.WriteLineAsync($"llama_n_ctx = {LlamaCppInterop.llama_n_ctx(ctx)}");
-                await Console.Out.WriteLineAsync($"llama_get_kv_cache_token_count = {LlamaCppInterop.llama_get_kv_cache_token_count(ctx)}");
-                await Console.Out.WriteLineAsync(new String('=', Console.WindowWidth));
+                Console.WriteLine(new String('=', Console.WindowWidth));
+                Console.WriteLine($"tokens_context = {tokens_context.Count}");
+                Console.WriteLine($"llama_n_ctx = {LlamaCppInterop.llama_n_ctx(ctx)}");
+                Console.WriteLine($"llama_get_kv_cache_token_count = {LlamaCppInterop.llama_get_kv_cache_token_count(ctx)}");
+                Console.WriteLine(new String('=', Console.WindowWidth));
 
                 var n_past = 0;
 
@@ -404,7 +412,7 @@ namespace LlamaCppCli
                         if (n_eval > cparams.n_batch)
                             n_eval = cparams.n_batch;
 
-                        LlamaCppInterop.llama_eval(ctx, tokens_list.Skip(i).ToArray(), n_eval, n_past, 8);
+                        LlamaCppInterop.llama_eval(ctx, tokens_list.Skip(i).ToArray(), n_eval, n_past, n_threads);
                         n_past += n_eval;
                     }
 
@@ -416,34 +424,34 @@ namespace LlamaCppCli
                     var logits = LlamaCppInterop.llama_get_logits(ctx);
                     var n_vocab = LlamaCppInterop.llama_n_vocab(ctx);
 
-                    var candidates = new List<LlamaCppInterop.llama_token_data>(n_vocab);
-
+                    var candidates = new LlamaCppInterop.llama_token_data[n_vocab];
                     for (llama_token token_id = 0; token_id < n_vocab && !cancellationTokenSource.IsCancellationRequested; token_id++)
-                        candidates.Add(new LlamaCppInterop.llama_token_data { id = token_id, logit = logits[token_id], p = 0.0f });
+                        candidates[token_id] = new LlamaCppInterop.llama_token_data { id = token_id, logit = logits[token_id], p = 0.0f };
 
                     if (cancellationTokenSource.IsCancellationRequested)
                         break;
 
-                    var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates.ToArray(), size = (nuint)candidates.Count, sorted = false };
+                    var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates, size = (nuint)candidates.Length, sorted = false };
 
                     var new_token_id = LlamaCppInterop.llama_sample_token_greedy(ctx, candidates_p);
                     if (new_token_id == LlamaCppInterop.llama_token_eos(ctx))
                     {
-                        await Console.Out.WriteLineAsync(" [end of text]");
+                        Console.WriteLine(" [end of text]");
                         break;
                     }
 
-                    await Console.Out.WriteAsync(LlamaCppInterop.llama_token_to_str(ctx, new_token_id));
+                    var token = LlamaCppInterop.llama_token_to_str(ctx, new_token_id);
+                    Console.Write(token);
 
                     tokens_list.Add(new_token_id);
                     tokens_context.Add(new_token_id);
                 }
 
-                await Console.Out.WriteLineAsync(new String('=', Console.WindowWidth));
-                await Console.Out.WriteLineAsync($"tokens_context = {tokens_context.Count}");
-                await Console.Out.WriteLineAsync($"llama_n_ctx = {LlamaCppInterop.llama_n_ctx(ctx)}");
-                await Console.Out.WriteLineAsync($"llama_get_kv_cache_token_count = {LlamaCppInterop.llama_get_kv_cache_token_count(ctx)}");
-                await Console.Out.WriteLineAsync(new String('=', Console.WindowWidth));
+                Console.WriteLine(new String('=', Console.WindowWidth));
+                Console.WriteLine($"tokens_context = {tokens_context.Count}");
+                Console.WriteLine($"llama_n_ctx = {LlamaCppInterop.llama_n_ctx(ctx)}");
+                Console.WriteLine($"llama_get_kv_cache_token_count = {LlamaCppInterop.llama_get_kv_cache_token_count(ctx)}");
+                Console.WriteLine(new String('=', Console.WindowWidth));
 
                 LlamaCppInterop.llama_free(ctx);
                 LlamaCppInterop.llama_free_model(model);

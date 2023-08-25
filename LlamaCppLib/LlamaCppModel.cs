@@ -40,9 +40,9 @@ namespace LlamaCppLib
 
         public List<LlamaToken> Tokenize(string text, bool addBos = false, bool addEos = false)
         {
-            var tokenBuffer = new LlamaToken[LlamaCppInterop.llama_n_ctx(_context)];
-            var count = LlamaCppInterop.llama_tokenize(_context, text, tokenBuffer, tokenBuffer.Length, addBos);
-            var tokens = tokenBuffer.Take(count).ToList();
+            LlamaCppInterop.llama_tokenize(_context, text, out var _tokens, addBos);
+            var tokens = new List<LlamaToken>();
+            for (var i = 0; i < _tokens.Length; i++) tokens.Add(_tokens[i]);
             if (addEos) tokens.Add(LlamaCppInterop.llama_token_eos(_context));
             return tokens;
         }
@@ -177,17 +177,17 @@ namespace LlamaCppLib
                     state.EvalOffset += evalCount;
                 }
 
-                var logits = LlamaCppInterop.llama_get_logits(_context);
+                //var logits = LlamaCppInterop.llama_get_logits(_context);
                 var n_vocab = LlamaCppInterop.llama_n_vocab(_context);
 
                 var candidates = new List<LlamaCppInterop.llama_token_data>(n_vocab);
                 for (LlamaToken tokenId = 0; tokenId < n_vocab; tokenId++)
-                    candidates.Add(new LlamaCppInterop.llama_token_data { id = tokenId, logit = logits[tokenId], p = 0.0f });
+                    candidates.Add(new LlamaCppInterop.llama_token_data { id = tokenId, logit = LlamaCppInterop.llama_get_logits(_context)[tokenId], p = 0.0f });
 
                 var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates.ToArray(), size = (nuint)candidates.Count, sorted = false };
 
                 // Apply penalties
-                var newLineLogit = logits[LlamaCppInterop.llama_token_nl(_context)];
+                var newLineLogit = LlamaCppInterop.llama_get_logits(_context)[LlamaCppInterop.llama_token_nl(_context)];
                 var lastRepeatCount = Math.Min(Math.Min(state.TokenIds.Count, options.LastTokenCountPenalty), LlamaCppInterop.llama_n_ctx(_context));
 
                 LlamaCppInterop.llama_sample_repetition_penalty(
@@ -206,7 +206,7 @@ namespace LlamaCppLib
                 );
 
                 if (!options.PenalizeNewLine)
-                    logits[LlamaCppInterop.llama_token_nl(_context)] = newLineLogit;
+                    LlamaCppInterop.llama_get_logits(_context)[LlamaCppInterop.llama_token_nl(_context)] = newLineLogit;
 
                 var id = default(LlamaToken);
 
