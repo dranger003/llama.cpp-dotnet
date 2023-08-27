@@ -103,13 +103,14 @@ namespace LlamaCppLib
                 throw new FileNotFoundException($"LoRA adapter file not found \"{loraPath}\".");
 
             var cparams = LlamaCppInterop.llama_context_default_params();
+            cparams.seed = options.Seed;
             cparams.n_ctx = options.ContextSize;
             cparams.n_gpu_layers = options.GpuLayers;
-            cparams.seed = options.Seed;
-            cparams.use_mmap = useLora ? false : options.UseMemoryMapping;
-            cparams.use_mlock = options.UseMemoryLocking;
             cparams.rope_freq_base = options.RopeFrequencyBase;
             cparams.rope_freq_scale = options.RopeFrequencyScale;
+            cparams.low_vram = options.LowVRAM;
+            cparams.use_mmap = useLora ? false : options.UseMemoryMapping;
+            cparams.use_mlock = options.UseMemoryLocking;
 
             _model = LlamaCppInterop.llama_load_model_from_file(modelPath, cparams);
             _context = LlamaCppInterop.llama_new_context_with_model(_model, cparams);
@@ -180,11 +181,14 @@ namespace LlamaCppLib
                 //var logits = LlamaCppInterop.llama_get_logits(_context);
                 var n_vocab = LlamaCppInterop.llama_n_vocab(_context);
 
-                var candidates = new List<LlamaCppInterop.llama_token_data>(n_vocab);
-                for (LlamaToken tokenId = 0; tokenId < n_vocab; tokenId++)
-                    candidates.Add(new LlamaCppInterop.llama_token_data { id = tokenId, logit = LlamaCppInterop.llama_get_logits(_context)[tokenId], p = 0.0f });
+                var candidates = new LlamaCppInterop.llama_token_data[n_vocab];
+                for (LlamaToken tokenId = 0; tokenId < n_vocab && !cancellationToken.IsCancellationRequested; tokenId++)
+                    candidates[tokenId] = new LlamaCppInterop.llama_token_data { id = tokenId, logit = LlamaCppInterop.llama_get_logits(_context)[tokenId], p = 0.0f };
 
-                var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates.ToArray(), size = (nuint)candidates.Count, sorted = false };
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+
+                var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates.ToArray(), size = (nuint)candidates.Length, sorted = false };
 
                 // Apply penalties
                 var newLineLogit = LlamaCppInterop.llama_get_logits(_context)[LlamaCppInterop.llama_token_nl(_context)];

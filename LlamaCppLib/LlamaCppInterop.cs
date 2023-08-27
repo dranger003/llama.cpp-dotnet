@@ -277,15 +277,15 @@ namespace LlamaCppLib
 
         [DllImport(LibName)] public static extern int llama_tokenize_with_model(llama_model model, string text, llama_token[] tokens, int n_max_tokens, bool add_bos);
 
-        [DllImport(LibName, EntryPoint = "llama_token_to_str")] private static extern int _llama_token_to_str(llama_context ctx, llama_token token, byte[] buf, int length);
-        public static string llama_token_to_str(llama_context ctx, llama_token token)
+        [DllImport(LibName, EntryPoint = "llama_token_to_piece")] private static extern int _llama_token_to_piece(llama_context ctx, llama_token token, byte[] buf, int length);
+        public static string llama_token_to_piece(llama_context ctx, llama_token token)
         {
             var result = new byte[8];
-            var n_tokens = _llama_token_to_str(ctx, token, result, result.Length);
+            var n_tokens = _llama_token_to_piece(ctx, token, result, result.Length);
             if (n_tokens < 0)
             {
                 result = new byte[-n_tokens];
-                var check = _llama_token_to_str(ctx, token, result, result.Length);
+                var check = _llama_token_to_piece(ctx, token, result, result.Length);
                 Debug.Assert(check == -n_tokens);
                 n_tokens = result.Length;
             }
@@ -293,7 +293,7 @@ namespace LlamaCppLib
             return Encoding.ASCII.GetString(result, 0, n_tokens);
         }
 
-        [DllImport(LibName)] public static extern nint llama_token_to_str_with_model(llama_model model, llama_token token, byte[] buf, int length);
+        [DllImport(LibName)] public static extern nint llama_token_to_piece_with_model(llama_model model, llama_token token, byte[] buf, int length);
 
         //
         // Grammar
@@ -443,7 +443,7 @@ namespace LlamaCppLib
         public static byte[] llama_token_to_bytes(llama_context ctx, llama_token token)
         {
             var result = new byte[8];
-            var n_tokens = _llama_token_to_str(ctx, token, result, result.Length);
+            var n_tokens = _llama_token_to_piece(ctx, token, result, result.Length);
             if (n_tokens >= 0)
             {
                 var bytes = new byte[n_tokens];
@@ -452,7 +452,7 @@ namespace LlamaCppLib
             }
 
             result = new byte[-n_tokens];
-            var check = _llama_token_to_str(ctx, token, result, result.Length);
+            var check = _llama_token_to_piece(ctx, token, result, result.Length);
             Debug.Assert(check == -n_tokens);
             return result;
         }

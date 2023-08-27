@@ -9,8 +9,6 @@ using System.Web;
 
 using LlamaCppLib;
 using BertCppLib;
-using System.IO;
-using System.Threading;
 
 namespace LlamaCppCli
 {
@@ -23,7 +21,8 @@ namespace LlamaCppCli
 #if DEBUG
             //args = new[] { "1", "http://localhost:5021", "meta-llama2-chat-13b-v1.0-q8_0", "60", "4096" };
             //args = new[] { "1", "http://localhost:5021", "openassistant-llama2-13b-orca-8k-3319-q8_0", "60", "8192" };
-            args = new[] { "4" };
+            args = new[] { "1", "http://localhost:5021", "codellama-7b-q8_0", "42", "16384" };
+            //args = new[] { "4" };
 #endif
             var samples = new (string Name, Func<string[], Task> Func)[]
             {
@@ -84,10 +83,11 @@ namespace LlamaCppCli
                 Seed = 0,
                 ContextSize = contextLength,
                 GpuLayers = gpuLayers,
-                //UseMemoryLocking = false,
-                //UseMemoryMapping = false,
                 //RopeFrequencyBase = 10000.0f,
                 //RopeFrequencyScale = 0.5f,
+                //LowVRAM = true,
+                //UseMemoryLocking = false,
+                //UseMemoryMapping = false,
             };
 
             using var model = new LlamaCppModel();
@@ -96,7 +96,7 @@ namespace LlamaCppCli
             var cancellationTokenSource = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) => cancellationTokenSource.Cancel(!(e.Cancel = true));
 
-            var generateOptions = new LlamaCppGenerateOptions { Mirostat = Mirostat.Mirostat2, ThreadCount = 8 };
+            var generateOptions = new LlamaCppGenerateOptions { Temperature = 0.0f, Mirostat = Mirostat.Disabled, ThreadCount = 4 };
             var session = model.CreateSession();
 
             await Console.Out.WriteLineAsync(
@@ -170,7 +170,7 @@ namespace LlamaCppCli
                             continue;
                         }
                         session.Reset();
-                        model.ResetState();
+                        //model.ResetState();
                     }
                     else if (command == "reset")
                     {
@@ -259,7 +259,7 @@ namespace LlamaCppCli
 
             // Generate token(s)
             {
-                var generateOptions = new LlamaCppGenerateOptions { Temperature = 0.0f, Mirostat = Mirostat.Mirostat2 };
+                var generateOptions = new LlamaCppGenerateOptions { Temperature = 0.0f, Mirostat = Mirostat.Disabled, ThreadCount = 2 };
 
                 await Console.Out.WriteLineAsync(
                     """
@@ -419,9 +419,10 @@ namespace LlamaCppCli
         static void _RunDebugSampleAsync(string[] args)
         {
             //var path = @"D:\LLM_MODELS\meta-llama\ggml-llama-2-13b-chat-Q8_0.gguf";
-            var path = @"D:\LLM_MODELS\codellama\ggml-codellama-34b-instruct-Q4_K.gguf";
+            //var path = @"D:\LLM_MODELS\codellama\ggml-codellama-34b-instruct-Q4_K.gguf";
+            var path = @"D:\LLM_MODELS\codellama\ggml-codellama-7b-instruct-Q8_0.gguf";
             //var path = @"D:\LLM_MODELS\tiiuae\ggml-falcon-40b-instruct-Q4_K.gguf";
-            var prompt = File.ReadAllText(@"..\..\..\PROMPT.txt");
+            var prompt = File.ReadAllText(@"..\..\..\CODELLAMA.txt");
 
             var cancellationTokenSource = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) => cancellationTokenSource.Cancel(!(e.Cancel = true));
@@ -433,7 +434,7 @@ namespace LlamaCppCli
                 cparams.n_ctx = 16384;
                 cparams.n_gpu_layers = 42;
 
-                var n_threads = 12;
+                var n_threads = 2;
 
                 Console.WriteLine($"lparams.n_ctx = {cparams.n_ctx}");
                 Console.WriteLine($"lparams.n_batch = {cparams.n_batch}");
@@ -519,7 +520,7 @@ namespace LlamaCppCli
                         break;
                     }
 
-                    var token = LlamaCppInterop.llama_token_to_str(ctx, new_token_id);
+                    var token = LlamaCppInterop.llama_token_to_piece(ctx, new_token_id);
                     Console.Write(token);
 
                     tokens_list.Add(new_token_id);

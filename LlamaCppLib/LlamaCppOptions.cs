@@ -16,6 +16,7 @@ namespace LlamaCppLib
         public int GpuLayers { get; set; } = 0;
         public float RopeFrequencyBase { get; set; } = 10000.0f;
         public float RopeFrequencyScale { get; set; } = 1.0f;
+        public bool LowVRAM { get; set; } = false;
 
         public static bool TryParse(string input, out LlamaCppModelOptions options)
         {
