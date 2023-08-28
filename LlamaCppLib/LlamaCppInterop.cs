@@ -440,10 +440,10 @@ namespace LlamaCppLib
         [StructLayout(LayoutKind.Sequential)]
         public struct llama_beams_state
         {
-            llama_beam_view[] beam_views;
+            public llama_beam_view[] beam_views;
             public nuint n_beams;
             public nuint common_prefix_length;
-            [MarshalAs(UnmanagedType.I1)] bool last_call;
+            [MarshalAs(UnmanagedType.I1)] public bool last_call;
         };
 
         public delegate void llama_beam_search_callback_fn_t(object callback_data, llama_beams_state state);
