@@ -265,6 +265,7 @@ namespace LlamaCppCli
                     """
 
                     Entering interactive mode:
+                        * Press <Ctrl+Z> on an empty line to submit your prompt
                         * Press <Ctrl+C> to cancel token generation
                         * Press <Enter> on an empty input prompt to quit
                     """
@@ -276,7 +277,7 @@ namespace LlamaCppCli
                     {
                         await Console.Out.WriteLineAsync("\nInput:");
 
-                        var prompt = await Console.In.ReadLineAsync(cancellationTokenSource.Token) ?? String.Empty;
+                        var prompt = (await Console.In.ReadToEndAsync()).Replace("\r", "").Trim();
                         if (String.IsNullOrWhiteSpace(prompt))
                             break;
 
@@ -318,6 +319,7 @@ namespace LlamaCppCli
                         await Console.Out.WriteLineAsync();
                         cancellationTokenSource.Token.ThrowIfCancellationRequested();
 
+                        // Remove this part if you want to keep your context!
                         var query = HttpUtility.ParseQueryString(String.Empty);
                         query["sessionId"] = $"{sessionId}";
                         (await httpClient.GetAsync($"{baseUrl}/session/reset?{query}")).EnsureSuccessStatusCode();
