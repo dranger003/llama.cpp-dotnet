@@ -425,6 +425,33 @@ namespace LlamaCppLib
         [DllImport(LibName)] public static extern void llama_grammar_accept_token(llama_context ctx, llama_grammar grammar, llama_token token);
 
         //
+        // Beam search
+        //
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct llama_beam_view
+        {
+            public llama_token[] tokens;
+            public nuint n_tokens;
+            public float p;
+            [MarshalAs(UnmanagedType.I1)] public bool eob;
+        };
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct llama_beams_state
+        {
+            llama_beam_view[] beam_views;
+            public nuint n_beams;
+            public nuint common_prefix_length;
+            [MarshalAs(UnmanagedType.I1)] bool last_call;
+        };
+
+        public delegate void llama_beam_search_callback_fn_t(object callback_data, llama_beams_state state);
+
+        [DllImport(LibName)]
+        public static extern void llama_beam_search(llama_context ctx, llama_beam_search_callback_fn_t callback, object callback_data, nuint n_beams, int n_past, int n_predict, int n_threads);
+
+        //
         // Performance information
         //
 
