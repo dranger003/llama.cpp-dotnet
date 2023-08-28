@@ -467,6 +467,8 @@ namespace LlamaCppLib
 
         [DllImport(LibName)] public static extern void llama_log_set(llama_log_callback log_callback, object user_data);
 
+        [DllImport(LibName)] public static extern void llama_dump_timing_info_yaml(nint stream, llama_context ctx);
+
         public static byte[] llama_token_to_bytes(llama_context ctx, llama_token token)
         {
             var result = new byte[8];
