@@ -50,7 +50,7 @@
 			<LibraryFiles Include="$(CMakeProject)/bin/$(Configuration)/$(LibraryFileExtension)" />
 			<LibraryFiles Include="$(CMakeProject)/$(LibraryFileExtension)" />
 		</ItemGroup>
-		<Copy SourceFiles="@(LibraryFiles)" DestinationFolder="$(SolutionDir)/$(Platform)/$(Configuration)/$(MSBuildProjectName)" />
+		<Copy SourceFiles="@(LibraryFiles)" DestinationFolder="$(SolutionDir)/$(Configuration)/$(MSBuildProjectName)" />
 	</Target>
 
 </Project>
