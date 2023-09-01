@@ -157,7 +157,7 @@ namespace LlamaCppLib
 
 #if WINDOWS
         private const string LibName = $"{nameof(LlamaCppLib)}/llama";
-#elif LINUX
+#elif LINUX || MACOS
         private const string LibName = $"{nameof(LlamaCppLib)}/libllama";
 #endif
 
