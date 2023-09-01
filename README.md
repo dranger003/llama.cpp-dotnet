@@ -15,7 +15,7 @@ Build (on Windows use the VS2022 x64 command prompt, on Linux make sure to insta
 ```
 git clone --recursive https://github.com/dranger003/llama.cpp-dotnet.git
 cd llama.cpp-dotnet
-dotnet build -c Release
+dotnet build -c Release /p:Platform="Any CPU"
 ```
 
 Windows:
