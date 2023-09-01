@@ -27,7 +27,7 @@ namespace BertCppLib
 
 #if WINDOWS
         private const string LibName = $"{nameof(BertCppLib)}/bert";
-#elif LINUX
+#elif LINUX || MACOS
         private const string LibName = $"{nameof(BertCppLib)}/libbert";
 #endif
 

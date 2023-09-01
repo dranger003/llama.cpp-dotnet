@@ -4,18 +4,17 @@
 		<TargetFramework>net7.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<Platforms>x64</Platforms>
 		<BaseOutputPath>..</BaseOutputPath>
 		<LangVersion>latest</LangVersion>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-
-		<DefineConstants Condition="'$(OS)' == 'Windows_NT'">WINDOWS</DefineConstants>
-		<DefineConstants Condition="$([System.String]::new('$(OS)').StartsWith('Unix'))">LINUX</DefineConstants>
+		<DefineConstants Condition="$([MSBuild]::IsOSPlatform('Windows'))">WINDOWS</DefineConstants>
+		<DefineConstants Condition="$([MSBuild]::IsOSPlatform('Linux'))">LINUX</DefineConstants>
+		<DefineConstants Condition="$([MSBuild]::IsOSPlatform('OSX'))">MACOS</DefineConstants>
 	</PropertyGroup>
 
-	<Target Name="CMakePrepareForBuild" BeforeTargets="PrepareForBuild;Clean">
+	<Target Name="CMakePrepareForBuild" BeforeTargets="PrepareForBuild;Clean" Condition="'$(NativeLibraries)'!='OFF'">
 		<PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
 			<Test>$(VsInstallRoot)</Test>
 			<CMakeBin Condition="Exists('$(Test)')">"$(VsInstallRoot)\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"</CMakeBin>
@@ -29,7 +28,7 @@
 		</PropertyGroup>
 	</Target>
 
-	<Target Name="CMakeConfigure" BeforeTargets="Build">
+	<Target Name="CMakeConfigure" BeforeTargets="Build" Condition="'$(NativeLibraries)'!='OFF'">
 		<PropertyGroup>
 			<CMakeCompilerFlags Condition="'$(OS)' == 'Windows_NT'">-DCMAKE_CXX_FLAGS="/W0 /EHsc /w" -DCMAKE_C_FLAGS="/W0 /w"</CMakeCompilerFlags>
 			<CMakeCompilerFlags Condition="$([System.String]::new('$(OS)').StartsWith('Unix'))">-DCMAKE_CXX_FLAGS=-w -DCMAKE_C_FLAGS=-w</CMakeCompilerFlags>
@@ -37,11 +36,11 @@
 		<Exec Command='$(CMakeBin) -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=$(Configuration) -S "$(CMakeProject)" -B "$(CMakeProject)" $(CMakeCompilerFlags)' />
 	</Target>
 
-	<Target Name="CMakeBuild" AfterTargets="CMakeConfigure">
+	<Target Name="CMakeBuild" AfterTargets="CMakeConfigure" Condition="'$(NativeLibraries)'!='OFF'">
 		<Exec Command='$(CMakeBin) --build "$(CMakeProject)" -j8 --config $(Configuration)' />
 	</Target>
 
-	<Target Name="CMakeCopyOutput" AfterTargets="CMakeBuild">
+	<Target Name="CMakeCopyOutput" AfterTargets="CMakeBuild" Condition="'$(NativeLibraries)'!='OFF'">
 		<PropertyGroup>
 			<LibraryFileExtension Condition="'$(OS)' == 'Windows_NT'">*.dll</LibraryFileExtension>
 			<LibraryFileExtension Condition="$([System.String]::new('$(OS)').StartsWith('Unix'))">lib*.so</LibraryFileExtension>
