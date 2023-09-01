@@ -21,13 +21,13 @@ If you don't need to compile the native libraries, you can also append `/p:Nativ
 
 Windows:
 ```
-cd x64\Release
+cd Release
 LlamaCppCli.exe 0 <model_path>
 ```
 
 Linux:
 ```
-cd x64/Release
+cd Release
 ./LlamaCppCli 0 <model_path>
 ```
 
