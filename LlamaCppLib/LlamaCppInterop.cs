@@ -121,6 +121,7 @@ namespace LlamaCppLib
             public llama_ftype ftype;
             [MarshalAs(UnmanagedType.I1)] public bool allow_requantize;
             [MarshalAs(UnmanagedType.I1)] public bool quantize_output_tensor;
+            [MarshalAs(UnmanagedType.I1)] public bool only_copy;
         }
 
         public enum llama_gretype
