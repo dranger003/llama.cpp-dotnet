@@ -302,6 +302,7 @@ namespace LlamaCppLib
 
         [DllImport(LibName)] public static extern llama_grammar llama_grammar_init(llama_grammar_element[] rules, nuint n_rules, nuint start_rule_index);
         [DllImport(LibName)] public static extern void llama_grammar_free(llama_grammar grammar);
+        [DllImport(LibName)] public static extern llama_grammar llama_grammar_copy(llama_grammar grammar);
 
         //
         // Sampling functions
