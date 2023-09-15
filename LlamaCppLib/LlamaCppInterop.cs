@@ -181,12 +181,14 @@ namespace LlamaCppLib
 
         [DllImport(LibName)] public static extern int llama_n_vocab(llama_context ctx);
         [DllImport(LibName)] public static extern int llama_n_ctx(llama_context ctx);
+        [DllImport(LibName)] public static extern int llama_n_ctx_train(llama_context ctx);
         [DllImport(LibName)] public static extern int llama_n_embd(llama_context ctx);
 
         [DllImport(LibName, EntryPoint = "llama_vocab_type")] public static extern llama_vocab_type_ llama_vocab_type(llama_context ctx);
 
         [DllImport(LibName)] public static extern int llama_model_n_vocab(llama_model model);
         [DllImport(LibName)] public static extern int llama_model_n_ctx(llama_model model);
+        [DllImport(LibName)] public static extern int llama_model_n_ctx_train(llama_model model);
         [DllImport(LibName)] public static extern int llama_model_n_embd(llama_model model);
 
         [DllImport(LibName)] public static extern int llama_model_type(llama_model model, char[] buf, nuint buf_size);
