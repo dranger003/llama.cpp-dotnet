@@ -261,16 +261,16 @@ namespace LlamaCppLib
         // Tokenization
         //
 
-        [DllImport(LibName, EntryPoint = "llama_tokenize")] private static extern int _llama_tokenize(llama_context ctx, string text, llama_token[] tokens, int n_max_tokens, bool add_bos);
+        [DllImport(LibName, EntryPoint = "llama_tokenize")] private static extern int _llama_tokenize(llama_context ctx, string text, int text_len, llama_token[] tokens, int n_max_tokens, bool add_bos);
         public static void llama_tokenize(llama_context ctx, string text, out ReadOnlySpan<llama_token> tokens, bool add_bos)
         {
             var n_tokens = text.Length + (add_bos ? 1 : 0);
             var result = new llama_token[n_tokens];
-            n_tokens = _llama_tokenize(ctx, text, result, result.Length, add_bos);
+            n_tokens = _llama_tokenize(ctx, text, text.Length, result, result.Length, add_bos);
             if (n_tokens < 0)
             {
                 result = new llama_token[-n_tokens];
-                var check = _llama_tokenize(ctx, text, result, result.Length, add_bos);
+                var check = _llama_tokenize(ctx, text, text.Length, result, result.Length, add_bos);
                 Debug.Assert(check == -n_tokens);
                 n_tokens = result.Length;
             }
@@ -278,7 +278,7 @@ namespace LlamaCppLib
             tokens = result.AsSpan(0, n_tokens);
         }
 
-        [DllImport(LibName)] public static extern int llama_tokenize_with_model(llama_model model, string text, llama_token[] tokens, int n_max_tokens, bool add_bos);
+        [DllImport(LibName)] public static extern int llama_tokenize_with_model(llama_model model, string text, int text_len, llama_token[] tokens, int n_max_tokens, bool add_bos);
 
         [DllImport(LibName, EntryPoint = "llama_token_to_piece")] private static extern int _llama_token_to_piece(llama_context ctx, llama_token token, byte[] buf, int length);
         public static string llama_token_to_piece(llama_context ctx, llama_token token)
