@@ -219,7 +219,7 @@ namespace LlamaCppLib
         [DllImport(LibName)] public static extern void llama_free_model(llama_model model);
 
         [DllImport(LibName)] public static extern llama_context llama_new_context_with_model(llama_model model, llama_context_params cparams);
-        [DllImport(LibName)] public static extern void llama_free(llama_context model);
+        [DllImport(LibName)] public static extern void llama_free(llama_context ctx);
 
         [DllImport(LibName)] public static extern long llama_time_us();
 
