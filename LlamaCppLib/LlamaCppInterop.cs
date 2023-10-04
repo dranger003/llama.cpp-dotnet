@@ -5,19 +5,35 @@ using System.Text;
 
 namespace LlamaCppLib
 {
+    // ggml.h
+
+    using ggml_tensor = System.IntPtr;
+
+    // llama.h
+
     using llama_model = System.IntPtr;
     using llama_context = System.IntPtr;
+
+    using llama_pos = System.Int32;
     using llama_token = System.Int32;
+    using llama_seq_id = System.Int32;
+
     using llama_grammar = System.IntPtr;
 
     public static class LlamaCppInterop
     {
-        public enum llama_log_level
+        // ggml.h
+
+        public enum ggml_log_level
         {
-            LLAMA_LOG_LEVEL_ERROR = 2,
-            LLAMA_LOG_LEVEL_WARN = 3,
-            LLAMA_LOG_LEVEL_INFO = 4
-        }
+            GGML_LOG_LEVEL_ERROR = 2,
+            GGML_LOG_LEVEL_WARN = 3,
+            GGML_LOG_LEVEL_INFO = 4
+        };
+
+        public delegate void ggml_log_callback(ggml_log_level level, string text, object user_data);
+
+        // llama.h
 
         public enum llama_vocab_type_
         {
@@ -43,8 +59,8 @@ namespace LlamaCppLib
             LLAMA_FTYPE_MOSTLY_Q4_0 = 2,
             LLAMA_FTYPE_MOSTLY_Q4_1 = 3,
             LLAMA_FTYPE_MOSTLY_Q4_1_SOME_F16 = 4,
-            // LLAMA_FTYPE_MOSTLY_Q4_2 = 5,         
-            // LLAMA_FTYPE_MOSTLY_Q4_3 = 6,         
+            //LLAMA_FTYPE_MOSTLY_Q4_2 = 5,
+            //LLAMA_FTYPE_MOSTLY_Q4_3 = 6,
             LLAMA_FTYPE_MOSTLY_Q8_0 = 7,
             LLAMA_FTYPE_MOSTLY_Q5_0 = 8,
             LLAMA_FTYPE_MOSTLY_Q5_1 = 9,
@@ -57,6 +73,7 @@ namespace LlamaCppLib
             LLAMA_FTYPE_MOSTLY_Q5_K_S = 16,
             LLAMA_FTYPE_MOSTLY_Q5_K_M = 17,
             LLAMA_FTYPE_MOSTLY_Q6_K = 18,
+
             LLAMA_FTYPE_GUESSED = 1024,
         }
 
@@ -86,33 +103,59 @@ namespace LlamaCppLib
         public delegate void llama_progress_callback(float progress, llama_context ctx);
 
         [StructLayout(LayoutKind.Sequential)]
+        public unsafe struct llama_batch
+        {
+            public int n_tokens;
+
+            private llama_token* _token;
+            private float* _embd;
+            private llama_pos* _pos;
+            private llama_seq_id* _seq_id;
+            private sbyte* _logits;
+
+            public llama_pos all_pos_0;
+            public llama_pos all_pos_1;
+            public llama_seq_id all_seq_id;
+
+            public Span<llama_token> token(int n_tokens) { return new(_token, n_tokens); }
+            public Span<float> embd(int n_tokens, int embd) { return new(_embd, n_tokens * embd); }
+            public Span<llama_pos> pos(int n_tokens) { return new(_pos, n_tokens); }
+            public Span<llama_seq_id> seq_id(int n_tokens) { return new(_seq_id, n_tokens); }
+            public Span<sbyte> logits(int n_tokens) { return new(_logits, n_tokens); }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct llama_model_params
+        {
+            public int n_gpu_layers;
+            public int main_gpu;
+            public readonly float[] tensor_split;
+
+            public llama_progress_callback progress_callback;
+            public object progress_callback_user_data;
+
+            [MarshalAs(UnmanagedType.I1)] public bool vocab_only;
+            [MarshalAs(UnmanagedType.I1)] public bool use_mmap;
+            [MarshalAs(UnmanagedType.I1)] public bool use_mlock;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         public struct llama_context_params
         {
             public uint seed;
-            public int n_ctx;
-            public int n_batch;
-            public int n_gpu_layers;
-            public int main_gpu;
-
-            public nint tensor_split;
+            public uint n_ctx;
+            public uint n_batch;
+            public uint n_threads;
+            public uint n_threads_batch;
 
             public float rope_freq_base;
             public float rope_freq_scale;
 
-            public llama_progress_callback progress_callback;
-            public nint progress_callback_user_data;
-
-            [MarshalAs(UnmanagedType.I1)] public bool low_vram;
             [MarshalAs(UnmanagedType.I1)] public bool mul_mat_q;
             [MarshalAs(UnmanagedType.I1)] public bool f16_kv;
             [MarshalAs(UnmanagedType.I1)] public bool logits_all;
-            [MarshalAs(UnmanagedType.I1)] public bool vocab_only;
-            [MarshalAs(UnmanagedType.I1)] public bool use_mmap;
-            [MarshalAs(UnmanagedType.I1)] public bool use_mlock;
             [MarshalAs(UnmanagedType.I1)] public bool embedding;
         }
-
-        public delegate void llama_log_callback(llama_log_level level, string text, object user_data);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct llama_model_quantize_params
@@ -151,6 +194,7 @@ namespace LlamaCppLib
             public double t_sample_ms;
             public double t_p_eval_ms;
             public double t_eval_ms;
+
             public int n_sample;
             public int n_p_eval;
             public int n_eval;
@@ -162,14 +206,18 @@ namespace LlamaCppLib
         private const string LibName = $"{nameof(LlamaCppLib)}/libllama";
 #endif
 
+        // Helpers for getting default parameters
+        [DllImport(LibName)] public static extern llama_model_params llama_model_default_params();
         [DllImport(LibName)] public static extern llama_context_params llama_context_default_params();
         [DllImport(LibName)] public static extern llama_model_quantize_params llama_model_quantize_default_params();
 
+        // Initialize the llama + ggml backend
         [DllImport(LibName)] public static extern void llama_backend_init(bool numa = false);
         [DllImport(LibName)] public static extern void llama_backend_free();
 
-        [DllImport(LibName)] public static extern llama_model llama_load_model_from_file(string path_model, llama_context_params cparams);
+        [DllImport(LibName)] public static extern llama_model llama_load_model_from_file(string path_model, llama_model_params cparams);
         [DllImport(LibName)] public static extern void llama_free_model(llama_model model);
+
         [DllImport(LibName)] public static extern llama_context llama_new_context_with_model(llama_model model, llama_context_params cparams);
         [DllImport(LibName)] public static extern void llama_free(llama_context model);
 
@@ -179,40 +227,73 @@ namespace LlamaCppLib
         [DllImport(LibName)][return: MarshalAs(UnmanagedType.I1)] public static extern bool llama_mmap_supported();
         [DllImport(LibName)][return: MarshalAs(UnmanagedType.I1)] public static extern bool llama_mlock_supported();
 
-        [DllImport(LibName)] public static extern int llama_n_vocab(llama_context ctx);
+        [DllImport(LibName)] public static extern llama_model llama_get_model(llama_context ctx);
+
         [DllImport(LibName)] public static extern int llama_n_ctx(llama_context ctx);
-        [DllImport(LibName)] public static extern int llama_n_ctx_train(llama_context ctx);
-        [DllImport(LibName)] public static extern int llama_n_embd(llama_context ctx);
 
-        [DllImport(LibName, EntryPoint = "llama_vocab_type")] public static extern llama_vocab_type_ llama_vocab_type(llama_context ctx);
+        [DllImport(LibName)] public static extern llama_vocab_type_ llama_vocab_type(llama_model model);
 
-        [DllImport(LibName)] public static extern int llama_model_n_vocab(llama_model model);
-        [DllImport(LibName)] public static extern int llama_model_n_ctx(llama_model model);
-        [DllImport(LibName)] public static extern int llama_model_n_ctx_train(llama_model model);
-        [DllImport(LibName)] public static extern int llama_model_n_embd(llama_model model);
+        [DllImport(LibName)] public static extern int llama_n_vocab(llama_model ctx);
+        [DllImport(LibName)] public static extern int llama_n_ctx_train(llama_model ctx);
+        [DllImport(LibName)] public static extern int llama_n_embd(llama_model ctx);
 
-        [DllImport(LibName)] public static extern int llama_model_type(llama_model model, char[] buf, nuint buf_size);
+        // Get the model's RoPE frequency scaling factor
+        [DllImport(LibName)] public static extern float llama_rope_freq_scale_train(llama_model model);
 
+        // Get a string describing the model type
+        [DllImport(LibName, EntryPoint = "llama_model_desc")] private static extern int _llama_model_desc(llama_model model, StringBuilder buf, nuint buf_size);
+        public static int llama_model_desc(llama_model model, out string buf, int capacity = 0x4000) // 16KiB
+        {
+            var _buf = new StringBuilder(capacity);
+            var result = _llama_model_desc(model, _buf, (nuint)_buf.Capacity);
+            buf = _buf.ToString();
+            return result;
+        }
+
+        // Returns the total size of all the tensors in the model in bytes
+        [DllImport(LibName)] public static extern ulong llama_model_size(llama_model model);
+
+        // Returns the total number of parameters in the model
+        [DllImport(LibName)] public static extern ulong llama_model_n_params(llama_model model);
+
+        // Get a llama model tensor
+        [DllImport(LibName)] public static extern ggml_tensor llama_get_model_tensor(llama_model model, string name);
+
+        // Returns 0 on success
         [DllImport(LibName)] public static extern int llama_model_quantize(string fname_inp, string fname_out, ref llama_model_quantize_params qparams);
 
-        [DllImport(LibName)] public static extern int llama_model_apply_lora_from_file(llama_model model, string path_lora, string? path_base_model, int n_threads);
+        // Apply a LoRA adapter to a loaded model
+        [DllImport(LibName)] public static extern int llama_model_apply_lora_from_file(llama_model model, string path_lora, float scale, string? path_base_model, int n_threads);
 
-        [DllImport(LibName)] public static extern int llama_get_kv_cache_token_count(llama_context ctx);
+        //
+        // KV cache
+        //
 
-        [DllImport(LibName)] public static extern void llama_set_rng_seed(llama_context ctx, uint seed);
+        [DllImport(LibName)] public static extern void llama_kv_cache_tokens_rm(llama_context ctx, int c0, int c1);
+        [DllImport(LibName)] public static extern void llama_kv_cache_seq_rm(llama_context ctx, llama_seq_id seq_id, llama_pos p0, llama_pos p1);
+        [DllImport(LibName)] public static extern void llama_kv_cache_seq_cp(llama_context ctx, llama_seq_id seq_id_src, llama_seq_id seq_id_dst, llama_pos p0, llama_pos p1);
+        [DllImport(LibName)] public static extern void llama_kv_cache_seq_keep(llama_context ctx, llama_seq_id seq_id);
+        [DllImport(LibName)] public static extern void llama_kv_cache_seq_shift(llama_context ctx, llama_seq_id seq_id, llama_pos p0, llama_pos p1, llama_pos delta);
 
+        //
+        // State / sessions
+        //
+
+        // Returns the maximum size in bytes of the state (rng, logits, embedding
+        // and kv_cache) - will often be smaller after compacting tokens
         [DllImport(LibName)] public static extern nuint llama_get_state_size(llama_context ctx);
 
         [DllImport(LibName, EntryPoint = "llama_copy_state_data")] private static extern nuint _llama_copy_state_data(llama_context ctx, byte[] dest);
         public static byte[] llama_copy_state_data(llama_context ctx)
         {
-            // This is a hack because llama_get_state_size() returns the maximum state size (>2GB for 8192 n_ctx)
+            // This is a hack because llama_get_state_size() returns the maximum state size (>2GB for >8192 n_ctx)
             // Hardcoding 1MiB as this is used exclusively for saving the initial state which is always < 1MiB
             // WARNING -- Using this method to save a non-intial state will most likely crash (i.e. when kv cache is larger than 1 MiB)
             var state = new byte[1024 * 1024];
             var count = (int)_llama_copy_state_data(ctx, state);
             return state.Take(count).ToArray();
         }
+
         [DllImport(LibName)] public static extern nuint llama_set_state_data(llama_context ctx, byte[] src);
 
         [DllImport(LibName)]
@@ -220,14 +301,30 @@ namespace LlamaCppLib
         [DllImport(LibName)]
         [return: MarshalAs(UnmanagedType.I1)] public static extern bool llama_save_session_file(llama_context ctx, string path_session, llama_token[] tokens, int n_token_count);
 
-        [DllImport(LibName)] public static extern int llama_eval(llama_context ctx, llama_token[] tokens, int n_tokens, int n_past, int n_threads);
-        [DllImport(LibName)] public static extern int llama_eval_embd(llama_context ctx, float[] embd, int n_tokens, int n_past, int n_threads);
-        [DllImport(LibName)] public static extern int llama_eval_export(llama_context ctx, string fname);
+        //
+        // Decoding
+        //
+
+        // NOTE: this is a helper function to facilitate transition to the new batch API - avoid using it
+        [DllImport(LibName)] private static extern llama_batch llama_batch_get_one(llama_token[] tokens, int n_tokens, llama_pos pos_0, llama_seq_id seq_id);
+
+        [DllImport(LibName)] public static extern llama_batch llama_batch_init(int n_tokens, int embd);
+        [DllImport(LibName)] public static extern void llama_batch_free(llama_batch batch);
+
+        [DllImport(LibName)] public static extern int llama_decode(llama_context ctx, llama_batch batch);
+
+        [DllImport(LibName)] public static extern void llama_set_n_threads(llama_context ctx, uint n_threads, uint n_threads_batch);
 
         [DllImport(LibName, EntryPoint = "llama_get_logits")] private static extern nint _llama_get_logits(llama_context ctx);
         public static unsafe Span<float> llama_get_logits(llama_context ctx)
         {
             return new(_llama_get_logits(ctx).ToPointer(), llama_n_vocab(ctx));
+        }
+
+        [DllImport(LibName, EntryPoint = "llama_get_logits_ith")] private static extern nint _llama_get_logits_ith(llama_context ctx, int i);
+        public static unsafe ReadOnlySpan<float> llama_get_logits_ith(llama_context ctx, int i)
+        {
+            return new(_llama_get_logits_ith(ctx, i).ToPointer(), llama_n_ctx(ctx) * llama_n_vocab(ctx));
         }
 
         [DllImport(LibName, EntryPoint = "llama_get_embeddings")] private static extern nint _llama_get_embeddings(llama_context ctx);
@@ -249,54 +346,57 @@ namespace LlamaCppLib
         [DllImport(LibName)] private static extern float llama_token_get_score(llama_context ctx, llama_token token);
         [DllImport(LibName)] private static extern llama_token_type llama_token_get_type(llama_context ctx, llama_token token);
 
-        //
         // Special tokens
-        //
-
         [DllImport(LibName)] public static extern llama_token llama_token_bos(llama_context ctx);
         [DllImport(LibName)] public static extern llama_token llama_token_eos(llama_context ctx);
         [DllImport(LibName)] public static extern llama_token llama_token_nl(llama_context ctx);
+
+        // codellama infill tokens
+        [DllImport(LibName)] public static extern llama_token llama_token_prefix(llama_context ctx);
+        [DllImport(LibName)] public static extern llama_token llama_token_middle(llama_context ctx);
+        [DllImport(LibName)] public static extern llama_token llama_token_suffix(llama_context ctx);
+        [DllImport(LibName)] public static extern llama_token llama_token_eot(llama_context ctx);
 
         //
         // Tokenization
         //
 
-        [DllImport(LibName, EntryPoint = "llama_tokenize")] private static extern int _llama_tokenize(llama_context ctx, string text, int text_len, llama_token[] tokens, int n_max_tokens, bool add_bos);
-        public static void llama_tokenize(llama_context ctx, string text, out ReadOnlySpan<llama_token> tokens, bool add_bos)
+        [DllImport(LibName, EntryPoint = "llama_tokenize")] private static extern int _llama_tokenize(llama_model model, string text, int text_len, llama_token[] tokens, int n_max_tokens, bool add_bos);
+        public static ReadOnlySpan<llama_token> llama_tokenize(llama_context ctx, string text, bool add_bos)
+        {
+            return llama_tokenize_with_model(llama_get_model(ctx), text, add_bos);
+        }
+        public static ReadOnlySpan<llama_token> llama_tokenize_with_model(llama_model model, string text, bool add_bos)
         {
             var n_tokens = text.Length + (add_bos ? 1 : 0);
             var result = new llama_token[n_tokens];
-            n_tokens = _llama_tokenize(ctx, text, text.Length, result, result.Length, add_bos);
+            n_tokens = _llama_tokenize(model, text, text.Length, result, result.Length, add_bos);
             if (n_tokens < 0)
             {
                 result = new llama_token[-n_tokens];
-                var check = _llama_tokenize(ctx, text, text.Length, result, result.Length, add_bos);
+                var check = _llama_tokenize(model, text, text.Length, result, result.Length, add_bos);
                 Debug.Assert(check == -n_tokens);
                 n_tokens = result.Length;
             }
 
-            tokens = result.AsSpan(0, n_tokens);
+            return result.AsSpan(0, n_tokens);
         }
 
-        [DllImport(LibName)] public static extern int llama_tokenize_with_model(llama_model model, string text, int text_len, llama_token[] tokens, int n_max_tokens, bool add_bos);
-
-        [DllImport(LibName, EntryPoint = "llama_token_to_piece")] private static extern int _llama_token_to_piece(llama_context ctx, llama_token token, byte[] buf, int length);
-        public static string llama_token_to_piece(llama_context ctx, llama_token token)
+        [DllImport(LibName, EntryPoint = "llama_token_to_piece")] private static extern int _llama_token_to_piece(llama_model model, llama_token token, byte[] buf, int length);
+        public static ReadOnlySpan<byte> llama_token_to_piece(llama_context ctx, llama_token token)
         {
             var result = new byte[8];
-            var n_tokens = _llama_token_to_piece(ctx, token, result, result.Length);
-            if (n_tokens < 0)
+            var n_pieces = _llama_token_to_piece(llama_get_model(ctx), token, result, result.Length);
+            if (n_pieces < 0)
             {
-                result = new byte[-n_tokens];
-                var check = _llama_token_to_piece(ctx, token, result, result.Length);
-                Debug.Assert(check == -n_tokens);
-                n_tokens = result.Length;
+                result = new byte[-n_pieces];
+                var check = _llama_token_to_piece(llama_get_model(ctx), token, result, result.Length);
+                Debug.Assert(check == -n_pieces);
+                n_pieces = result.Length;
             }
 
-            return Encoding.ASCII.GetString(result, 0, n_tokens);
+            return result.AsSpan(0, n_pieces);
         }
-
-        [DllImport(LibName)] public static extern nint llama_token_to_piece_with_model(llama_model model, llama_token token, byte[] buf, int length);
 
         //
         // Grammar
@@ -309,6 +409,8 @@ namespace LlamaCppLib
         //
         // Sampling functions
         //
+
+        [DllImport(LibName)] public static extern void llama_set_rng_seed(llama_context ctx, uint seed);
 
         [DllImport(LibName, EntryPoint = "llama_sample_repetition_penalty")] private static extern void _llama_sample_repetition_penalty(llama_context ctx, nint candidates, llama_token[] last_tokens, int last_tokens_size, float penalty);
         public static unsafe void llama_sample_repetition_penalty(llama_context ctx, llama_token_data_array candidates, llama_token[] last_tokens, float penalty)
@@ -376,13 +478,15 @@ namespace LlamaCppLib
             _llama_sample_typical(ctx, new(&_candidates), p, min_keep);
         }
 
-        [DllImport(LibName, EntryPoint = "llama_sample_temperature")] private static extern void _llama_sample_temperature(llama_context ctx, nint candidates, float temp);
-        public static unsafe void llama_sample_temperature(llama_context ctx, llama_token_data_array candidates, float temp)
+        [DllImport(LibName, EntryPoint = "llama_sample_temp")] private static extern void _llama_sample_temp(llama_context ctx, nint candidates, float temp);
+        public static unsafe void llama_sample_temp(llama_context ctx, llama_token_data_array candidates, float temp)
         {
             using var handle = candidates.data.Pin();
             var _candidates = new _llama_token_data_array { data = new(handle.Pointer), size = candidates.size, sorted = candidates.sorted };
-            _llama_sample_temperature(ctx, new(&_candidates), temp);
+            _llama_sample_temp(ctx, new(&_candidates), temp);
         }
+
+        // DEPRECATED: void llama_sample_temperature(llama_context ctx, llama_token_data_array[] candidates, float temp);
 
         [DllImport(LibName, EntryPoint = "llama_sample_grammar")] private static extern void _llama_sample_grammar(llama_context ctx, nint candidates, llama_grammar grammar);
         private static unsafe void llama_sample_grammar(llama_context ctx, llama_token_data_array candidates, llama_grammar grammar)
@@ -453,41 +557,44 @@ namespace LlamaCppLib
         public delegate void llama_beam_search_callback_fn_t(object callback_data, llama_beams_state state);
 
         [DllImport(LibName)]
-        public static extern void llama_beam_search(llama_context ctx, llama_beam_search_callback_fn_t callback, object callback_data, nuint n_beams, int n_past, int n_predict, int n_threads);
+        public static extern void llama_beam_search(llama_context ctx, llama_beam_search_callback_fn_t callback, object callback_data, nuint n_beams, int n_past, int n_predict);
 
-        //
         // Performance information
-        //
-
         [DllImport(LibName)] public static extern llama_timings llama_get_timings(llama_context ctx);
+
         [DllImport(LibName)] public static extern void llama_print_timings(llama_context ctx);
         [DllImport(LibName)] public static extern void llama_reset_timings(llama_context ctx);
 
+        // Print system information
         [DllImport(LibName, EntryPoint = "llama_print_system_info")] private static extern nint _llama_print_system_info();
         public static string llama_print_system_info()
         {
             return Marshal.PtrToStringAnsi(_llama_print_system_info()) ?? String.Empty;
         }
 
-        [DllImport(LibName)] public static extern void llama_log_set(llama_log_callback log_callback, object user_data);
+        [DllImport(LibName)] public static extern void llama_log_set(ggml_log_callback log_callback, object user_data);
 
         [DllImport(LibName)] public static extern void llama_dump_timing_info_yaml(nint stream, llama_context ctx);
 
-        public static byte[] llama_token_to_bytes(llama_context ctx, llama_token token)
-        {
-            var result = new byte[8];
-            var n_tokens = _llama_token_to_piece(ctx, token, result, result.Length);
-            if (n_tokens >= 0)
-            {
-                var bytes = new byte[n_tokens];
-                Array.Copy(result, bytes, bytes.Length);
-                return bytes;
-            }
+        //
+        // Other
+        //
 
-            result = new byte[-n_tokens];
-            var check = _llama_token_to_piece(ctx, token, result, result.Length);
-            Debug.Assert(check == -n_tokens);
-            return result;
-        }
+        //public static byte[] llama_token_to_bytes(llama_context ctx, llama_token token)
+        //{
+        //    var result = new byte[8];
+        //    var n_tokens = _llama_token_to_piece(ctx, token, result, result.Length);
+        //    if (n_tokens >= 0)
+        //    {
+        //        var bytes = new byte[n_tokens];
+        //        Array.Copy(result, bytes, bytes.Length);
+        //        return bytes;
+        //    }
+
+        //    result = new byte[-n_tokens];
+        //    var check = _llama_token_to_piece(ctx, token, result, result.Length);
+        //    Debug.Assert(check == -n_tokens);
+        //    return result;
+        //}
     }
 }

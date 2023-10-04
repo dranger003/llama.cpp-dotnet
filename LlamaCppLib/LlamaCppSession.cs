@@ -1,67 +1,67 @@
 ﻿namespace LlamaCppLib
 {
-    using LlamaToken = System.Int32;
+    //using LlamaToken = System.Int32;
 
-    internal class LlamaCppSessionState
-    {
-        public List<LlamaToken> TokenIds { get; } = new();
-        public int EvalOffset { get; set; } = 0;
-    }
+    //internal class LlamaCppSessionState
+    //{
+    //    public List<LlamaToken> TokenIds { get; } = new();
+    //    public int EvalOffset { get; set; } = 0;
+    //}
 
-    public class LlamaCppSession
-    {
-        private LlamaCppModel _model;
-        private LlamaCppSessionState _state = new();
-        private Guid _id = Guid.NewGuid();
+    //public class LlamaCppSession
+    //{
+    //    private LlamaCppModel _model;
+    //    private LlamaCppSessionState _state = new();
+    //    private Guid _id = Guid.NewGuid();
 
-        private static LlamaCppSession? _lastSessionToGenerate;
+    //    private static LlamaCppSession? _lastSessionToGenerate;
 
-        internal LlamaCppSession(LlamaCppModel model) => _model = model;
+    //    internal LlamaCppSession(LlamaCppModel model) => _model = model;
 
-        public Guid Id => _id;
+    //    public Guid Id => _id;
 
-        public void Reset()
-        {
-            _state.TokenIds.Clear();
-            _state.EvalOffset = 0;
-        }
+    //    public void Reset()
+    //    {
+    //        _state.TokenIds.Clear();
+    //        _state.EvalOffset = 0;
+    //    }
 
-        public string GetContextAsText() => _model.UntokenizeToText(_state.TokenIds);
+    //    public string GetContextAsText() => _model.UntokenizeToText(_state.TokenIds);
 
-        public IAsyncEnumerable<byte[]> GenerateTokenBytesAsync(string prompt, LlamaCppGenerateOptions? options = default, CancellationToken cancellationToken = default)
-        {
-            if (_lastSessionToGenerate != null && _lastSessionToGenerate != this)
-                _state.EvalOffset = 0;
+    //    public IAsyncEnumerable<byte[]> GenerateTokenBytesAsync(string prompt, LlamaCppGenerateOptions? options = default, CancellationToken cancellationToken = default)
+    //    {
+    //        if (_lastSessionToGenerate != null && _lastSessionToGenerate != this)
+    //            _state.EvalOffset = 0;
 
-            _lastSessionToGenerate = this;
+    //        _lastSessionToGenerate = this;
 
-            if (options == default)
-                options = new();
+    //        if (options == default)
+    //            options = new();
 
-            _state.TokenIds.AddRange(_model.Tokenize(prompt, !_state.TokenIds.Any()));
-            return _model.GenerateTokenBytesAsync(options, _state, cancellationToken);
-        }
+    //        _state.TokenIds.AddRange(_model.Tokenize(prompt, !_state.TokenIds.Any()));
+    //        return _model.GenerateTokenBytesAsync(options, _state, cancellationToken);
+    //    }
 
-        public IAsyncEnumerable<byte[]> GenerateTokenBytesAsync(string prompt, CancellationToken cancellationToken = default) =>
-            GenerateTokenBytesAsync(prompt, default, cancellationToken);
+    //    public IAsyncEnumerable<byte[]> GenerateTokenBytesAsync(string prompt, CancellationToken cancellationToken = default) =>
+    //        GenerateTokenBytesAsync(prompt, default, cancellationToken);
 
-        public IAsyncEnumerable<string> GenerateTokenStringAsync(string prompt, LlamaCppGenerateOptions? options = default, CancellationToken cancellationToken = default)
-        {
-            if (_lastSessionToGenerate != null && _lastSessionToGenerate != this)
-                _state.EvalOffset = 0;
+    //    public IAsyncEnumerable<string> GenerateTokenStringAsync(string prompt, LlamaCppGenerateOptions? options = default, CancellationToken cancellationToken = default)
+    //    {
+    //        if (_lastSessionToGenerate != null && _lastSessionToGenerate != this)
+    //            _state.EvalOffset = 0;
 
-            _lastSessionToGenerate = this;
+    //        _lastSessionToGenerate = this;
 
-            if (options == default)
-                options = new();
+    //        if (options == default)
+    //            options = new();
 
-            var tokens = _model.Tokenize(prompt, !_state.TokenIds.Any());
-            _state.TokenIds.AddRange(tokens);
+    //        var tokens = _model.Tokenize(prompt, !_state.TokenIds.Any());
+    //        _state.TokenIds.AddRange(tokens);
 
-            return _model.GenerateTokenStringAsync(options, _state, cancellationToken);
-        }
+    //        return _model.GenerateTokenStringAsync(options, _state, cancellationToken);
+    //    }
 
-        public IAsyncEnumerable<string> GenerateTokenStringAsync(string prompt, CancellationToken cancellationToken = default) =>
-            GenerateTokenStringAsync(prompt, default, cancellationToken);
-    }
+    //    public IAsyncEnumerable<string> GenerateTokenStringAsync(string prompt, CancellationToken cancellationToken = default) =>
+    //        GenerateTokenStringAsync(prompt, default, cancellationToken);
+    //}
 }
