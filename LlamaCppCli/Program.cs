@@ -9,6 +9,8 @@ using System.Web;
 
 using LlamaCppLib;
 using BertCppLib;
+using System.Runtime.CompilerServices;
+using System.Data.Common;
 
 namespace LlamaCppCli
 {
@@ -18,51 +20,54 @@ namespace LlamaCppCli
     {
         static async Task Main(string[] args)
         {
-#if DEBUG
-            //args = new[] { "1", "http://localhost:5021", "meta-llama2-chat-13b-v1.0-q8_0", "60", "4096" };
-            //args = new[] { "1", "http://localhost:5021", "openassistant-llama2-13b-orca-8k-3319-q8_0", "60", "8192" };
-            //args = new[] { "1", "http://localhost:5021", "codellama-7b-q8_0", "42", "16384" };
-            args = new[] { "4" };
-#endif
-            var samples = new (string Name, Func<string[], Task> Func)[]
-            {
-                (nameof(RunLocalSampleAsync), RunLocalSampleAsync),             // Run locally
-                (nameof(RunRemoteSampleAsync), RunRemoteSampleAsync),           // Run via API
-                (nameof(RunBertSampleAsync), RunBertSampleAsync),               // BERT
-                (nameof(RunEmbeddingsSampleAsync), RunEmbeddingsSampleAsync),
-                (nameof(RunDebugSampleAsync), RunDebugSampleAsync),             // Simple (used for debugging)
-            }
-                .Select((sample, index) => (sample, index))
-                .ToDictionary(k => k.sample.Name, v => (Index: v.index, v.sample.Func));
+            //#if DEBUG
+            //            //args = new[] { "1", "http://localhost:5021", "meta-llama2-chat-13b-v1.0-q8_0", "60", "4096" };
+            //            //args = new[] { "1", "http://localhost:5021", "openassistant-llama2-13b-orca-8k-3319-q8_0", "60", "8192" };
+            //            //args = new[] { "1", "http://localhost:5021", "codellama-7b-q8_0", "42", "16384" };
+            //            args = new[] { "4" };
+            //#endif
+            //            var samples = new (string Name, Func<string[], Task> Func)[]
+            //            {
+            //                (nameof(RunLocalSampleAsync), RunLocalSampleAsync),             // Run locally
+            //                (nameof(RunRemoteSampleAsync), RunRemoteSampleAsync),           // Run via API
+            //                (nameof(RunBertSampleAsync), RunBertSampleAsync),               // BERT
+            //                (nameof(RunEmbeddingsSampleAsync), RunEmbeddingsSampleAsync),
+            //                (nameof(RunDebugSampleAsync), RunDebugSampleAsync),             // Simple (used for debugging)
+            //            }
+            //                .Select((sample, index) => (sample, index))
+            //                .ToDictionary(k => k.sample.Name, v => (Index: v.index, v.sample.Func));
 
-            var PrintAvailableSamples = () =>
-            {
-                Console.WriteLine($"Available sample(s):");
-                foreach (var sample in samples)
-                    Console.WriteLine($"    [{sample.Value.Index}] = {sample.Key}");
-            };
+            //            var PrintAvailableSamples = () =>
+            //            {
+            //                Console.WriteLine($"Available sample(s):");
+            //                foreach (var sample in samples)
+            //                    Console.WriteLine($"    [{sample.Value.Index}] = {sample.Key}");
+            //            };
 
-            if (args.Length < 1)
-            {
-                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} <SampleIndex> <SampleArgs>");
-                PrintAvailableSamples();
-                return;
-            }
+            //            if (args.Length < 1)
+            //            {
+            //                await Console.Out.WriteLineAsync($"Usage: {Path.GetFileName(Assembly.GetExecutingAssembly().Location)} <SampleIndex> <SampleArgs>");
+            //                PrintAvailableSamples();
+            //                return;
+            //            }
 
-            var sampleIndex = Int32.Parse(args[0]);
-            var sampleName = samples.SingleOrDefault(sample => sample.Value.Index == sampleIndex).Key;
+            //            var sampleIndex = Int32.Parse(args[0]);
+            //            var sampleName = samples.SingleOrDefault(sample => sample.Value.Index == sampleIndex).Key;
 
-            if (sampleName == default)
-            {
-                Console.WriteLine($"Sample not found ({sampleIndex}).");
-                PrintAvailableSamples();
-                return;
-            }
+            //            if (sampleName == default)
+            //            {
+            //                Console.WriteLine($"Sample not found ({sampleIndex}).");
+            //                PrintAvailableSamples();
+            //                return;
+            //            }
 
-            // Required for multi-byte character encoding (e.g. emojis)
-            Console.OutputEncoding = Encoding.UTF8;
+            //            // Required for multi-byte character encoding (e.g. emojis)
+            //            Console.OutputEncoding = Encoding.UTF8;
 
-            await samples[sampleName].Func(args.Skip(1).ToArray());
+            //            await samples[sampleName].Func(args.Skip(1).ToArray());
+
+            _RunDebugSampleAsync(args);
+            await Task.CompletedTask;
         }
 
         static async Task RunLocalSampleAsync(string[] args)
@@ -416,126 +421,107 @@ namespace LlamaCppCli
             //LlamaCppInterop.llama_backend_free();
         }
 
-        static async Task RunDebugSampleAsync(string[] args)
-        {
-            _RunDebugSampleAsync(args);
-            await Task.CompletedTask;
-        }
+        //static async Task RunDebugSampleAsync(string[] args)
+        //{
+        //    _RunDebugSampleAsync(args);
+        //    await Task.CompletedTask;
+        //}
 
         static void _RunDebugSampleAsync(string[] args)
         {
-            var model_path = "D:\\LLM_MODELS\\ehartford\\ggml-dolphin-2.0-mistral-7b-q8_0.gguf";
-
             var system = "You are an astrophysicist.";
+
             var chat = new[]
             {
-                    "Write a table listing the planets of the solar system. The planets must be listed in reverse order from the Sun.",
-                }
-                .Select((x, i) => (i % 2) == 0 ? $"<|im_start|>user\n{x}<|im_end|>\n" : $"<|im_start|>assistant\n{x}<|im_end|>\n")
-                .Aggregate((x, y) => $"{x}{y}");
+                "Lists the planets of the solar system in order from the Sun.",
+                "Mercury\nVenus\nEarth\nMars\nJupiter\nSaturn\nUranus\nNeptune",
+                "Write a table listing the planets of the solar system in reverse order from the Sun.",
+            }
+                .Select((x, i) => (i % 2) == 0 ? $"<|im_start|>user\n{x}<|im_end|>" : $"<|im_start|>assistant\n{x}<|im_end|>")
+                .Aggregate((x, y) => $"{x}\n{y}");
 
             var prompt = $"<|im_start|>system\n{system}<|im_end|>\n{chat}";
 
-            LlamaCppInterop.llama_backend_init();
+            LlamaCppInterop.llama_backend_init(false);
 
             var model_params = LlamaCppInterop.llama_model_default_params();
-            model_params.n_gpu_layers = 32;
+            model_params.n_gpu_layers = 64;
 
-            var model = LlamaCppInterop.llama_load_model_from_file(model_path, model_params);
+            var model = LlamaCppInterop.llama_load_model_from_file("D:\\LLM_MODELS\\ehartford\\ggml-dolphin-2.0-mistral-7b-q8_0.gguf", model_params);
 
             var ctx_params = LlamaCppInterop.llama_context_default_params();
-            ctx_params.seed = 0;
+            ctx_params.seed = 1;
             ctx_params.n_ctx = 16384;
-            ctx_params.n_threads = 2;
-            ctx_params.n_threads_batch = 2;
+            ctx_params.n_batch = 512;
+            ctx_params.n_threads = 1;
+            ctx_params.n_threads_batch = 1;
 
             var ctx = LlamaCppInterop.llama_new_context_with_model(model, ctx_params);
 
             var tokens_list = LlamaCppInterop.llama_tokenize(ctx, prompt, true);
 
-            var n_ctx = LlamaCppInterop.llama_n_ctx(ctx);
-
-            //foreach (var id in tokens_list)
-            //{
-            //    Console.WriteLine(Encoding.ASCII.GetString(LlamaCppInterop.llama_token_to_piece(ctx, id)));
-            //}
-
-            var n_tokens = 512;
-            var batch = LlamaCppInterop.llama_batch_init(n_tokens, 0);
+            var batch = LlamaCppInterop.llama_batch_init((int)ctx_params.n_batch, 0);
             batch.n_tokens = tokens_list.Length;
-
             for (var i = 0; i < batch.n_tokens; i++)
             {
-                batch.token(n_tokens)[i] = tokens_list[i];
-                batch.pos(n_tokens)[i] = i;
-                batch.seq_id(n_tokens)[i] = 0;
-                batch.logits(n_tokens)[i] = 0; // false
+                batch.token((int)ctx_params.n_batch)[i] = tokens_list[i];
+                batch.pos((int)ctx_params.n_batch)[i] = i;
+                batch.seq_id((int)ctx_params.n_batch)[i] = 0;
+                batch.logits((int)ctx_params.n_batch)[i] = 0;
             }
-
-            batch.logits(n_tokens)[batch.n_tokens - 1] = 1; // true
+            batch.logits((int)ctx_params.n_batch)[batch.n_tokens - 1] = 1;
 
             LlamaCppInterop.llama_decode(ctx, batch);
 
-            var n_cur = batch.n_tokens;
-            var n_decode = 0;
+            int n_cur = batch.n_tokens;
+            int n_decode = 0;
 
-            var t_main_start = LlamaCppInterop.llama_time_us();
+            Console.Write(prompt);
 
             while (true)
             {
-                {
-                    var n_vocab = LlamaCppInterop.llama_n_vocab(model);
-                    var logits = LlamaCppInterop.llama_get_logits_ith(ctx, batch.n_tokens - 1);
+                var n_vocab = LlamaCppInterop.llama_n_vocab(model);
+                var logits = LlamaCppInterop.llama_get_logits_ith(ctx, batch.n_tokens - 1);
 
-                    var candidates = new LlamaCppInterop.llama_token_data[n_vocab];
-                    for (llama_token token_id = 0; token_id < n_vocab; token_id++)
-                        candidates[token_id] = new LlamaCppInterop.llama_token_data { id = token_id, logit = logits[token_id], p = 0.0f };
+                var candidates = new LlamaCppInterop.llama_token_data[n_vocab];
+                for (llama_token token_id = 0; token_id < n_vocab; token_id++)
+                    candidates[token_id] = new LlamaCppInterop.llama_token_data { id = token_id, logit = logits[token_id], p = 0.0f };
+                var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates, size = (nuint)candidates.Length, sorted = false };
 
-                    var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates, size = (nuint)candidates.Length, sorted = false };
-                    var new_token_id = LlamaCppInterop.llama_sample_token_greedy(ctx, candidates_p);
+                const int top_k = 40;
+                const float top_p = 0.9f;
+                const float temp = 0.0f;
 
-                    if (new_token_id == LlamaCppInterop.llama_token_eos(ctx))
-                    {
-                        break;
-                    }
+                LlamaCppInterop.llama_sample_top_k(ctx, candidates_p, top_k, 1);
+                LlamaCppInterop.llama_sample_top_p(ctx, candidates_p, top_p, 1);
+                LlamaCppInterop.llama_sample_temp(ctx, candidates_p, temp);
 
-                    Console.Write(Encoding.ASCII.GetString(LlamaCppInterop.llama_token_to_piece(ctx, new_token_id)));
+                var new_token_id = LlamaCppInterop.llama_sample_token(ctx, candidates_p);
+                //var new_token_id = LlamaCppInterop.llama_sample_token_greedy(ctx, candidates_p);
 
-                    batch.n_tokens = 0;
+                if (new_token_id == LlamaCppInterop.llama_token_eos(ctx))
+                    break;
 
-                    batch.token(n_tokens)[batch.n_tokens] = new_token_id;
-                    batch.pos(n_tokens)[batch.n_tokens] = n_cur;
-                    batch.seq_id(n_tokens)[batch.n_tokens] = 0;
-                    batch.logits(n_tokens)[batch.n_tokens] = 1; // true
-                    batch.n_tokens += 1;
+                Console.Write(Encoding.ASCII.GetString(LlamaCppInterop.llama_token_to_piece(ctx, new_token_id)));
 
-                    n_decode += 1;
-                }
+                batch.n_tokens = 0;
+                batch.token((int)ctx_params.n_batch)[batch.n_tokens] = new_token_id;
+                batch.pos((int)ctx_params.n_batch)[batch.n_tokens] = n_cur;
+                batch.seq_id((int)ctx_params.n_batch)[batch.n_tokens] = 0;
+                batch.logits((int)ctx_params.n_batch)[batch.n_tokens] = 1;
+                batch.n_tokens += 1;
 
+                n_decode += 1;
                 n_cur += 1;
 
-                if (LlamaCppInterop.llama_decode(ctx, batch) > 0)
-                {
-                    Console.WriteLine("main: failed to eval, return code 1");
-                    return;
-                }
+                LlamaCppInterop.llama_decode(ctx, batch);
             }
-
-            Console.WriteLine();
-
-            var t_main_end = LlamaCppInterop.llama_time_us();
-
-            Console.WriteLine($"main: decoded {n_decode} tokens in {(t_main_end - t_main_start) / 1000000.0f:F2} s, speed: {n_decode / ((t_main_end - t_main_start) / 1000000.0f):F2} t/s");
-
-            LlamaCppInterop.llama_print_timings(ctx);
 
             Console.WriteLine();
 
             LlamaCppInterop.llama_batch_free(batch);
-
             LlamaCppInterop.llama_free(ctx);
             LlamaCppInterop.llama_free_model(model);
-
             LlamaCppInterop.llama_backend_free();
         }
 

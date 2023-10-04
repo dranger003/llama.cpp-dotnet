@@ -233,9 +233,9 @@ namespace LlamaCppLib
 
         [DllImport(LibName)] public static extern llama_vocab_type_ llama_vocab_type(llama_model model);
 
-        [DllImport(LibName)] public static extern int llama_n_vocab(llama_model ctx);
-        [DllImport(LibName)] public static extern int llama_n_ctx_train(llama_model ctx);
-        [DllImport(LibName)] public static extern int llama_n_embd(llama_model ctx);
+        [DllImport(LibName)] public static extern int llama_n_vocab(llama_model model);
+        [DllImport(LibName)] public static extern int llama_n_ctx_train(llama_model model);
+        [DllImport(LibName)] public static extern int llama_n_embd(llama_model model);
 
         // Get the model's RoPE frequency scaling factor
         [DllImport(LibName)] public static extern float llama_rope_freq_scale_train(llama_model model);
@@ -322,13 +322,13 @@ namespace LlamaCppLib
         }
 
         [DllImport(LibName, EntryPoint = "llama_get_logits_ith")] private static extern nint _llama_get_logits_ith(llama_context ctx, int i);
-        public static unsafe ReadOnlySpan<float> llama_get_logits_ith(llama_context ctx, int i)
+        public static unsafe Span<float> llama_get_logits_ith(llama_context ctx, int i)
         {
-            return new(_llama_get_logits_ith(ctx, i).ToPointer(), llama_n_ctx(ctx) * llama_n_vocab(ctx));
+            return new(_llama_get_logits_ith(ctx, i).ToPointer(), llama_n_vocab(llama_get_model(ctx)));
         }
 
         [DllImport(LibName, EntryPoint = "llama_get_embeddings")] private static extern nint _llama_get_embeddings(llama_context ctx);
-        public static unsafe ReadOnlySpan<float> llama_get_embeddings(llama_context ctx)
+        public static unsafe Span<float> llama_get_embeddings(llama_context ctx)
         {
             return new(_llama_get_embeddings(ctx).ToPointer(), llama_n_embd(ctx));
         }
