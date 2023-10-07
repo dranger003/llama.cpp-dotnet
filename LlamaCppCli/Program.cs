@@ -9,6 +9,8 @@ using System.Web;
 
 using LlamaCppLib;
 using BertCppLib;
+using System.Diagnostics;
+using System.Data.Common;
 
 namespace LlamaCppCli
 {
@@ -64,6 +66,12 @@ namespace LlamaCppCli
 
             //            await samples[sampleName].Func(args.Skip(1).ToArray());
 
+            args = new[]
+            {
+                "D:\\LLM_MODELS\\codellama\\ggml-codeLlama-7b-instruct-q8_0.gguf",
+                args.Length > 0 ? args[0] : "1",
+            };
+
             //await RunSimpleSampleAsync(args);
             await RunBatchedSampleAsync(args);
         }
@@ -76,39 +84,38 @@ namespace LlamaCppCli
 
         static void RunSimpleSample(string[] args)
         {
-            var system = "You are an astrophysicist.";
+            var top_k = 40;
+            var top_p = 0.9f;
+            var temp = 0.0f;
 
-            var chat = new[]
-            {
-                "Lists the planets of the solar system in order from the Sun.",
-                "Mercury\nVenus\nEarth\nMars\nJupiter\nSaturn\nUranus\nNeptune",
-                "Write a table listing the planets of the solar system in reverse order from the Sun.",
-            }
-                .Select((x, i) => (i % 2) == 0 ? $"<|im_start|>user\n{x}<|im_end|>" : $"<|im_start|>assistant\n{x}<|im_end|>")
-                .Aggregate((x, y) => $"{x}\n{y}");
-
-            var prompt = $"<|im_start|>system\n{system}<|im_end|>\n{chat}";
-
+            // Backend init
             LlamaCppInterop.llama_backend_init(false);
 
-            var model_params = LlamaCppInterop.llama_model_default_params();
-            model_params.n_gpu_layers = 64;
+            // Model init
+            var mdl_params = LlamaCppInterop.llama_model_default_params();
+            mdl_params.n_gpu_layers = 64;
+            var mdl = LlamaCppInterop.llama_load_model_from_file(args[0], mdl_params);
 
-            var model = LlamaCppInterop.llama_load_model_from_file("D:\\LLM_MODELS\\ehartford\\ggml-dolphin-2.0-mistral-7b-q8_0.gguf", model_params);
-
+            // Context init
             var ctx_params = LlamaCppInterop.llama_context_default_params();
             ctx_params.seed = 1;
             ctx_params.n_ctx = 16384;
             ctx_params.n_batch = 512;
             ctx_params.n_threads = 1;
             ctx_params.n_threads_batch = 1;
+            var ctx = LlamaCppInterop.llama_new_context_with_model(mdl, ctx_params);
 
-            var ctx = LlamaCppInterop.llama_new_context_with_model(model, ctx_params);
+            // Prompt tokenization
+            var tokens_list = new List<llama_token>() { LlamaCppInterop.llama_token_bos(ctx) };
+            {
+                tokens_list.AddRange(LlamaCppInterop.llama_tokenize(ctx, "[INST] List the planets of the solar system in order from the Sun. [/INST]\nMercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus and Neptune.").ToArray());
+                tokens_list.AddRange(new[] { LlamaCppInterop.llama_token_eos(ctx), LlamaCppInterop.llama_token_bos(ctx) });
+                tokens_list.AddRange(LlamaCppInterop.llama_tokenize(ctx, "[INST] Write a table listing the planets of the solar system in reverse order from the Sun. [/INST]\n").ToArray());
+            }
 
-            var tokens_list = LlamaCppInterop.llama_tokenize(ctx, prompt, true);
-
+            // Prompt batching
             var batch = LlamaCppInterop.llama_batch_init((int)ctx_params.n_batch, 0);
-            batch.n_tokens = tokens_list.Length;
+            batch.n_tokens = tokens_list.Count;
             for (var i = 0; i < batch.n_tokens; i++)
             {
                 batch.token((int)ctx_params.n_batch)[i] = tokens_list[i];
@@ -118,62 +125,48 @@ namespace LlamaCppCli
             }
             batch.logits((int)ctx_params.n_batch)[batch.n_tokens - 1] = 1;
 
+            // Prompt decoding
             LlamaCppInterop.llama_decode(ctx, batch);
 
-            int n_cur = batch.n_tokens;
-            int n_decode = 0;
+            var candidates = new LlamaCppInterop.llama_token_data[LlamaCppInterop.llama_n_vocab(mdl)];
+            var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates, size = (nuint)candidates.Length, sorted = false };
 
-            Console.Write(prompt);
+            var n_cur = batch.n_tokens;
+
+            var sw = Stopwatch.StartNew();
 
             while (true)
             {
-                var n_vocab = LlamaCppInterop.llama_n_vocab(model);
                 var logits = LlamaCppInterop.llama_get_logits_ith(ctx, batch.n_tokens - 1);
-
-                var candidates = new LlamaCppInterop.llama_token_data[n_vocab];
-                for (llama_token token_id = 0; token_id < n_vocab; token_id++)
+                for (var token_id = 0; token_id < candidates.Length; token_id++)
                     candidates[token_id] = new LlamaCppInterop.llama_token_data { id = token_id, logit = logits[token_id], p = 0.0f };
-                var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates, size = (nuint)candidates.Length, sorted = false };
 
-                llama_token new_token_id;
-                {
-                    const int top_k = 40;
-                    const float top_p = 0.9f;
-                    const float temp = 0.0f;
-
-                    LlamaCppInterop.llama_sample_top_k(ctx, candidates_p, top_k, 1);
-                    LlamaCppInterop.llama_sample_top_p(ctx, candidates_p, top_p, 1);
-                    LlamaCppInterop.llama_sample_temp(ctx, candidates_p, temp);
-
-                    new_token_id = LlamaCppInterop.llama_sample_token(ctx, candidates_p);
-                }
-                //{
-                //    new_token_id = LlamaCppInterop.llama_sample_token_greedy(ctx, candidates_p);
-                //}
+                LlamaCppInterop.llama_sample_top_k(ctx, candidates_p, top_k, 1);
+                LlamaCppInterop.llama_sample_top_p(ctx, candidates_p, top_p, 1);
+                LlamaCppInterop.llama_sample_temp(ctx, candidates_p, temp);
+                var new_token_id = LlamaCppInterop.llama_sample_token(ctx, candidates_p);
 
                 if (new_token_id == LlamaCppInterop.llama_token_eos(ctx))
                     break;
 
                 Console.Write(Encoding.ASCII.GetString(LlamaCppInterop.llama_token_to_piece(ctx, new_token_id)));
 
-                batch.n_tokens = 0;
-                batch.token((int)ctx_params.n_batch)[batch.n_tokens] = new_token_id;
-                batch.pos((int)ctx_params.n_batch)[batch.n_tokens] = n_cur;
-                batch.seq_id((int)ctx_params.n_batch)[batch.n_tokens] = 0;
-                batch.logits((int)ctx_params.n_batch)[batch.n_tokens] = 1;
-                batch.n_tokens += 1;
+                batch.n_tokens = 1;
+                batch.token((int)ctx_params.n_batch)[0] = new_token_id;
+                batch.pos((int)ctx_params.n_batch)[0] = n_cur;
+                batch.seq_id((int)ctx_params.n_batch)[0] = 0;
+                batch.logits((int)ctx_params.n_batch)[0] = 1;
 
-                n_decode += 1;
-                n_cur += 1;
+                ++n_cur;
 
                 LlamaCppInterop.llama_decode(ctx, batch);
             }
 
-            Console.WriteLine();
+            Console.WriteLine($"\nElapsed = {sw.Elapsed}\n");
 
             LlamaCppInterop.llama_batch_free(batch);
             LlamaCppInterop.llama_free(ctx);
-            LlamaCppInterop.llama_free_model(model);
+            LlamaCppInterop.llama_free_model(mdl);
             LlamaCppInterop.llama_backend_free();
         }
 
@@ -185,51 +178,68 @@ namespace LlamaCppCli
 
         static void RunBatchedSample(string[] args)
         {
-            var n_parallel = Int32.Parse(args[0]);
+            var n_parallel = args.Length > 1 ? Int32.Parse(args[1]) : 1;
 
+            var top_k = 40;
+            var top_p = 0.9f;
+            var temp = 0.0f;
+
+            // Backend init
             LlamaCppInterop.llama_backend_init(false);
 
-            var model_params = LlamaCppInterop.llama_model_default_params();
-            model_params.n_gpu_layers = 64;
+            // Model init
+            var mdl_params = LlamaCppInterop.llama_model_default_params();
+            mdl_params.n_gpu_layers = 64;
+            var mdl = LlamaCppInterop.llama_load_model_from_file(args[0], mdl_params);
 
-            var model = LlamaCppInterop.llama_load_model_from_file("D:\\LLM_MODELS\\ehartford\\ggml-dolphin-2.0-mistral-7b-q8_0.gguf", model_params);
-
+            // Context init
             var ctx_params = LlamaCppInterop.llama_context_default_params();
             ctx_params.seed = 1;
             ctx_params.n_ctx = 16384;
             ctx_params.n_batch = 512;
             ctx_params.n_threads = 1;
             ctx_params.n_threads_batch = 1;
+            var ctx = LlamaCppInterop.llama_new_context_with_model(mdl, ctx_params);
 
-            var ctx = LlamaCppInterop.llama_new_context_with_model(model, ctx_params);
+            // Prompt tokenization
+            var tokens_list = new List<llama_token>() { LlamaCppInterop.llama_token_bos(ctx) };
+            {
+                tokens_list.AddRange(LlamaCppInterop.llama_tokenize(ctx, "[INST] List the planets of the solar system in order from the Sun. [/INST]\nMercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus and Neptune.").ToArray());
+                tokens_list.AddRange(new[] { LlamaCppInterop.llama_token_eos(ctx), LlamaCppInterop.llama_token_bos(ctx) });
+                tokens_list.AddRange(LlamaCppInterop.llama_tokenize(ctx, "[INST] Write a table listing the planets of the solar system in reverse order from the Sun. [/INST]\n").ToArray());
+            }
 
-            var tokens_list = LlamaCppInterop.llama_tokenize(
-                ctx,
-                "<|im_start|>system\nYou are an astrophysicist.<|im_end|>\n<|im_start|>user\nList the planets of the solar system in order from the Sun.<|im_end|>\n",
-                true
-            );
-
+            // Prompt batching
             var batch = LlamaCppInterop.llama_batch_init((int)ctx_params.n_batch, 0);
-            batch.n_tokens = tokens_list.Length;
+            batch.n_tokens = tokens_list.Count;
             for (var i = 0; i < batch.n_tokens; i++)
             {
                 batch.token((int)ctx_params.n_batch)[i] = tokens_list[i];
                 batch.pos((int)ctx_params.n_batch)[i] = i;
                 batch.seq_id((int)ctx_params.n_batch)[i] = 0;
-                batch.logits((int)ctx_params.n_batch)[i] = 0; // false
+                batch.logits((int)ctx_params.n_batch)[i] = 0;
             }
-            batch.logits((int)ctx_params.n_batch)[batch.n_tokens - 1] = 1; // true
+            batch.logits((int)ctx_params.n_batch)[batch.n_tokens - 1] = 1;
 
+            // Prompt decoding
             LlamaCppInterop.llama_decode(ctx, batch);
 
+            // Prompt duplication
             for (var i = 1; i < n_parallel; ++i)
                 LlamaCppInterop.llama_kv_cache_seq_cp(ctx, 0, i, 0, batch.n_tokens);
 
-            var streams = new string[n_parallel];
+            var candidates = new LlamaCppInterop.llama_token_data[LlamaCppInterop.llama_n_vocab(mdl)];
+            var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates, size = (nuint)candidates.Length, sorted = false };
+
+            var streams = new StringBuilder[n_parallel];
+            for (var i = 0; i < streams.Length; ++i)
+                streams[i] = new StringBuilder();
+
             var i_batch = Enumerable.Repeat(batch.n_tokens - 1, n_parallel).ToArray();
 
-            int n_cur = batch.n_tokens;
-            int n_decode = 0;
+            var n_cur = batch.n_tokens;
+
+            var sw = Stopwatch.StartNew();
 
             while (true)
             {
@@ -240,29 +250,14 @@ namespace LlamaCppCli
                     if (i_batch[i] < 0)
                         continue;
 
-                    var n_vocab = LlamaCppInterop.llama_n_vocab(model);
                     var logits = LlamaCppInterop.llama_get_logits_ith(ctx, i_batch[i]);
-
-                    var candidates = new LlamaCppInterop.llama_token_data[n_vocab];
-                    for (llama_token token_id = 0; token_id < n_vocab; token_id++)
+                    for (var token_id = 0; token_id < candidates.Length; token_id++)
                         candidates[token_id] = new LlamaCppInterop.llama_token_data { id = token_id, logit = logits[token_id], p = 0.0f };
-                    var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates, size = (nuint)candidates.Length, sorted = false };
 
-                    llama_token new_token_id;
-                    {
-                        const int top_k = 40;
-                        const float top_p = 0.9f;
-                        const float temp = 0.0f;
-
-                        LlamaCppInterop.llama_sample_top_k(ctx, candidates_p, top_k, 1);
-                        LlamaCppInterop.llama_sample_top_p(ctx, candidates_p, top_p, 1);
-                        LlamaCppInterop.llama_sample_temp(ctx, candidates_p, temp);
-
-                        new_token_id = LlamaCppInterop.llama_sample_token(ctx, candidates_p);
-                    }
-                    //{
-                    //    new_token_id = LlamaCppInterop.llama_sample_token_greedy(ctx, candidates_p);
-                    //}
+                    LlamaCppInterop.llama_sample_top_k(ctx, candidates_p, top_k, 1);
+                    LlamaCppInterop.llama_sample_top_p(ctx, candidates_p, top_p, 1);
+                    LlamaCppInterop.llama_sample_temp(ctx, candidates_p, temp);
+                    var new_token_id = LlamaCppInterop.llama_sample_token(ctx, candidates_p);
 
                     if (new_token_id == LlamaCppInterop.llama_token_eos(ctx))
                     {
@@ -270,34 +265,32 @@ namespace LlamaCppCli
                         continue;
                     }
 
-                    streams[i] += Encoding.ASCII.GetString(LlamaCppInterop.llama_token_to_piece(ctx, new_token_id));
+                    streams[i].Append(Encoding.ASCII.GetString(LlamaCppInterop.llama_token_to_piece(ctx, new_token_id)));
                     i_batch[i] = batch.n_tokens;
 
                     batch.token((int)ctx_params.n_batch)[batch.n_tokens] = new_token_id;
                     batch.pos((int)ctx_params.n_batch)[batch.n_tokens] = n_cur;
                     batch.seq_id((int)ctx_params.n_batch)[batch.n_tokens] = i;
-                    batch.logits((int)ctx_params.n_batch)[batch.n_tokens] = 1; // true
+                    batch.logits((int)ctx_params.n_batch)[batch.n_tokens] = 1;
                     batch.n_tokens += 1;
-
-                    n_decode += 1;
                 }
 
                 if (batch.n_tokens == 0)
                     break;
 
-                n_cur += 1;
+                ++n_cur;
 
                 LlamaCppInterop.llama_decode(ctx, batch);
             }
 
-            Console.WriteLine();
+            Console.WriteLine($"\nElapsed = {sw.Elapsed}\n");
 
             for (var i = 0; i < n_parallel; ++i)
-                Console.WriteLine($"sequence {i}:\n{streams[i]}\n");
+                Console.WriteLine($"[{i}]:\n{streams[i]}\n");
 
             LlamaCppInterop.llama_batch_free(batch);
             LlamaCppInterop.llama_free(ctx);
-            LlamaCppInterop.llama_free_model(model);
+            LlamaCppInterop.llama_free_model(mdl);
             LlamaCppInterop.llama_backend_free();
         }
 

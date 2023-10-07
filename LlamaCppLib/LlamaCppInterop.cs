@@ -318,19 +318,19 @@ namespace LlamaCppLib
         [DllImport(LibName, EntryPoint = "llama_get_logits")] private static extern nint _llama_get_logits(llama_context ctx);
         public static unsafe Span<float> llama_get_logits(llama_context ctx)
         {
-            return new(_llama_get_logits(ctx).ToPointer(), llama_n_vocab(ctx));
+            return new(_llama_get_logits(ctx).ToPointer(), llama_n_vocab(llama_get_model(ctx)) * llama_n_ctx(ctx));
         }
 
         [DllImport(LibName, EntryPoint = "llama_get_logits_ith")] private static extern nint _llama_get_logits_ith(llama_context ctx, int i);
         public static unsafe Span<float> llama_get_logits_ith(llama_context ctx, int i)
         {
-            return new(_llama_get_logits_ith(ctx, i).ToPointer(), llama_n_vocab(llama_get_model(ctx)));
+            return new(_llama_get_logits_ith(ctx, i).ToPointer(), llama_n_vocab(llama_get_model(ctx)) * llama_n_ctx(ctx));
         }
 
         [DllImport(LibName, EntryPoint = "llama_get_embeddings")] private static extern nint _llama_get_embeddings(llama_context ctx);
         public static unsafe Span<float> llama_get_embeddings(llama_context ctx)
         {
-            return new(_llama_get_embeddings(ctx).ToPointer(), llama_n_embd(ctx));
+            return new(_llama_get_embeddings(ctx).ToPointer(), llama_n_embd(llama_get_model(ctx)));
         }
 
         //
@@ -362,7 +362,7 @@ namespace LlamaCppLib
         //
 
         [DllImport(LibName, EntryPoint = "llama_tokenize")] private static extern int _llama_tokenize(llama_model model, string text, int text_len, llama_token[] tokens, int n_max_tokens, bool add_bos);
-        public static ReadOnlySpan<llama_token> llama_tokenize(llama_context ctx, string text, bool add_bos)
+        public static ReadOnlySpan<llama_token> llama_tokenize(llama_context ctx, string text, bool add_bos = false)
         {
             return llama_tokenize_with_model(llama_get_model(ctx), text, add_bos);
         }
