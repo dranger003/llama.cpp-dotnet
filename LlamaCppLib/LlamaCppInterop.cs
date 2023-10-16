@@ -107,11 +107,11 @@ namespace LlamaCppLib
         {
             public int n_tokens;
 
-            private llama_token* _token;
-            private float* _embd;
-            private llama_pos* _pos;
-            private llama_seq_id* _seq_id;
-            private sbyte* _logits;
+            public llama_token* _token;
+            public float* _embd;
+            public llama_pos* _pos;
+            public llama_seq_id* _seq_id;
+            public sbyte* _logits;
 
             public llama_pos all_pos_0;
             public llama_pos all_pos_1;
@@ -122,6 +122,29 @@ namespace LlamaCppLib
             public Span<llama_pos> pos(int n_tokens) { return new(_pos, n_tokens); }
             public Span<llama_seq_id> seq_id(int n_tokens) { return new(_seq_id, n_tokens); }
             public Span<sbyte> logits(int n_tokens) { return new(_logits, n_tokens); }
+
+            public llama_batch(
+                int n_tokens,
+                llama_token* token,
+                float* embd,
+                llama_pos* pos,
+                llama_seq_id* seq_id,
+                sbyte* logits,
+                llama_pos all_pos_0 = 0,
+                llama_pos all_pos_1 = 0,
+                llama_seq_id all_seq_id = 0
+            )
+            {
+                this.n_tokens = n_tokens;
+                this._token = token;
+                this._embd = embd;
+                this._pos = pos;
+                this._seq_id = seq_id;
+                this._logits = logits;
+                this.all_pos_0 = all_pos_0;
+                this.all_pos_1 = all_pos_1;
+                this.all_seq_id = all_seq_id;
+            }
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -362,11 +385,11 @@ namespace LlamaCppLib
         //
 
         [DllImport(LibName, EntryPoint = "llama_tokenize")] private static extern int _llama_tokenize(llama_model model, string text, int text_len, llama_token[] tokens, int n_max_tokens, bool add_bos);
-        public static ReadOnlySpan<llama_token> llama_tokenize(llama_context ctx, string text, bool add_bos = false)
+        public static Span<llama_token> llama_tokenize(llama_context ctx, string text, bool add_bos = false)
         {
             return llama_tokenize_with_model(llama_get_model(ctx), text, add_bos);
         }
-        public static ReadOnlySpan<llama_token> llama_tokenize_with_model(llama_model model, string text, bool add_bos)
+        public static Span<llama_token> llama_tokenize_with_model(llama_model model, string text, bool add_bos)
         {
             var n_tokens = text.Length + (add_bos ? 1 : 0);
             var result = new llama_token[n_tokens];
@@ -383,7 +406,7 @@ namespace LlamaCppLib
         }
 
         [DllImport(LibName, EntryPoint = "llama_token_to_piece")] private static extern int _llama_token_to_piece(llama_model model, llama_token token, byte[] buf, int length);
-        public static ReadOnlySpan<byte> llama_token_to_piece(llama_context ctx, llama_token token)
+        public static Span<byte> llama_token_to_piece(llama_context ctx, llama_token token)
         {
             var result = new byte[8];
             var n_pieces = _llama_token_to_piece(llama_get_model(ctx), token, result, result.Length);
@@ -565,7 +588,6 @@ namespace LlamaCppLib
         [DllImport(LibName)] public static extern void llama_print_timings(llama_context ctx);
         [DllImport(LibName)] public static extern void llama_reset_timings(llama_context ctx);
 
-        // Print system information
         [DllImport(LibName, EntryPoint = "llama_print_system_info")] private static extern nint _llama_print_system_info();
         public static string llama_print_system_info()
         {
@@ -575,26 +597,5 @@ namespace LlamaCppLib
         [DllImport(LibName)] public static extern void llama_log_set(ggml_log_callback log_callback, object user_data);
 
         [DllImport(LibName)] public static extern void llama_dump_timing_info_yaml(nint stream, llama_context ctx);
-
-        //
-        // Other
-        //
-
-        //public static byte[] llama_token_to_bytes(llama_context ctx, llama_token token)
-        //{
-        //    var result = new byte[8];
-        //    var n_tokens = _llama_token_to_piece(ctx, token, result, result.Length);
-        //    if (n_tokens >= 0)
-        //    {
-        //        var bytes = new byte[n_tokens];
-        //        Array.Copy(result, bytes, bytes.Length);
-        //        return bytes;
-        //    }
-
-        //    result = new byte[-n_tokens];
-        //    var check = _llama_token_to_piece(ctx, token, result, result.Length);
-        //    Debug.Assert(check == -n_tokens);
-        //    return result;
-        //}
     }
 }
