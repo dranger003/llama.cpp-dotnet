@@ -329,7 +329,7 @@ namespace LlamaCppLib
         //
 
         // NOTE: this is a helper function to facilitate transition to the new batch API - avoid using it
-        [DllImport(LibName)] private static extern llama_batch llama_batch_get_one(llama_token[] tokens, int n_tokens, llama_pos pos_0, llama_seq_id seq_id);
+        [DllImport(LibName)] public static extern llama_batch llama_batch_get_one(llama_token[] tokens, int n_tokens, llama_pos pos_0, llama_seq_id seq_id);
 
         [DllImport(LibName)] public static extern llama_batch llama_batch_init(int n_tokens, int embd);
         [DllImport(LibName)] public static extern void llama_batch_free(llama_batch batch);

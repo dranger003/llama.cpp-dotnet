@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Net.Mime;
 using System.Reflection;
@@ -9,16 +10,12 @@ using System.Web;
 
 using LlamaCppLib;
 using BertCppLib;
-using System.Diagnostics;
 using System.Data.Common;
-using System.ComponentModel.DataAnnotations;
-using System;
-using System.IO;
 
 namespace LlamaCppCli
 {
-    using static LlamaCppLib.LlamaCppInterop;
     using llama_token = System.Int32;
+    using llama_seq_id = System.Int32;
 
     internal class Program
     {
@@ -81,7 +78,8 @@ namespace LlamaCppCli
             await RunParallelSampleAsync(args);
         }
 
-        static string __func__() => MethodBase.GetCurrentMethod()?.Name ?? String.Empty;
+        //static string __func__ => new StackTrace().GetFrame(1)?.GetMethod()?.Name ?? String.Empty;
+        static string __func__ => "main";
 
         static async Task RunSimpleSampleAsync(string[] args)
         {
@@ -319,10 +317,10 @@ namespace LlamaCppCli
             LlamaCppInterop.llama_backend_free();
         }
 
-        private struct Client
+        private class Client
         {
             public int id;
-            public int seq_id = -1;
+            public llama_seq_id seq_id = -1;
             public llama_token sampled;
             public long t_start_prompt;
             public long t_start_gen;
@@ -333,9 +331,6 @@ namespace LlamaCppCli
             public string prompt = String.Empty;
             public string response = String.Empty;
             public List<llama_token> tokens_prev = new();
-
-            public Client()
-            { }
         }
 
         static async Task RunParallelSampleAsync(string[] args)
@@ -346,8 +341,11 @@ namespace LlamaCppCli
 
         static unsafe void RunParallelSample(string[] args)
         {
+            // parallel.exe -s 1 -t 1 -tb 1 -n 128 -c 2048 -b 512 -np 9 -ns 9 -ngl 64 -m D:\LLM_MODELS\codellama\ggml-codeLlama-7b-instruct-q8_0.gguf
+
             var k_system = "";
-            var k_prompts = new[]{
+            var k_prompts = new[]
+            {
                 "What is the meaning of life?",
                 "Tell me an interesting fact about llamas.",
                 "What is the best way to cook a steak?",
@@ -359,15 +357,16 @@ namespace LlamaCppCli
                 "I want to learn how to play the piano.",
             };
 
-            var n_predict = -1;
+            var n_predict = 128;
 
-            var rand = new Random(1234);
+            //var rand = new Random(1234);
+            var rand = 0;
 
             // number of simultaneous "clients" to simulate
-            var n_clients = args.Length > 1 ? Int32.Parse(args[1]) : 1;
+            var n_clients = k_prompts.Length; //args.Length > 1 ? Int32.Parse(args[1]) : 1;
 
             // requests to simulate
-            var n_seq = 1;
+            var n_seq = k_prompts.Length;
 
             // insert new requests as soon as the previous one is done
             var cont_batching = false;
@@ -382,12 +381,23 @@ namespace LlamaCppCli
 
             var ctx_params = LlamaCppInterop.llama_context_default_params();
             ctx_params.seed = 1;
-            ctx_params.n_ctx = 16384;
+            ctx_params.n_ctx = 2048;
             ctx_params.n_batch = 512;
             ctx_params.n_threads = 1;
             ctx_params.n_threads_batch = 1;
             ctx_params.logits_all = true;
             var ctx = LlamaCppInterop.llama_new_context_with_model(mdl, ctx_params);
+
+            //{
+            //    //warming up the model with an empty run
+            //    var tmp = new llama_token[] { LlamaCppInterop.llama_token_bos(ctx), LlamaCppInterop.llama_token_eos(ctx) };
+            //    LlamaCppInterop.llama_decode(ctx, LlamaCppInterop.llama_batch_get_one(tmp, Math.Min(tmp.Length, (int)ctx_params.n_batch), 0, 0));
+            //    LlamaCppInterop.llama_kv_cache_tokens_rm(ctx, -1, -1);
+            //    LlamaCppInterop.llama_reset_timings(ctx);
+            //}
+
+            Console.WriteLine($"\n\u001b[32mNo new questions so proceed with build-in defaults.\u001b[0m");
+            Console.WriteLine($"\n");
 
             var n_ctx = LlamaCppInterop.llama_n_ctx(ctx);
             var n_vocab = LlamaCppInterop.llama_n_vocab(mdl);
@@ -421,11 +431,11 @@ namespace LlamaCppCli
 
             var t_main_start = LlamaCppInterop.llama_time_us();
 
-            Console.WriteLine($"{__func__()}: Simulating parallel requests from clients:");
-            Console.WriteLine($"{__func__()}: n_parallel = {n_clients}, n_sequences = {n_seq}, cont_batching = {cont_batching}, system tokens = {n_tokens_system}\n");
+            Console.WriteLine($"{__func__}: Simulating parallel requests from clients:");
+            Console.WriteLine($"{__func__}: n_parallel = {n_clients}, n_sequences = {n_seq}, cont_batching = {(!cont_batching ? 0 : 1)}, system tokens = {n_tokens_system}\n");
 
             {
-                Console.WriteLine($"{__func__()}: Evaluating the system prompt ...");
+                Console.WriteLine($"{__func__}: Evaluating the system prompt ...");
 
                 batch.n_tokens = n_tokens_system;
 
@@ -483,7 +493,7 @@ namespace LlamaCppCli
                     for (int i = 0; i < n_clients; ++i)
                         LlamaCppInterop.llama_kv_cache_seq_rm(ctx, i, n_tokens_system, -1);
 
-                    Console.WriteLine($"{__func__()}: clearing the KV cache");
+                    Console.WriteLine($"{__func__}: clearing the KV cache");
                 }
 
                 // insert new sequences for decoding
@@ -500,8 +510,9 @@ namespace LlamaCppCli
                             client.t_start_prompt = LlamaCppInterop.llama_time_us();
                             client.t_start_gen = 0;
 
-                            client.input = k_prompts[rand.Next(k_prompts.Length - 1)];
-                            client.prompt = client.input + "\nAssistant:";
+                            //client.input = k_prompts[rand.Next(k_prompts.Length)];
+                            client.input = k_prompts[rand++ % k_prompts.Length];
+                            client.prompt = $"[INST] {client.input} [/INST]";
                             client.response = String.Empty;
 
                             client.tokens_prev = Enumerable.Repeat(0, client.tokens_prev.Count).ToList();
@@ -526,7 +537,7 @@ namespace LlamaCppCli
                             client.n_decoded = 0;
                             client.i_batch = batch.n_tokens - 1;
 
-                            Console.WriteLine($"\u001b[31mClient {client.id}, seq {client.seq_id}, started decoding ...\u001b[0m");
+                            Console.WriteLine($"\u001b[31mClient {client.id,3}, seq {client.seq_id,4}, started decoding ...\u001b[0m");
 
                             g_seq_id += 1;
 
@@ -548,7 +559,7 @@ namespace LlamaCppCli
                 {
                     var n_tokens = Math.Min(n_batch, batch.n_tokens - i);
 
-                    var batch_view = new llama_batch(
+                    var batch_view = new LlamaCppInterop.llama_batch(
                         n_tokens,
                         batch._token + i,
                         null,
@@ -564,7 +575,7 @@ namespace LlamaCppCli
                         if (n_batch == 1 || ret < 0)
                         {
                             // if you get here, it means the KV cache is full - try increasing it via the context size
-                            Console.WriteLine($"{__func__()} : failed to decode the batch, n_batch = {n_batch}, ret = {ret}");
+                            Console.WriteLine($"{__func__} : failed to decode the batch, n_batch = {n_batch}, ret = {ret}");
                             return;
                         }
 
@@ -579,7 +590,7 @@ namespace LlamaCppCli
                         continue;
                     }
 
-                    Console.WriteLine($"{__func__()} : decoded batch of {n_tokens} tokens\n");
+                    //Console.WriteLine($"{__func__} : decoded batch of {n_tokens} tokens\n");
 
                     for (var ci = 0; ci < clients.Count; ci++)
                     {
@@ -591,7 +602,6 @@ namespace LlamaCppCli
                         //Console.WriteLine($"client {client.id}, seq {client.seq_id}, token {client.sampled}, pos {client.n_decoded}, batch {client.i_batch}");
 
                         //var id = LlamaCppInterop.llama_sampling_sample(ctx, null, ctx_sampling, client.tokens_prev, candidates, client.i_batch - i, client.seq_id);
-
                         var logits = LlamaCppInterop.llama_get_logits_ith(ctx, client.i_batch - i);
                         for (var token_id = 0; token_id < candidates.Length; token_id++)
                             candidates[token_id] = new LlamaCppInterop.llama_token_data { id = token_id, logit = logits[token_id], p = 0.0f };
@@ -614,16 +624,12 @@ namespace LlamaCppCli
 
                         //Console.WriteLine($"client {client.id}, seq {client.seq_id}, token {id}, pos {client.n_decoded}, batch {client.i_batch}: {token_str}");
 
-                        if (client.n_decoded > 2 &&
-                            (id == LlamaCppInterop.llama_token_eos(ctx) ||
-                            (n_predict > 0 && client.n_decoded + client.n_prompt >= n_predict) ||
-                            client.response.Contains("User:") ||
-                            client.response.Contains('\n')))
+                        if (id == LlamaCppInterop.llama_token_eos(ctx) || (n_predict > 0 && client.n_decoded + client.n_prompt >= n_predict))
                         {
                             // basic reverse prompt
-                            var pos = client.response.IndexOf("User:");
-                            if (pos > 0)
-                                client.response = client.response.Substring(0, pos);
+                            //var pos = client.response.IndexOf("User:");
+                            //if (pos > 0)
+                            //    client.response = client.response.Substring(0, pos);
 
                             // delete only the generated part of the sequence, i.e. keep the system prompt in the cache
                             LlamaCppInterop.llama_kv_cache_seq_rm(ctx, client.id, n_tokens_system, -1);
@@ -659,19 +665,12 @@ namespace LlamaCppCli
 
             t_main_end = LlamaCppInterop.llama_time_us();
 
-            var print_date_time = () =>
-            {
-                DateTime currentTime = DateTime.Now;
-                string formattedTime = currentTime.ToString("yyyy-MM-dd HH:mm:ss");
-                Console.WriteLine($"\n\u001b[35mrun parameters as at {formattedTime}\u001b[0m");
-            };
+            Console.WriteLine($"\n\u001b[35mrun parameters as at {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}\u001b[0m");
 
-            print_date_time();
-
-            Console.WriteLine($"\n{__func__()}: n_parallel = {n_clients}, n_sequences = {n_seq}, cont_batching = {cont_batching}, system tokens = {n_tokens_system}");
+            Console.WriteLine($"\n{__func__}: n_parallel = {n_clients}, n_sequences = {n_seq}, cont_batching = {(!cont_batching ? 0 : 1)}, system tokens = {n_tokens_system}");
 
             Console.WriteLine($"External prompt file: \u001b[32m{"used built-in defaults"}\u001b[0m");
-            Console.WriteLine($"Model and path used:  \u001b[32m%s\u001b[0m\n", args[0]);
+            Console.WriteLine($"Model and path used:  \u001b[32m{args[0]}\u001b[0m\n");
 
             Console.WriteLine($"Total prompt tokens: {n_total_prompt,6}, speed: {(double)n_total_prompt / (t_main_end - t_main_start) * 1e6,5:F2} t/s");
             Console.WriteLine($"Total gen tokens:    {n_total_gen,6}, speed: {(double)n_total_gen / (t_main_end - t_main_start) * 1e6,5:F2} t/s");
@@ -684,6 +683,8 @@ namespace LlamaCppCli
             LlamaCppInterop.llama_free(ctx);
             LlamaCppInterop.llama_free_model(mdl);
             LlamaCppInterop.llama_backend_free();
+
+            Console.WriteLine($"\n");
         }
 
         //static async Task RunLocalSampleAsync(string[] args)
