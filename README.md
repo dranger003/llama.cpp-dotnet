@@ -2,6 +2,10 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+### *Update 10/2023*
+*There has been a major overhaul of the upstream repo to support parallel decoding.*  
+*The upstream changes are currently being ported and therefore most of the code here needs to be refactored.*
+
 ### Description
 
 C# bindings for llama.cpp including a .NET core library and sample projects (CLI & Web API).
