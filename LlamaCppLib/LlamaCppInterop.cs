@@ -110,7 +110,8 @@ namespace LlamaCppLib
             public llama_token* _token;
             public float* _embd;
             public llama_pos* _pos;
-            public llama_seq_id* _seq_id;
+            public int* _n_seq_id;
+            public llama_seq_id** _seq_id;
             public sbyte* _logits;
 
             public llama_pos all_pos_0;
@@ -120,7 +121,8 @@ namespace LlamaCppLib
             public Span<llama_token> token(int n_tokens) { return new(_token, n_tokens); }
             public Span<float> embd(int n_tokens, int embd) { return new(_embd, n_tokens * embd); }
             public Span<llama_pos> pos(int n_tokens) { return new(_pos, n_tokens); }
-            public Span<llama_seq_id> seq_id(int n_tokens) { return new(_seq_id, n_tokens); }
+            public Span<int> n_seq_id(int n_tokens) { return new(_n_seq_id, n_tokens); }
+            public Span<llama_seq_id> seq_id(int n_tokens, int i) { return new(_seq_id[i], n_tokens); }
             public Span<sbyte> logits(int n_tokens) { return new(_logits, n_tokens); }
 
             public llama_batch(
@@ -128,7 +130,8 @@ namespace LlamaCppLib
                 llama_token* token,
                 float* embd,
                 llama_pos* pos,
-                llama_seq_id* seq_id,
+                int* n_seq_id,
+                llama_seq_id** seq_id,
                 sbyte* logits,
                 llama_pos all_pos_0 = 0,
                 llama_pos all_pos_1 = 0,
@@ -139,6 +142,7 @@ namespace LlamaCppLib
                 this._token = token;
                 this._embd = embd;
                 this._pos = pos;
+                this._n_seq_id = n_seq_id;
                 this._seq_id = seq_id;
                 this._logits = logits;
                 this.all_pos_0 = all_pos_0;
@@ -331,7 +335,7 @@ namespace LlamaCppLib
         // NOTE: this is a helper function to facilitate transition to the new batch API - avoid using it
         [DllImport(LibName)] public static extern llama_batch llama_batch_get_one(llama_token[] tokens, int n_tokens, llama_pos pos_0, llama_seq_id seq_id);
 
-        [DllImport(LibName)] public static extern llama_batch llama_batch_init(int n_tokens, int embd);
+        [DllImport(LibName)] public static extern llama_batch llama_batch_init(int n_tokens, int embd, int n_seq_max);
         [DllImport(LibName)] public static extern void llama_batch_free(llama_batch batch);
 
         [DllImport(LibName)] public static extern int llama_decode(llama_context ctx, llama_batch batch);
@@ -384,20 +388,20 @@ namespace LlamaCppLib
         // Tokenization
         //
 
-        [DllImport(LibName, EntryPoint = "llama_tokenize")] private static extern int _llama_tokenize(llama_model model, string text, int text_len, llama_token[] tokens, int n_max_tokens, bool add_bos);
-        public static Span<llama_token> llama_tokenize(llama_context ctx, string text, bool add_bos = false)
+        [DllImport(LibName, EntryPoint = "llama_tokenize")] private static extern int _llama_tokenize(llama_model model, string text, int text_len, llama_token[] tokens, int n_max_tokens, bool add_bos, bool special);
+        public static Span<llama_token> llama_tokenize(llama_context ctx, string text, bool add_bos = false, bool special = false)
         {
-            return llama_tokenize_with_model(llama_get_model(ctx), text, add_bos);
+            return llama_tokenize_with_model(llama_get_model(ctx), text, add_bos, special);
         }
-        public static Span<llama_token> llama_tokenize_with_model(llama_model model, string text, bool add_bos)
+        public static Span<llama_token> llama_tokenize_with_model(llama_model model, string text, bool add_bos, bool special)
         {
             var n_tokens = text.Length + (add_bos ? 1 : 0);
             var result = new llama_token[n_tokens];
-            n_tokens = _llama_tokenize(model, text, text.Length, result, result.Length, add_bos);
+            n_tokens = _llama_tokenize(model, text, text.Length, result, result.Length, add_bos, special);
             if (n_tokens < 0)
             {
                 result = new llama_token[-n_tokens];
-                var check = _llama_tokenize(model, text, text.Length, result, result.Length, add_bos);
+                var check = _llama_tokenize(model, text, text.Length, result, result.Length, add_bos, special);
                 Debug.Assert(check == -n_tokens);
                 n_tokens = result.Length;
             }
@@ -597,5 +601,19 @@ namespace LlamaCppLib
         [DllImport(LibName)] public static extern void llama_log_set(ggml_log_callback log_callback, object user_data);
 
         [DllImport(LibName)] public static extern void llama_dump_timing_info_yaml(nint stream, llama_context ctx);
+
+        // Batch utils
+        public static void llama_batch_clear(ref llama_batch batch) => batch.n_tokens = 0;
+
+        public static void llama_batch_add(int n_tokens, ref llama_batch batch, llama_token id, llama_pos pos, Span<llama_seq_id> seq_ids, bool logits)
+        {
+            batch.token(n_tokens)[batch.n_tokens] = id;
+            batch.pos(n_tokens)[batch.n_tokens] = pos;
+            batch.n_seq_id(n_tokens)[batch.n_tokens] = seq_ids.Length;
+            for (var i = 0; i < seq_ids.Length; i++)
+                batch.seq_id(n_tokens, i)[batch.n_tokens] = seq_ids[i];
+            batch.logits(n_tokens)[batch.n_tokens] = (sbyte)(!logits ? 0 : 1);
+            batch.n_tokens++;
+        }
     }
 }

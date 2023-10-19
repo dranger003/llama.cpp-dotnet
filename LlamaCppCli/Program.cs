@@ -10,7 +10,6 @@ using System.Web;
 
 using LlamaCppLib;
 using BertCppLib;
-using System.Data.Common;
 
 namespace LlamaCppCli
 {
@@ -114,7 +113,7 @@ namespace LlamaCppCli
 
             // Initialize Batch
             var n_batch = LlamaCppInterop.llama_n_ctx(ctx);
-            var batch = LlamaCppInterop.llama_batch_init(n_batch, 0);
+            var batch = LlamaCppInterop.llama_batch_init(n_batch, 0, 1);
 
             // Initialize Candidates
             var candidates = new LlamaCppInterop.llama_token_data[LlamaCppInterop.llama_n_vocab(mdl)];
@@ -141,7 +140,7 @@ namespace LlamaCppCli
                     {
                         batch.token(n_batch)[i] = tokens[i];
                         batch.pos(n_batch)[i] = n_cur;
-                        batch.seq_id(n_batch)[i] = 0;
+                        batch.seq_id(n_batch, 0)[i] = 0;
                         batch.logits(n_batch)[i] = 0;
                     }
 
@@ -231,15 +230,10 @@ namespace LlamaCppCli
             }
 
             // Prompt batching
-            var batch = LlamaCppInterop.llama_batch_init((int)ctx_params.n_batch, 0);
+            var batch = LlamaCppInterop.llama_batch_init((int)ctx_params.n_batch, 0, 1);
             batch.n_tokens = tokens_list.Count;
-            for (var i = 0; i < batch.n_tokens; i++)
-            {
-                batch.token((int)ctx_params.n_batch)[i] = tokens_list[i];
-                batch.pos((int)ctx_params.n_batch)[i] = i;
-                batch.seq_id((int)ctx_params.n_batch)[i] = 0;
-                batch.logits((int)ctx_params.n_batch)[i] = 0;
-            }
+            for (var i = 0; i < tokens_list.Count; i++)
+                LlamaCppInterop.llama_batch_add((int)ctx_params.n_batch, ref batch, tokens_list[i], i, new[] { 0 }, false);
             batch.logits((int)ctx_params.n_batch)[batch.n_tokens - 1] = 1;
 
             // Prompt decoding
@@ -291,11 +285,7 @@ namespace LlamaCppCli
                     streams[i].Append(Encoding.ASCII.GetString(LlamaCppInterop.llama_token_to_piece(ctx, new_token_id)));
                     i_batch[i] = batch.n_tokens;
 
-                    batch.token((int)ctx_params.n_batch)[batch.n_tokens] = new_token_id;
-                    batch.pos((int)ctx_params.n_batch)[batch.n_tokens] = n_cur;
-                    batch.seq_id((int)ctx_params.n_batch)[batch.n_tokens] = i;
-                    batch.logits((int)ctx_params.n_batch)[batch.n_tokens] = 1;
-                    batch.n_tokens += 1;
+                    LlamaCppInterop.llama_batch_add((int)ctx_params.n_batch, ref batch, new_token_id, n_cur, new[] { i }, true);
                 }
 
                 if (batch.n_tokens == 0)
@@ -317,20 +307,26 @@ namespace LlamaCppCli
             LlamaCppInterop.llama_backend_free();
         }
 
-        private class Client
+        private struct Client
         {
             public int id;
+
             public llama_seq_id seq_id = -1;
+
             public llama_token sampled;
+
             public long t_start_prompt;
             public long t_start_gen;
+
             public int n_prompt;
             public int n_decoded;
             public int i_batch = -1;
+
             public string input = String.Empty;
             public string prompt = String.Empty;
-            public string response = String.Empty;
-            public List<llama_token> tokens_prev = new();
+            public StringBuilder response = new();
+
+            public Client() { }
         }
 
         static async Task RunParallelSampleAsync(string[] args)
@@ -363,10 +359,10 @@ namespace LlamaCppCli
             var rand = 0;
 
             // number of simultaneous "clients" to simulate
-            var n_clients = k_prompts.Length; //args.Length > 1 ? Int32.Parse(args[1]) : 1;
+            var n_clients = args.Length > 1 ? Int32.Parse(args[1]) : 1;
 
             // requests to simulate
-            var n_seq = k_prompts.Length;
+            var n_seq = n_clients;
 
             // insert new requests as soon as the previous one is done
             var cont_batching = false;
@@ -381,7 +377,7 @@ namespace LlamaCppCli
 
             var ctx_params = LlamaCppInterop.llama_context_default_params();
             ctx_params.seed = 1;
-            ctx_params.n_ctx = 2048;
+            ctx_params.n_ctx = 4096;
             ctx_params.n_batch = 512;
             ctx_params.n_threads = 1;
             ctx_params.n_threads_batch = 1;
@@ -404,14 +400,8 @@ namespace LlamaCppCli
 
             var clients = Enumerable
                 .Range(0, n_clients)
-                .Select(
-                    i => new Client()
-                    {
-                        id = i,
-                        tokens_prev = Enumerable.Repeat(0, Math.Max(256, n_predict)).ToList(),
-                    }
-                )
-                .ToList();
+                .Select(i => new Client() { id = i })
+                .ToArray();
 
             var candidates = new LlamaCppInterop.llama_token_data[n_vocab];
             var candidates_p = new LlamaCppInterop.llama_token_data_array { data = candidates, size = (nuint)candidates.Length, sorted = false };
@@ -423,7 +413,7 @@ namespace LlamaCppCli
 
             // the max batch size is as large as the context to handle cases where we get very long input prompt from multiple
             // users. regardless of the size, the main loop will chunk the batch into a maximum of params.n_batch tokens at a time
-            var batch = LlamaCppInterop.llama_batch_init(n_ctx, 0);
+            var batch = LlamaCppInterop.llama_batch_init(n_ctx, 0, 1);
 
             var n_total_prompt = 0;
             var n_total_gen = 0;
@@ -437,15 +427,8 @@ namespace LlamaCppCli
             {
                 Console.WriteLine($"{__func__}: Evaluating the system prompt ...");
 
-                batch.n_tokens = n_tokens_system;
-
-                for (var i = 0; i < batch.n_tokens; ++i)
-                {
-                    batch.token(n_ctx)[i] = tokens_system[i];
-                    batch.pos(n_ctx)[i] = i;
-                    batch.seq_id(n_ctx)[i] = 0;
-                    batch.logits(n_ctx)[i] = 0; // false
-                }
+                for (var i = 0; i < n_tokens_system; i++)
+                    LlamaCppInterop.llama_batch_add(n_ctx, ref batch, tokens_system[i], i, new[] { 0 }, false);
 
                 if (LlamaCppInterop.llama_decode(ctx, batch) != 0)
                 {
@@ -466,25 +449,21 @@ namespace LlamaCppCli
 
             while (true)
             {
-                batch.n_tokens = 0;
+                LlamaCppInterop.llama_batch_clear(ref batch);
 
                 // decode any currently ongoing sequences
-                for (var ci = 0; ci < clients.Count; ci++)
+                for (var ci = 0; ci < clients.Length; ci++)
                 {
-                    var client = clients[ci];
+                    ref var client = ref clients[ci];
 
                     if (client.seq_id == -1)
                         continue;
 
-                    batch.token(n_ctx)[batch.n_tokens] = client.sampled;
-                    batch.pos(n_ctx)[batch.n_tokens] = n_tokens_system + client.n_prompt + client.n_decoded;
-                    batch.seq_id(n_ctx)[batch.n_tokens] = client.id;
-                    batch.logits(n_ctx)[batch.n_tokens] = 1; // true
-
-                    client.n_decoded += 1;
                     client.i_batch = batch.n_tokens;
 
-                    batch.n_tokens += 1;
+                    LlamaCppInterop.llama_batch_add(n_ctx, ref batch, client.sampled, n_tokens_system + client.n_prompt + client.n_decoded, new[] { client.id }, true);
+
+                    client.n_decoded += 1;
                 }
 
                 if (batch.n_tokens == 0)
@@ -499,9 +478,9 @@ namespace LlamaCppCli
                 // insert new sequences for decoding
                 if (cont_batching || batch.n_tokens == 0)
                 {
-                    for (var ci = 0; ci < clients.Count; ci++)
+                    for (var ci = 0; ci < clients.Length; ci++)
                     {
-                        var client = clients[ci];
+                        ref var client = ref clients[ci];
 
                         if (client.seq_id == -1 && g_seq_id < n_seq)
                         {
@@ -513,21 +492,13 @@ namespace LlamaCppCli
                             //client.input = k_prompts[rand.Next(k_prompts.Length)];
                             client.input = k_prompts[rand++ % k_prompts.Length];
                             client.prompt = $"[INST] {client.input} [/INST]";
-                            client.response = String.Empty;
-
-                            client.tokens_prev = Enumerable.Repeat(0, client.tokens_prev.Count).ToList();
+                            client.response.Clear();
 
                             // do not prepend BOS because we have a system prompt!
                             var tokens_prompt = LlamaCppInterop.llama_tokenize(ctx, client.prompt, false);
 
                             for (var i = 0; i < tokens_prompt.Length; i++)
-                            {
-                                batch.token(n_ctx)[batch.n_tokens] = tokens_prompt[i];
-                                batch.pos(n_ctx)[batch.n_tokens] = i + n_tokens_system;
-                                batch.seq_id(n_ctx)[batch.n_tokens] = client.id;
-                                batch.logits(n_ctx)[batch.n_tokens] = 0; // false
-                                batch.n_tokens += 1;
-                            }
+                                LlamaCppInterop.llama_batch_add(n_ctx, ref batch, tokens_prompt[i], i + n_tokens_system, new[] { client.id }, false);
 
                             // extract the logits only for the last token
                             if (batch.n_tokens > 0)
@@ -564,9 +535,10 @@ namespace LlamaCppCli
                         batch._token + i,
                         null,
                         batch._pos + i,
+                        batch._n_seq_id + i,
                         batch._seq_id + i,
                         batch._logits + i,
-                        0, 0, 0
+                        0, 0, 0 // unused
                     );
 
                     var ret = LlamaCppInterop.llama_decode(ctx, batch_view);
@@ -592,9 +564,9 @@ namespace LlamaCppCli
 
                     //Console.WriteLine($"{__func__} : decoded batch of {n_tokens} tokens\n");
 
-                    for (var ci = 0; ci < clients.Count; ci++)
+                    for (var ci = 0; ci < clients.Length; ci++)
                     {
-                        var client = clients[ci];
+                        ref var client = ref clients[ci];
 
                         if (client.i_batch < i || client.i_batch >= (i + n_tokens))
                             continue;
@@ -614,12 +586,8 @@ namespace LlamaCppCli
                             client.t_start_gen = LlamaCppInterop.llama_time_us();
                         }
 
-                        // remember which tokens were sampled - used for repetition penalties during sampling
-                        client.tokens_prev.RemoveAt(0);
-                        client.tokens_prev.Add(id);
-
                         var token_str = Encoding.ASCII.GetString(LlamaCppInterop.llama_token_to_piece(ctx, id));
-                        client.response += token_str;
+                        client.response.Append(token_str);
                         client.sampled = id;
 
                         //Console.WriteLine($"client {client.id}, seq {client.seq_id}, token {id}, pos {client.n_decoded}, batch {client.i_batch}: {token_str}");
@@ -648,13 +616,13 @@ namespace LlamaCppCli
                                 + $"\u001b[0m\n"
                                 + $"Input:    {client.input.Trim()}\n"
                                 + $"\u001b[35m"
-                                + $"Response: {client.response.Trim()}"
+                                + $"Response: {client.response.ToString().Trim()}"
                                 + $"\u001b[0m\n"
                             );
 
                             n_total_prompt += client.n_prompt;
                             n_total_gen += client.n_decoded;
-                            //llama_sampling_context_reset(ctx_sampling, client.seq_id);
+
                             client.seq_id = -1;
                         }
 
