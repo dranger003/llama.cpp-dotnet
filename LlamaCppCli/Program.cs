@@ -8,7 +8,7 @@ using LlamaCppLib;
 
 namespace LlamaCppCli
 {
-    using llama_token = int;
+    using llama_token = System.Int32;
 
     internal class Program
     {

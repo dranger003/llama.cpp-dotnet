@@ -2,10 +2,10 @@
 
 namespace LlamaCppLib
 {
-    using llama_model = nint;
-    using llama_token = int;
-    using llama_pos = int;
-    using llama_seq_id = int;
+    using llama_model = System.IntPtr;
+    using llama_token = System.Int32;
+    using llama_pos = System.Int32;
+    using llama_seq_id = System.Int32;
 
     public static unsafe class Interop
     {
