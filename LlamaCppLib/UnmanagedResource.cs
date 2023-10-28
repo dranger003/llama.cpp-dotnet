@@ -10,8 +10,6 @@ namespace LlamaCppLib
             if (EqualityComparer<T>.Default.Equals(_handle, default) || _handle == null)
                 return;
 
-            Console.WriteLine($"{typeof(T)}");
-
             _dealloc?.Invoke(_handle);
             _handle = default;
         }
@@ -27,7 +25,7 @@ namespace LlamaCppLib
             return _handle;
         }
 
-        public static explicit operator T(UnmanagedResource<T> safeHandle) => safeHandle.Handle;
+        public void GetResource(out T? resource) => resource = _handle;
     }
 
     internal class UnmanagedResource : UnmanagedResource<bool>

@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace LlamaCppLib
 {
@@ -14,6 +15,12 @@ namespace LlamaCppLib
         private UnmanagedResource<PInvoke.llama_batch> _batch = new();
 
         private BackendOptions _backendOptions = new();
+        private ModelOptions _modelOptions = new();
+
+        private List<LlmRequest> _requests = new();
+
+        private CancellationTokenSource _cancellationTokenSource = new();
+        private Task? _task;
 
         public LlmModel() { }
         public LlmModel(BackendOptions backendOptions) => _backendOptions = backendOptions;
@@ -27,6 +34,7 @@ namespace LlamaCppLib
                 if (disposing)
                 {
                     // Managed
+                    StopAsync().Wait();
                 }
 
                 // Unmanaged
@@ -57,8 +65,8 @@ namespace LlamaCppLib
             if (_model.Created)
                 throw new InvalidOperationException("Model already loaded.");
 
-            if (modelOptions == default)
-                modelOptions = new();
+            if (modelOptions != default)
+                _modelOptions = modelOptions;
 
             if (!_backend.Created)
                 _backend.Create(() => PInvoke.llama_backend_init(_backendOptions.NumaOptimizations), PInvoke.llama_backend_free);
@@ -67,23 +75,23 @@ namespace LlamaCppLib
             progressCallbackHandle.Create(() => GCHandle.Alloc(progressCallback), handle => handle.Free());
 
             var mparams = PInvoke.llama_model_default_params();
-            mparams.n_gpu_layers = modelOptions.GpuLayers;
-            mparams.use_mmap = (byte)(modelOptions.UseMemoryMap ? 1 : 0);
+            mparams.n_gpu_layers = _modelOptions.GpuLayers;
+            mparams.use_mmap = (byte)(_modelOptions.UseMemoryMap ? 1 : 0);
             mparams.progress_callback = &LlmModel._ProgressCallback;
-            mparams.progress_callback_user_data = GCHandle.ToIntPtr((GCHandle)progressCallbackHandle).ToPointer();
+            mparams.progress_callback_user_data = GCHandle.ToIntPtr(progressCallbackHandle.Handle).ToPointer();
 
             _model.Create(() => PInvoke.llama_load_model_from_file(modelPath, mparams), PInvoke.llama_free_model);
 
             var cparams = PInvoke.llama_context_default_params();
-            cparams.seed = (uint)modelOptions.Seed;
-            cparams.n_ctx = (uint)modelOptions.ContextLength;
-            cparams.n_batch = (uint)modelOptions.BatchSize;
-            cparams.n_threads = (uint)modelOptions.ThreadCount;
-            cparams.n_threads_batch = (uint)modelOptions.BatchThreadCount;
+            cparams.seed = (uint)_modelOptions.Seed;
+            cparams.n_ctx = (uint)_modelOptions.ContextLength;
+            cparams.n_batch = (uint)_modelOptions.BatchSize;
+            cparams.n_threads = (uint)_modelOptions.ThreadCount;
+            cparams.n_threads_batch = (uint)_modelOptions.BatchThreadCount;
 
-            _context.Create(() => PInvoke.llama_new_context_with_model((nint)_model, cparams), PInvoke.llama_free);
+            _context.Create(() => PInvoke.llama_new_context_with_model(_model.Handle, cparams), PInvoke.llama_free);
 
-            _batch.Create(() => PInvoke.llama_batch_init(PInvoke.llama_n_ctx((nint)_context), 0, 1), PInvoke.llama_batch_free);
+            _batch.Create(() => PInvoke.llama_batch_init(PInvoke.llama_n_ctx(_context.Handle), 0, 1), PInvoke.llama_batch_free);
         }
 
         public void Unload()
@@ -93,155 +101,184 @@ namespace LlamaCppLib
             _model.Dispose();
         }
 
-        //public IEnumerable<byte[]> NextToken(SamplingOptions? samplingOptions = default)
-        //{
-        //    var requests = new List<LlmRequest>();
-        //    var bat_view = stackalloc PInvoke.llama_batch[1];
+        public Span<int> Tokenize(string prompt, bool addBos = false, bool specialTokens = false) => Interop.llama_tokenize(_model.Handle, prompt, addBos, specialTokens);
 
-        //    var candidates = new PInvoke.llama_token_data[PInvoke.llama_n_vocab((nint)_model)];
-        //    var candidates_p = stackalloc PInvoke.llama_token_data_array[1];
+        public Task StartAsync()
+        {
+            if (_task != default)
+                throw new InvalidOperationException("Already running.");
 
-        //    for (var token = 0; token < candidates.Length; token++)
-        //        candidates[token] = new PInvoke.llama_token_data();
+            _task = new Task(_Run);
+            _task.Start();
 
-        //    while (true)
-        //    {
-        //        if (!requests.Any())
-        //        {
-        //            Console.Write("\n> ");
-        //            var prompt = Console.ReadLine() ?? String.Empty;
+            return _task;
+        }
 
-        //            prompt = Regex.Replace(prompt, "\\\\n", "\n");
+        public async Task StopAsync()
+        {
+            if (_task == default)
+                return;
 
-        //            if (String.IsNullOrWhiteSpace(prompt))
-        //                break;
+            _cancellationTokenSource.Cancel();
+            await (_task ?? Task.CompletedTask);
+            _cancellationTokenSource = new();
 
-        //            var match = Regex.Match(prompt, @"^/load (.+)$");
-        //            if (match.Success)
-        //                prompt = File.ReadAllText(match.Groups[1].Value);
+            _task = default;
+        }
 
-        //            var tokens = Interop.llama_tokenize(mdl, prompt, true, true);
-        //            Console.WriteLine($"{tokens.Length} token(s)");
+        private unsafe void _Run()
+        {
+            var batchView = stackalloc PInvoke.llama_batch[1];
 
-        //            requests.Add(new LlmRequest(PInvoke.llama_n_ctx(ctx), tokens));
+            var candidates = new PInvoke.llama_token_data[PInvoke.llama_n_vocab(_model.Handle)];
+            var candidates_p = stackalloc PInvoke.llama_token_data_array[1];
 
-        //            PInvoke.llama_kv_cache_seq_rm(ctx, 0, 0, -1);
-        //        }
+            for (var token = 0; token < candidates.Length; token++)
+                candidates[token] = new PInvoke.llama_token_data();
 
-        //        bat.n_tokens = 0;
+            _batch.GetResource(out var batch);
 
-        //        foreach (var request in requests)
-        //        {
-        //            for (; request.PosBatch < request.PosTokens; request.PosBatch++)
-        //                Interop.llama_batch_add(ref bat, request.Tokens[request.PosBatch], request.PosBatch, new[] { request.Id }, false);
+            var cancellationToken = _cancellationTokenSource.Token;
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                while (!_requests.Any())
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
 
-        //            request.PosLogit = bat.n_tokens - 1;
-        //            bat.logits[request.PosLogit] = true ? 1 : 0;
-        //        }
+                    Thread.Sleep(10);
+                }
 
-        //        if (bat.n_tokens == 0)
-        //            break;
+                batch.n_tokens = 0;
 
-        //        var n_batch = (int)cparams.n_batch;
-        //        for (var i = 0; i < bat.n_tokens; i += n_batch)
-        //        {
-        //            var n_tokens = Math.Min(n_batch, bat.n_tokens - i);
+                foreach (var request in _requests)
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
 
-        //            bat_view->n_tokens = n_tokens;
-        //            bat_view->token = bat.token + i;
-        //            bat_view->embd = null;
-        //            bat_view->pos = bat.pos + i;
-        //            bat_view->n_seq_id = bat.n_seq_id + i;
-        //            bat_view->seq_id = bat.seq_id + i;
-        //            bat_view->logits = bat.logits + i;
-        //            bat_view->all_pos_0 = 0;
-        //            bat_view->all_pos_1 = 0;
-        //            bat_view->all_seq_id = 0;
+                    for (; request.PosBatch < request.PosTokens; request.PosBatch++)
+                        Interop.llama_batch_add(ref batch, request.Tokens[request.PosBatch], request.PosBatch, new[] { request.Id }, false);
 
-        //            PInvoke.llama_decode(ctx, *bat_view);
+                    request.PosLogit = batch.n_tokens - 1;
+                    batch.logits[request.PosLogit] = true ? 1 : 0;
+                }
 
-        //            foreach (var request in requests)
-        //            {
-        //                if (request.PosLogit < i || request.PosLogit >= i + n_tokens)
-        //                    continue;
+                if (batch.n_tokens == 0)
+                    break;
 
-        //                var logits = PInvoke.llama_get_logits_ith(ctx, request.PosLogit - i);
+                var nbatch = _modelOptions.BatchSize;
+                for (var i = 0; i < batch.n_tokens; i += nbatch)
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
 
-        //                for (var token = 0; token < candidates.Length; token++)
-        //                {
-        //                    candidates[token].id = token;
-        //                    candidates[token].logit = logits[token];
-        //                    candidates[token].p = 0.0f;
-        //                }
+                    var n_tokens = Math.Min(nbatch, batch.n_tokens - i);
 
-        //                fixed (PInvoke.llama_token_data* p1 = &candidates[0])
-        //                {
-        //                    candidates_p->data = p1;
-        //                    candidates_p->size = (nuint)candidates.Length;
-        //                    candidates_p->sorted = false ? 1 : 0;
+                    batchView->n_tokens = n_tokens;
+                    batchView->token = batch.token + i;
+                    batchView->embd = null;
+                    batchView->pos = batch.pos + i;
+                    batchView->n_seq_id = batch.n_seq_id + i;
+                    batchView->seq_id = batch.seq_id + i;
+                    batchView->logits = batch.logits + i;
+                    batchView->all_pos_0 = 0;
+                    batchView->all_pos_1 = 0;
+                    batchView->all_seq_id = 0;
 
-        //                    fixed (llama_token* p2 = &request.Tokens[Math.Max(0, request.PosTokens - samplingOptions.PenaltyLastN)])
-        //                    {
-        //                        PInvoke.llama_sample_repetition_penalties(
-        //                            ctx,
-        //                            candidates_p,
-        //                            p2,
-        //                            (nuint)samplingOptions.PenaltyLastN,
-        //                            samplingOptions.PenaltyRepeat,
-        //                            samplingOptions.PenaltyFreq,
-        //                            samplingOptions.PenaltyPresent);
-        //                    }
+                    PInvoke.llama_decode(_context.Handle, *batchView);
 
-        //                    llama_token token;
-        //                    if (samplingOptions.Temperature < 0.0f)
-        //                    {
-        //                        PInvoke.llama_sample_softmax(ctx, candidates_p);
-        //                        token = candidates_p->data[0].id;
-        //                    }
-        //                    else if (samplingOptions.Temperature == 0.0f)
-        //                    {
-        //                        token = PInvoke.llama_sample_token_greedy(ctx, candidates_p);
-        //                    }
-        //                    else if (samplingOptions.Mirostat == Mirostat.MirostatV1)
-        //                    {
-        //                        PInvoke.llama_sample_temp(ctx, candidates_p, samplingOptions.Temperature);
-        //                        token = PInvoke.llama_sample_token_mirostat(ctx, candidates_p, samplingOptions.MirostatTau, samplingOptions.MirostatEta, 100, ref request.MirostatMU);
-        //                    }
-        //                    else if (samplingOptions.Mirostat == Mirostat.MirostatV2)
-        //                    {
-        //                        PInvoke.llama_sample_temp(ctx, candidates_p, samplingOptions.Temperature);
-        //                        token = PInvoke.llama_sample_token_mirostat_v2(ctx, candidates_p, samplingOptions.MirostatTau, samplingOptions.MirostatEta, ref request.MirostatMU);
-        //                    }
-        //                    else
-        //                    {
-        //                        PInvoke.llama_sample_top_k(ctx, candidates_p, samplingOptions.TopK, 1);
-        //                        PInvoke.llama_sample_tail_free(ctx, candidates_p, samplingOptions.TfsZ, 1);
-        //                        PInvoke.llama_sample_typical(ctx, candidates_p, samplingOptions.TypicalP, 1);
-        //                        PInvoke.llama_sample_top_p(ctx, candidates_p, samplingOptions.TopP, 1);
-        //                        PInvoke.llama_sample_temp(ctx, candidates_p, samplingOptions.Temperature);
-        //                        token = PInvoke.llama_sample_token(ctx, candidates_p);
-        //                    }
+                    foreach (var request in _requests)
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                            break;
 
-        //                    request.Tokens[request.PosTokens++] = token;
-        //                    Console.Write(Encoding.ASCII.GetString(Interop.llama_token_to_piece(mdl, token)));
+                        if (request.PosLogit < i || request.PosLogit >= i + n_tokens)
+                            continue;
 
-        //                    if (request.T1 == default)
-        //                        request.T1 = DateTime.Now;
+                        var logits = PInvoke.llama_get_logits_ith(_context.Handle, request.PosLogit - i);
 
-        //                    if (token == PInvoke.llama_token_eos(mdl))
-        //                        request.T2 = DateTime.Now;
-        //                }
-        //            }
-        //        }
+                        for (var token = 0; token < candidates.Length; token++)
+                        {
+                            candidates[token].id = token;
+                            candidates[token].logit = logits[token];
+                            candidates[token].p = 0.0f;
+                        }
 
-        //        requests
-        //            .Where(r => r.Tokens[r.PosTokens - 1] == PInvoke.llama_token_eos(mdl))
-        //            .ToList()
-        //            .ForEach(r => Console.WriteLine($"\n{r.PosTokens / (double)(((r.T2 - r.T1)?.TotalSeconds) ?? 1):F2} t/s"));
+                        fixed (PInvoke.llama_token_data* p1 = &candidates[0])
+                        {
+                            candidates_p->data = p1;
+                            candidates_p->size = (nuint)candidates.Length;
+                            candidates_p->sorted = false ? 1 : 0;
 
-        //        requests.RemoveAll(r => r.Tokens[r.PosTokens - 1] == PInvoke.llama_token_eos(mdl));
-        //    }
-        //}
+                            fixed (int* p2 = &request.Tokens[Math.Max(0, request.PosTokens - request.SamplingOptions.PenaltyLastN)])
+                            {
+                                PInvoke.llama_sample_repetition_penalties(
+                                    _context.Handle,
+                                    candidates_p,
+                                    p2,
+                                    (nuint)request.SamplingOptions.PenaltyLastN,
+                                    request.SamplingOptions.PenaltyRepeat,
+                                    request.SamplingOptions.PenaltyFreq,
+                                    request.SamplingOptions.PenaltyPresent);
+                            }
+
+                            int token;
+                            if (request.SamplingOptions.Temperature < 0.0f)
+                            {
+                                PInvoke.llama_sample_softmax(_context.Handle, candidates_p);
+                                token = candidates_p->data[0].id;
+                            }
+                            else if (request.SamplingOptions.Temperature == 0.0f)
+                            {
+                                token = PInvoke.llama_sample_token_greedy(_context.Handle, candidates_p);
+                            }
+                            else if (request.SamplingOptions.Mirostat == Mirostat.MirostatV1)
+                            {
+                                PInvoke.llama_sample_temp(_context.Handle, candidates_p, request.SamplingOptions.Temperature);
+                                token = PInvoke.llama_sample_token_mirostat(
+                                    _context.Handle,
+                                    candidates_p,
+                                    request.SamplingOptions.MirostatTau,
+                                    request.SamplingOptions.MirostatEta,
+                                    100, ref request.MirostatMU
+                                );
+                            }
+                            else if (request.SamplingOptions.Mirostat == Mirostat.MirostatV2)
+                            {
+                                PInvoke.llama_sample_temp(_context.Handle, candidates_p, request.SamplingOptions.Temperature);
+                                token = PInvoke.llama_sample_token_mirostat_v2(
+                                    _context.Handle,
+                                    candidates_p,
+                                    request.SamplingOptions.MirostatTau,
+                                    request.SamplingOptions.MirostatEta,
+                                    ref request.MirostatMU
+                                );
+                            }
+                            else
+                            {
+                                PInvoke.llama_sample_top_k(_context.Handle, candidates_p, request.SamplingOptions.TopK, 1);
+                                PInvoke.llama_sample_tail_free(_context.Handle, candidates_p, request.SamplingOptions.TfsZ, 1);
+                                PInvoke.llama_sample_typical(_context.Handle, candidates_p, request.SamplingOptions.TypicalP, 1);
+                                PInvoke.llama_sample_top_p(_context.Handle, candidates_p, request.SamplingOptions.TopP, 1);
+                                PInvoke.llama_sample_temp(_context.Handle, candidates_p, request.SamplingOptions.Temperature);
+                                token = PInvoke.llama_sample_token(_context.Handle, candidates_p);
+                            }
+
+                            request.Tokens[request.PosTokens++] = token;
+                            Console.Write(Encoding.ASCII.GetString(Interop.llama_token_to_piece(_model.Handle, token)));
+
+                            if (request.T1 == default)
+                                request.T1 = DateTime.Now;
+
+                            if (token == PInvoke.llama_token_eos(_model.Handle))
+                                request.T2 = DateTime.Now;
+                        }
+                    }
+                }
+
+                _requests.RemoveAll(r => r.Tokens[r.PosTokens - 1] == PInvoke.llama_token_eos(_model.Handle));
+            }
+        }
     }
 
     internal class LlmRequest : IEquatable<LlmRequest>
@@ -254,6 +291,7 @@ namespace LlamaCppLib
         public int PosTokens { get; set; }
         public int[] Tokens { get; set; }
 
+        public SamplingOptions SamplingOptions { get; set; } = new();
         public float MirostatMU = 0.0f;
 
         public DateTime? T1 { get; set; }
