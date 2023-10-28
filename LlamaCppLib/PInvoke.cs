@@ -1,5 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace LlamaCppLib
 {
@@ -84,7 +83,6 @@ namespace LlamaCppLib
         }
 
         [LibraryImport(LibName)]
-        [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
         public static partial llama_model_params llama_model_default_params();
 
         [LibraryImport(LibName)]
@@ -187,6 +185,11 @@ namespace LlamaCppLib
 
         [LibraryImport(LibName)]
         public static partial llama_token llama_sample_token_greedy(
+            llama_context ctx,
+            llama_token_data_array* candidates);
+
+        [LibraryImport(LibName)]
+        public static partial void llama_sample_softmax(
             llama_context ctx,
             llama_token_data_array* candidates);
 
