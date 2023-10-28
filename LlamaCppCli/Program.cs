@@ -1,6 +1,9 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+
 using LlamaCppLib;
 
 namespace LlamaCppCli
@@ -26,8 +29,21 @@ namespace LlamaCppCli
             await Task.CompletedTask;
         }
 
-        unsafe static void RunSample(string[] args)
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        static unsafe void ProgressCallback(float progress, void* state) => Console.Write($"{new string(' ', 32)}\rLoading model... {(byte)(progress * 100)}%\r");
+
+        static unsafe void RunSample(string[] args)
         {
+            var top_k = 40;
+            var top_p = 0.95f;
+            var tfs_z = 1.0f;
+            var typical_p = 1.0f;
+            var temp = 0.0f;
+
+            var mirostat = 0;
+            var mirostat_tau = 5.0f;
+            var mirostat_eta = 0.1f;
+
             var penalty_last_n = 64;
             var penalty_repeat = 1.1f;
             var penalty_freq = 0.0f;
@@ -35,6 +51,7 @@ namespace LlamaCppCli
 
             var mparams = PInvoke.llama_model_default_params();
             mparams.n_gpu_layers = 64;
+            mparams.progress_callback = &ProgressCallback;
 
             var cparams = PInvoke.llama_context_default_params();
             cparams.seed = 0;
@@ -46,7 +63,9 @@ namespace LlamaCppCli
             PInvoke.llama_backend_init(false);
 
             var mdl = PInvoke.llama_load_model_from_file(args[0], mparams);
+            Console.Write($"\nCreating new model context...");
             var ctx = PInvoke.llama_new_context_with_model(mdl, cparams);
+            Console.Write($" 100%");
             var bat = PInvoke.llama_batch_init(PInvoke.llama_n_ctx(ctx), 0, 1);
 
             var requests = new List<Request>();
@@ -55,18 +74,8 @@ namespace LlamaCppCli
             var candidates = new PInvoke.llama_token_data[PInvoke.llama_n_vocab(mdl)];
             var candidates_p = stackalloc PInvoke.llama_token_data_array[1];
 
-            //var tokens = Interop.llama_tokenize(
-            //    mdl,
-            //    "<|im_start|>system\n" +
-            //    "You are an astrophysicist.<|im_end|>\n" +
-            //    "<|im_start|>user\n" +
-            //    "Write a table listing the planets of the solar system in reverse order from the Sun.<|im_end|>\n" +
-            //    "<|im_start|>assistant\n",
-            //    true,
-            //    true
-            //);
-
-            //requests.Add(new Request(PInvoke.llama_n_ctx(ctx), tokens));
+            for (var token = 0; token < candidates.Length; token++)
+                candidates[token] = new PInvoke.llama_token_data();
 
             var min = (int a, int b) => a < b ? a : b;
             var max = (int a, int b) => a > b ? a : b;
@@ -135,7 +144,11 @@ namespace LlamaCppCli
                         var logits = PInvoke.llama_get_logits_ith(ctx, request.PosLogit - i);
 
                         for (var token = 0; token < candidates.Length; token++)
-                            candidates[token] = new PInvoke.llama_token_data { id = token, logit = logits[token], p = 0.0f };
+                        {
+                            candidates[token].id = token;
+                            candidates[token].logit = logits[token];
+                            candidates[token].p = 0.0f;
+                        }
 
                         fixed (PInvoke.llama_token_data* p1 = &candidates[0])
                         {
@@ -155,7 +168,30 @@ namespace LlamaCppCli
                                     penalty_present);
                             }
 
-                            var token = PInvoke.llama_sample_token_greedy(ctx, candidates_p);
+                            llama_token token;
+                            if (temp <= 0)
+                            {
+                                token = PInvoke.llama_sample_token_greedy(ctx, candidates_p);
+                            }
+                            else if (mirostat == 1)
+                            {
+                                PInvoke.llama_sample_temp(ctx, candidates_p, temp);
+                                token = PInvoke.llama_sample_token_mirostat(ctx, candidates_p, mirostat_tau, mirostat_eta, 100, ref request.MirostatMU);
+                            }
+                            else if (mirostat == 2)
+                            {
+                                PInvoke.llama_sample_temp(ctx, candidates_p, temp);
+                                token = PInvoke.llama_sample_token_mirostat_v2(ctx, candidates_p, mirostat_tau, mirostat_eta, ref request.MirostatMU);
+                            }
+                            else
+                            {
+                                PInvoke.llama_sample_top_k(ctx, candidates_p, top_k, 1);
+                                PInvoke.llama_sample_tail_free(ctx, candidates_p, tfs_z, 1);
+                                PInvoke.llama_sample_typical(ctx, candidates_p, typical_p, 1);
+                                PInvoke.llama_sample_top_p(ctx, candidates_p, top_p, 1);
+                                PInvoke.llama_sample_temp(ctx, candidates_p, temp);
+                                token = PInvoke.llama_sample_token(ctx, candidates_p);
+                            }
 
                             request.Tokens[request.PosTokens++] = token;
                             Console.Write(Encoding.ASCII.GetString(Interop.llama_token_to_piece(mdl, token)));
@@ -172,7 +208,7 @@ namespace LlamaCppCli
                 requests
                     .Where(r => r.Tokens[r.PosTokens - 1] == PInvoke.llama_token_eos(mdl))
                     .ToList()
-                    .ForEach(r => Console.WriteLine($"\n{r.PosTokens / (double)((r.T2 - r.T1)?.TotalSeconds ?? 1):F2} t/s"));
+                    .ForEach(r => Console.WriteLine($"\n{r.PosTokens / (double)(((r.T2 - r.T1)?.TotalSeconds) ?? 1):F2} t/s"));
 
                 requests.RemoveAll(r => r.Tokens[r.PosTokens - 1] == PInvoke.llama_token_eos(mdl));
             }
@@ -182,34 +218,34 @@ namespace LlamaCppCli
             PInvoke.llama_free_model(mdl);
             PInvoke.llama_backend_free();
         }
+    }
 
-        internal class Request : IEquatable<Request>
+    internal class Request : IEquatable<Request>
+    {
+        public int Id { get; set; }
+
+        public int PosBatch { get; set; }
+        public int PosLogit { get; set; }
+
+        public int PosTokens { get; set; }
+        public llama_token[] Tokens { get; set; }
+
+        public float MirostatMU;
+
+        public DateTime? T1 { get; set; }
+        public DateTime? T2 { get; set; }
+
+        public Request(int n_ctx, Span<llama_token> tokens)
         {
-            public int Id { get; set; }
-
-            public int PosBatch { get; set; }
-            public int PosLogit { get; set; }
-
-            public int PosTokens { get; set; }
-            public llama_token[] Tokens { get; set; }
-
-            public float MirostatMU { get; set; }
-
-            public DateTime? T1 { get; set; }
-            public DateTime? T2 { get; set; }
-
-            public Request(int n_ctx, Span<llama_token> tokens)
-            {
-                Tokens = new llama_token[n_ctx];
-                tokens.CopyTo(Tokens);
-                PosTokens += tokens.Length;
-            }
-
-            public override bool Equals([NotNullWhen(true)] object? obj) => obj is Request request && Equals(request);
-            public override int GetHashCode() => Id.GetHashCode();
-
-            // IEquatable<T>
-            public bool Equals(Request? other) => other?.Id == this.Id;
+            Tokens = new llama_token[n_ctx];
+            tokens.CopyTo(Tokens);
+            PosTokens += tokens.Length;
         }
+
+        public override bool Equals([NotNullWhen(true)] object? obj) => obj is Request request && Equals(request);
+        public override int GetHashCode() => Id.GetHashCode();
+
+        // IEquatable<T>
+        public bool Equals(Request? other) => other?.Id == this.Id;
     }
 }

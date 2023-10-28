@@ -23,7 +23,7 @@ namespace LlamaCppLib
             public int main_gpu;
             public float* tensor_split;
 
-            public delegate*<float, void*, void> progress_callback;
+            public delegate* unmanaged[Cdecl]<float, void*, void> progress_callback;
             public void* progress_callback_user_data;
 
             public byte vocab_only;
@@ -201,7 +201,7 @@ namespace LlamaCppLib
             float tau,
             float eta,
             int m,
-            float* mu);
+            ref float mu);
 
         [LibraryImport(LibName)]
         public static partial llama_token llama_sample_token_mirostat_v2(
@@ -209,7 +209,7 @@ namespace LlamaCppLib
             llama_token_data_array* candidates,
             float tau,
             float eta,
-            float* mu);
+            ref float mu);
 
         [LibraryImport(LibName)]
         public static partial void llama_sample_top_k(
