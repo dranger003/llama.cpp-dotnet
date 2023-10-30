@@ -131,9 +131,9 @@ namespace LlamaCppLib
                 await Task.Delay(pollingRateMs);
         }
 
-        public LlmRequest NewRequest(string prompt, bool prependBosToken = false, bool processSpecialTokens = false)
+        public LlmRequest NewRequest(string prompt, SamplingOptions? samplingOptions = default, bool prependBosToken = false, bool processSpecialTokens = false)
         {
-            var request = new LlmRequest(prompt, prependBosToken, processSpecialTokens);
+            var request = new LlmRequest(prompt, samplingOptions ?? new(), prependBosToken, processSpecialTokens);
             _requests.Enqueue(request);
             return request;
         }
@@ -298,7 +298,10 @@ namespace LlamaCppLib
                                 throw new Exception("Unable to write next token to request channel.");
 
                             if (token == eosToken)
+                            {
+                                PInvoke.llama_kv_cache_seq_rm(_context.Handle, sequence.Id, -1, -1);
                                 sequence.Request.Tokens.Writer.Complete();
+                            }
                         }
                     }
                 }

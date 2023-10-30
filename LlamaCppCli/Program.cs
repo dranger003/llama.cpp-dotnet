@@ -20,11 +20,11 @@ namespace LlamaCppCli
 
         static async Task RunSampleAsync(string[] args)
         {
-            using var llm = new LlmEngine();
+            using var llm = new LlmEngine(new EngineOptions { MaxParallel = 8 });
 
             llm.LoadModel(
                 args[0],
-                new ModelOptions { GpuLayers = 64 },
+                new ModelOptions { Seed = 0, GpuLayers = 64 },
                 loadProgress => Console.Write($"\r{new String(' ', 64)}\rLoading... {loadProgress:F2}%{(loadProgress == 100.0f ? "\n" : "")}")
             );
 
@@ -41,20 +41,47 @@ namespace LlamaCppCli
                         if (String.IsNullOrWhiteSpace(prompt))
                             break;
 
-                        var match = Regex.Match(prompt, @"^/load (.+)$");
+                        var match = Regex.Match(prompt, @"\/load\s+("".*?""(?:\s+|$))+");
                         if (match.Success)
                         {
-                            var fileName = match.Groups[1].Value;
-                            if (File.Exists(fileName))
+                            var fileNames = Regex.Matches(prompt, "\"(.*?)\"").Select(x => x.Groups[1].Value).ToList();
+
+                            fileNames
+                                .Where(fileName => !File.Exists(fileName))
+                                .ToList()
+                                .ForEach(fileName => Console.WriteLine($"File \"{fileName}\" not found."));
+
+                            var requests = fileNames
+                                .Where(fileName => File.Exists(fileName))
+                                .Select(fileName => llm.NewRequest(File.ReadAllText(fileName), new SamplingOptions { Temperature = 0.0f }, true, true))
+                                .Select(async request =>
+                                    {
+                                        var text = new StringBuilder();
+                                        await foreach (var token in request.Tokens.Reader.ReadAllAsync())
+                                        {
+                                            text.Append(Encoding.ASCII.GetString(token));
+                                        }
+                                        return (Request: request, Response: text.ToString());
+                                    }
+                                )
+                                .ToList();
+
+                            var results = await Task.WhenAll(requests);
+
+                            Console.WriteLine(new String('=', 64));
+                            foreach (var result in results)
                             {
-                                Console.WriteLine($"File \"{fileName}\" not found.");
-                                continue;
+                                Console.WriteLine(result.Request.Prompt);
+                                Console.WriteLine(new String('-', 64));
+                                Console.WriteLine(result.Response);
+                                Console.WriteLine(new String('=', 64));
                             }
 
-                            prompt = File.ReadAllText(fileName);
+                            continue;
                         }
 
-                        var request = llm.NewRequest(prompt, true, true);
+                        var request = llm.NewRequest(prompt, new SamplingOptions { Temperature = 0.0f }, true, true);
+
                         await foreach (var token in request.Tokens.Reader.ReadAllAsync())
                             Console.Write(Encoding.ASCII.GetString(token));
 

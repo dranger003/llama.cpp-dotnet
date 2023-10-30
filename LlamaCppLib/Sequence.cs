@@ -23,6 +23,7 @@ namespace LlamaCppLib
             this.Tokens = new int[tokenCount];
             this.MirostatM = mirostatM;
             this.Request = request;
+            this.SamplingOptions = request.SamplingOptions;
 
             tokens.CopyTo(Tokens);
             PosTokens += tokens.Length;
