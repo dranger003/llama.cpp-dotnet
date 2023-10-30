@@ -15,6 +15,8 @@ namespace LlamaCppCli
                 //"D:\\LLM_MODELS\\codellama\\ggml-codellama-34b-instruct-q4_k.gguf",
             };
 
+            Console.OutputEncoding = Encoding.UTF8;
+
             await RunSampleAsync(args);
         }
 
@@ -57,10 +59,21 @@ namespace LlamaCppCli
                                 .Select(async request =>
                                     {
                                         var text = new StringBuilder();
+                                        var buffer = new List<byte>();
+
                                         await foreach (var token in request.Tokens.Reader.ReadAllAsync())
                                         {
-                                            text.Append(Encoding.ASCII.GetString(token));
+                                            buffer.AddRange(token);
+                                            if (buffer.ToArray().TryGetUtf8String(out var piece) && piece != null)
+                                            {
+                                                text.Append(piece);
+                                                buffer.Clear();
+                                            }
                                         }
+
+                                        if (buffer.Any())
+                                            text.Append(Encoding.UTF8.GetString(buffer.ToArray()));
+
                                         return (Request: request, Response: text.ToString());
                                     }
                                 )
@@ -81,9 +94,20 @@ namespace LlamaCppCli
                         }
 
                         var request = llm.NewRequest(prompt, new SamplingOptions { Temperature = 0.0f }, true, true);
+                        var buffer = new List<byte>();
 
                         await foreach (var token in request.Tokens.Reader.ReadAllAsync())
-                            Console.Write(Encoding.ASCII.GetString(token));
+                        {
+                            buffer.AddRange(token);
+                            if (buffer.ToArray().TryGetUtf8String(out var piece) && piece != null)
+                            {
+                                Console.Write(piece);
+                                buffer.Clear();
+                            }
+                        }
+
+                        if (buffer.Any())
+                            Console.Write(Encoding.UTF8.GetString(buffer.ToArray()));
 
                         Console.WriteLine();
                     }
