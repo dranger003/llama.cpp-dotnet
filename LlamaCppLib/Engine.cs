@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 
 namespace LlamaCppLib
 {
-    public class LlmModel : IDisposable
+    public class LlmEngine : IDisposable
     {
         private bool _disposed;
 
@@ -13,16 +13,18 @@ namespace LlamaCppLib
         private UnmanagedResource<nint> _context = new();
         private UnmanagedResource<PInvoke.llama_batch> _batch = new();
 
-        private BackendOptions _backendOptions = new();
+        private EngineOptions _backendOptions = new();
         private ModelOptions _modelOptions = new();
+
+        private ConcurrentQueue<LlmRequest> _requests = new();
 
         private CancellationTokenSource _cancellationTokenSource = new();
         private Task? _task;
 
-        public LlmModel() { }
-        public LlmModel(BackendOptions backendOptions) => _backendOptions = backendOptions;
+        public LlmEngine() { }
+        public LlmEngine(EngineOptions backendOptions) => _backendOptions = backendOptions;
 
-        ~LlmModel() => Dispose(disposing: false);
+        ~LlmEngine() => Dispose(disposing: false);
 
         protected virtual void Dispose(bool disposing)
         {
@@ -57,7 +59,7 @@ namespace LlamaCppLib
             callback?.Invoke(progress * 100);
         }
 
-        public unsafe void Load(string modelPath, ModelOptions? modelOptions = default, Action<float>? progressCallback = default)
+        public unsafe void LoadModel(string modelPath, ModelOptions? modelOptions = default, Action<float>? progressCallback = default)
         {
             if (_model.Created)
                 throw new InvalidOperationException("Model already loaded.");
@@ -74,7 +76,7 @@ namespace LlamaCppLib
             var mparams = PInvoke.llama_model_default_params();
             mparams.n_gpu_layers = _modelOptions.GpuLayers;
             mparams.use_mmap = (byte)(_modelOptions.UseMemoryMap ? 1 : 0);
-            mparams.progress_callback = &LlmModel._ProgressCallback;
+            mparams.progress_callback = &LlmEngine._ProgressCallback;
             mparams.progress_callback_user_data = GCHandle.ToIntPtr(progressCallbackHandle.Handle).ToPointer();
 
             _model.Create(() => PInvoke.llama_load_model_from_file(modelPath, mparams), PInvoke.llama_free_model);
@@ -91,24 +93,22 @@ namespace LlamaCppLib
             _batch.Create(() => PInvoke.llama_batch_init(PInvoke.llama_n_ctx(_context.Handle), 0, 1), PInvoke.llama_batch_free);
         }
 
-        public void Unload()
+        public void UnloadModel()
         {
             _batch.Dispose();
             _context.Dispose();
             _model.Dispose();
         }
 
-        public Span<int> Tokenize(string prompt, bool addBos = false, bool specialTokens = false) => Interop.llama_tokenize(_model.Handle, prompt, addBos, specialTokens);
+        public Span<int> Tokenize(string prompt, bool prependBosToken = false, bool processSpecialTokens = false) =>
+            Interop.llama_tokenize(_model.Handle, prompt, prependBosToken, processSpecialTokens);
 
         public Task RunAsync()
         {
             if (_task != default)
                 throw new InvalidOperationException("Already running.");
 
-            _task = new Task(_Run);
-            _task.Start();
-
-            return _task;
+            return _task = Task.Run(_Run);
         }
 
         public async Task StopAsync()
@@ -121,6 +121,21 @@ namespace LlamaCppLib
             _cancellationTokenSource = new();
 
             _task = default;
+        }
+
+        public bool IsRunning => _task?.Status == TaskStatus.Running;
+
+        public async Task WaitForRunningAsync(int pollingRateMs = 10)
+        {
+            while (!this.IsRunning)
+                await Task.Delay(pollingRateMs);
+        }
+
+        public LlmRequest NewRequest(string prompt, bool prependBosToken = false, bool processSpecialTokens = false)
+        {
+            var request = new LlmRequest(prompt, prependBosToken, processSpecialTokens);
+            _requests.Enqueue(request);
+            return request;
         }
 
         private unsafe void _Run()
@@ -138,22 +153,22 @@ namespace LlamaCppLib
             _batch.GetResource(out var batch);
 
             var sequences = new List<LlmSequence>();
-            var requests = new ConcurrentQueue<LlmRequest>();
 
             var cancellationToken = _cancellationTokenSource.Token;
 
             while (!cancellationToken.IsCancellationRequested)
             {
-                while (sequences.Count < _backendOptions.MaxParallel)
+                // Fill as many sequence slots as possible given pending requests
+                while (sequences.Count < _backendOptions.MaxParallel && _requests.Count > 0)
                 {
-                    if (requests.TryDequeue(out var request))
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
+
+                    if (_requests.TryDequeue(out var request))
                     {
                         var sequence = new LlmSequence(request, contextLength, Tokenize(request.Prompt, request.PrependBosToken, request.ProcessSpecialTokens));
                         sequences.Add(sequence);
                     }
-
-                    if (requests.Count == 0 && sequences.Count > 0)
-                        break;
                 }
 
                 batch.n_tokens = 0;
@@ -170,16 +185,20 @@ namespace LlamaCppLib
                     batch.logits[sequence.PosLogit] = true ? 1 : 0;
                 }
 
+                // Engine idle
                 if (batch.n_tokens == 0)
+                {
+                    Thread.Sleep(10);
                     continue;
+                }
 
-                var nbatch = _modelOptions.BatchSize;
-                for (var i = 0; i < batch.n_tokens; i += nbatch)
+                var batchSize = _modelOptions.BatchSize;
+                for (var i = 0; i < batch.n_tokens; i += batchSize)
                 {
                     if (cancellationToken.IsCancellationRequested)
                         break;
 
-                    var n_tokens = Math.Min(nbatch, batch.n_tokens - i);
+                    var n_tokens = Math.Min(batchSize, batch.n_tokens - i);
 
                     batchPtr->n_tokens = n_tokens;
                     batchPtr->token = batch.token + i;
@@ -229,7 +248,7 @@ namespace LlamaCppLib
                                     sequence.SamplingOptions.PenaltyPresent);
                             }
 
-                            var token = eosToken;
+                            var token = default(int);
 
                             if (sequence.SamplingOptions.Temperature < 0.0f)
                             {
@@ -276,23 +295,15 @@ namespace LlamaCppLib
                             sequence.Tokens[sequence.PosTokens++] = token;
 
                             if (!sequence.Request.Tokens.Writer.TryWrite(Interop.llama_token_to_piece(_model.Handle, token).ToArray()))
-                                throw new Exception("Unable to write next token to channel.");
-
-                            if (sequence.T1 == default)
-                            {
-                                sequence.T1 = DateTime.Now;
-                            }
+                                throw new Exception("Unable to write next token to request channel.");
 
                             if (token == eosToken)
-                            {
-                                sequence.T2 = DateTime.Now;
                                 sequence.Request.Tokens.Writer.Complete();
-                            }
                         }
                     }
                 }
 
-                sequences.RemoveAll(r => r.Tokens[r.PosTokens - 1] == PInvoke.llama_token_eos(_model.Handle));
+                sequences.RemoveAll(r => r.Tokens[r.PosTokens - 1] == eosToken);
             }
         }
     }

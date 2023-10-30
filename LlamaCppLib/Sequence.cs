@@ -16,9 +16,6 @@ namespace LlamaCppLib
         public int MirostatM { get; private set; }
         public float MirostatMu = 0.0f;
 
-        public DateTime? T1 { get; set; }
-        public DateTime? T2 { get; set; }
-
         public LlmRequest Request { get; private set; }
 
         public LlmSequence(LlmRequest request, int tokenCount, Span<int> tokens, int mirostatM = 100)

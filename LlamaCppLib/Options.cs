@@ -1,6 +1,6 @@
 namespace LlamaCppLib
 {
-    public class BackendOptions
+    public class EngineOptions
     {
         public bool NumaOptimizations { get; set; } = false;
         public int MaxParallel { get; set; } = 1;

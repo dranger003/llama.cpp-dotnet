@@ -1,4 +1,5 @@
 ﻿using LlamaCppLib;
+using System.Text;
 
 namespace LlamaCppCli
 {
@@ -17,16 +18,43 @@ namespace LlamaCppCli
 
         static async Task RunSampleAsync(string[] args)
         {
-            var modelOptions = new ModelOptions { GpuLayers = 64 };
-            using var model = new LlmModel();
+            using var llm = new LlmEngine();
 
-            model.Load(args[0], modelOptions, loadProgress => { Console.Write($"\r{new String(' ', 32)}\r{loadProgress:F2}{(loadProgress == 100.0f ? "\n" : "")}"); });
-            _ = model.RunAsync();
+            llm.LoadModel(
+                args[0],
+                new ModelOptions { GpuLayers = 64 },
+                loadProgress => Console.Write($"\r{new String(' ', 64)}\rLoading... {loadProgress:F2}%{(loadProgress == 100.0f ? "\n" : "")}")
+            );
 
-            Console.WriteLine("Press <any key> to quit.");
-            Console.ReadKey(true);
+            var task = Task.Run(
+                async () =>
+                {
+                    await llm.WaitForRunningAsync();
+                    Console.WriteLine("\nEngine ready and model loaded.");
 
-            await model.StopAsync();
+                    while (true)
+                    {
+                        Console.Write("> ");
+                        var line = (Console.ReadLine() ?? String.Empty).Replace("\\n", "\n");
+                        if (String.IsNullOrWhiteSpace(line))
+                            break;
+
+                        var request = llm.NewRequest(line, true, true);
+                        await foreach (var token in request.Tokens.Reader.ReadAllAsync())
+                            Console.Write(Encoding.ASCII.GetString(token));
+
+                        Console.WriteLine();
+                    }
+
+                    Console.WriteLine($"Stopping...");
+                    await llm.StopAsync();
+                }
+            );
+
+            await llm.RunAsync();
+
+            await task;
+            Console.WriteLine("Done.");
         }
 
         //static void RunSample(string[] args)
