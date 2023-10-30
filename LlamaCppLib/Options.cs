@@ -3,6 +3,7 @@ namespace LlamaCppLib
     public class BackendOptions
     {
         public bool NumaOptimizations { get; set; } = false;
+        public int MaxParallel { get; set; } = 1;
     }
 
     public class ModelOptions

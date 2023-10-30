@@ -157,6 +157,10 @@ namespace LlamaCppLib
             llama_model model);
 
         [LibraryImport(LibName)]
+        public static partial void llama_kv_cache_clear(
+            llama_context ctx);
+
+        [LibraryImport(LibName)]
         public static partial void llama_kv_cache_seq_rm(
             llama_context ctx,
             llama_seq_id seq_id,
