@@ -13,7 +13,7 @@ namespace LlamaCppLib
         private UnmanagedResource<nint> _context = new();
         private UnmanagedResource<PInvoke.llama_batch> _batch = new();
 
-        private EngineOptions _backendOptions = new();
+        private EngineOptions _engineOptions = new();
         private ModelOptions _modelOptions = new();
 
         private ConcurrentQueue<LlmRequest> _requests = new();
@@ -22,7 +22,7 @@ namespace LlamaCppLib
         private Task? _task;
 
         public LlmEngine() { }
-        public LlmEngine(EngineOptions backendOptions) => _backendOptions = backendOptions;
+        public LlmEngine(EngineOptions backendOptions) => _engineOptions = backendOptions;
 
         ~LlmEngine() => Dispose(disposing: false);
 
@@ -68,7 +68,7 @@ namespace LlamaCppLib
                 _modelOptions = modelOptions;
 
             if (!_backend.Created)
-                _backend.Create(() => PInvoke.llama_backend_init(_backendOptions.NumaOptimizations), PInvoke.llama_backend_free);
+                _backend.Create(() => PInvoke.llama_backend_init(_engineOptions.NumaOptimizations), PInvoke.llama_backend_free);
 
             using var progressCallbackHandle = new UnmanagedResource<GCHandle>();
             progressCallbackHandle.Create(() => GCHandle.Alloc(progressCallback), handle => handle.Free());
@@ -152,14 +152,13 @@ namespace LlamaCppLib
             var batchPtr = stackalloc PInvoke.llama_batch[1];
             _batch.GetResource(out var batch);
 
-            var sequences = new List<LlmSequence>();
+            var sequences = new Slots<LlmSequence>(_engineOptions.MaxParallel);
 
             var cancellationToken = _cancellationTokenSource.Token;
-
             while (!cancellationToken.IsCancellationRequested)
             {
                 // Fill as many sequence slots as possible given pending requests
-                while (sequences.Count < _backendOptions.MaxParallel && _requests.Count > 0)
+                while (sequences.HasFreeSlot && _requests.Count > 0)
                 {
                     if (cancellationToken.IsCancellationRequested)
                         break;
@@ -167,7 +166,8 @@ namespace LlamaCppLib
                     if (_requests.TryDequeue(out var request))
                     {
                         var sequence = new LlmSequence(request, contextLength, Tokenize(request.Prompt, request.PrependBosToken, request.ProcessSpecialTokens));
-                        sequences.Add(sequence);
+                        var id = sequences.Add(sequence);
+                        sequence.Id = id;
                     }
                 }
 
@@ -185,7 +185,7 @@ namespace LlamaCppLib
                     batch.logits[sequence.PosLogit] = true ? 1 : 0;
                 }
 
-                // Engine idle
+                // Idle
                 if (batch.n_tokens == 0)
                 {
                     Thread.Sleep(10);

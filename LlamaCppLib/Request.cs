@@ -18,5 +18,7 @@ namespace LlamaCppLib
         public bool ProcessSpecialTokens { get; private set; }
 
         public Channel<byte[]> Tokens { get; private set; }
+
+        public bool ClearCache { get; set; }
     }
 }
