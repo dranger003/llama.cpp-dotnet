@@ -18,7 +18,7 @@ namespace LlamaCppLib
 
         public LlmRequest Request { get; private set; }
 
-        public LlmSequence(LlmRequest request, int tokenCount, Span<int> tokens, int mirostatM = 100)
+        public LlmSequence(LlmRequest request, int tokenCount, ReadOnlySpan<int> tokens, int mirostatM = 100)
         {
             this.Tokens = new int[tokenCount];
             this.MirostatM = mirostatM;

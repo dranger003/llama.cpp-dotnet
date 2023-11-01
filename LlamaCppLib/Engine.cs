@@ -2,6 +2,9 @@ using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
+using static LlamaCppLib.PInvoke;
+using static LlamaCppLib.Interop;
+
 namespace LlamaCppLib
 {
     public class LlmEngine : IDisposable
@@ -11,7 +14,7 @@ namespace LlamaCppLib
         private UnmanagedResource _backend = new();
         private UnmanagedResource<nint> _model = new();
         private UnmanagedResource<nint> _context = new();
-        private UnmanagedResource<PInvoke.llama_batch> _batch = new();
+        private UnmanagedResource<llama_batch> _batch = new();
 
         private EngineOptions _engineOptions = new();
         private ModelOptions _modelOptions = new();
@@ -68,29 +71,29 @@ namespace LlamaCppLib
                 _modelOptions = modelOptions;
 
             if (!_backend.Created)
-                _backend.Create(() => PInvoke.llama_backend_init(_engineOptions.NumaOptimizations), PInvoke.llama_backend_free);
+                _backend.Create(() => llama_backend_init(_engineOptions.NumaOptimizations), llama_backend_free);
 
             using var progressCallbackHandle = new UnmanagedResource<GCHandle>();
             progressCallbackHandle.Create(() => GCHandle.Alloc(progressCallback), handle => handle.Free());
 
-            var mparams = PInvoke.llama_model_default_params();
+            var mparams = llama_model_default_params();
             mparams.n_gpu_layers = _modelOptions.GpuLayers;
             mparams.use_mmap = (byte)(_modelOptions.UseMemoryMap ? 1 : 0);
             mparams.progress_callback = &LlmEngine._ProgressCallback;
             mparams.progress_callback_user_data = GCHandle.ToIntPtr(progressCallbackHandle.Handle).ToPointer();
 
-            _model.Create(() => PInvoke.llama_load_model_from_file(modelPath, mparams), PInvoke.llama_free_model);
+            _model.Create(() => llama_load_model_from_file(modelPath, mparams), llama_free_model);
 
-            var cparams = PInvoke.llama_context_default_params();
+            var cparams = llama_context_default_params();
             cparams.seed = (uint)_modelOptions.Seed;
             cparams.n_ctx = (uint)_modelOptions.ContextLength;
             cparams.n_batch = (uint)_modelOptions.BatchSize;
             cparams.n_threads = (uint)_modelOptions.ThreadCount;
             cparams.n_threads_batch = (uint)_modelOptions.BatchThreadCount;
 
-            _context.Create(() => PInvoke.llama_new_context_with_model(_model.Handle, cparams), PInvoke.llama_free);
+            _context.Create(() => llama_new_context_with_model(_model.Handle, cparams), llama_free);
 
-            _batch.Create(() => PInvoke.llama_batch_init(PInvoke.llama_n_ctx(_context.Handle), 0, 1), PInvoke.llama_batch_free);
+            _batch.Create(() => llama_batch_init(llama_n_ctx(_context.Handle), 0, 1), llama_batch_free);
         }
 
         public void UnloadModel()
@@ -101,7 +104,7 @@ namespace LlamaCppLib
         }
 
         public Span<int> Tokenize(string prompt, bool prependBosToken = false, bool processSpecialTokens = false) =>
-            Interop.llama_tokenize(_model.Handle, prompt, prependBosToken, processSpecialTokens);
+            llama_tokenize(_model.Handle, prompt, prependBosToken, processSpecialTokens);
 
         public Task RunAsync()
         {
@@ -140,16 +143,6 @@ namespace LlamaCppLib
 
         private unsafe void _Run()
         {
-            var contextLength = PInvoke.llama_n_ctx(_context.Handle);
-            var eosToken = PInvoke.llama_token_eos(_model.Handle);
-
-            var candidates = new PInvoke.llama_token_data[PInvoke.llama_n_vocab(_model.Handle)];
-            var candidatesPtr = stackalloc PInvoke.llama_token_data_array[1];
-
-            for (var token = 0; token < candidates.Length; token++)
-                candidates[token] = new PInvoke.llama_token_data();
-
-            var batchPtr = stackalloc PInvoke.llama_batch[1];
             _batch.GetResource(out var batch);
 
             var sequences = new Slots<LlmSequence>(_engineOptions.MaxParallel);
@@ -165,11 +158,14 @@ namespace LlamaCppLib
 
                     if (_requests.TryDequeue(out var request))
                     {
-                        var sequence = new LlmSequence(request, contextLength, Tokenize(request.Prompt, request.PrependBosToken, request.ProcessSpecialTokens));
+                        var sequence = new LlmSequence(request, llama_n_ctx(_context.Handle), Tokenize(request.Prompt, request.PrependBosToken, request.ProcessSpecialTokens));
                         var id = sequences.Add(sequence);
                         sequence.Id = id;
                     }
                 }
+
+                if (cancellationToken.IsCancellationRequested)
+                    continue;
 
                 batch.n_tokens = 0;
 
@@ -179,11 +175,14 @@ namespace LlamaCppLib
                         break;
 
                     for (; sequence.PosBatch < sequence.PosTokens; sequence.PosBatch++)
-                        Interop.llama_batch_add(ref batch, sequence.Tokens[sequence.PosBatch], sequence.PosBatch, new[] { sequence.Id }, false);
+                        llama_batch_add(ref batch, sequence.Tokens[sequence.PosBatch], sequence.PosBatch, new[] { sequence.Id }, false);
 
                     sequence.PosLogit = batch.n_tokens - 1;
                     batch.logits[sequence.PosLogit] = true ? 1 : 0;
                 }
+
+                if (cancellationToken.IsCancellationRequested)
+                    continue;
 
                 // Idle
                 if (batch.n_tokens == 0)
@@ -200,18 +199,22 @@ namespace LlamaCppLib
 
                     var n_tokens = Math.Min(batchSize, batch.n_tokens - i);
 
-                    batchPtr->n_tokens = n_tokens;
-                    batchPtr->token = batch.token + i;
-                    batchPtr->embd = null;
-                    batchPtr->pos = batch.pos + i;
-                    batchPtr->n_seq_id = batch.n_seq_id + i;
-                    batchPtr->seq_id = batch.seq_id + i;
-                    batchPtr->logits = batch.logits + i;
-                    batchPtr->all_pos_0 = 0;
-                    batchPtr->all_pos_1 = 0;
-                    batchPtr->all_seq_id = 0;
-
-                    PInvoke.llama_decode(_context.Handle, *batchPtr);
+                    llama_decode(
+                        _context.Handle,
+                        new llama_batch
+                        {
+                            n_tokens = n_tokens,
+                            token = batch.token + i,
+                            embd = null,
+                            pos = batch.pos + i,
+                            n_seq_id = batch.n_seq_id + i,
+                            seq_id = batch.seq_id + i,
+                            logits = batch.logits + i,
+                            all_pos_0 = 0,
+                            all_pos_1 = 0,
+                            all_seq_id = 0,
+                        }
+                    );
 
                     foreach (var sequence in sequences)
                     {
@@ -221,50 +224,61 @@ namespace LlamaCppLib
                         if (sequence.PosLogit < i || sequence.PosLogit >= i + n_tokens)
                             continue;
 
-                        var logits = PInvoke.llama_get_logits_ith(_context.Handle, sequence.PosLogit - i);
+                        var logits = llama_get_logits_ith(_context.Handle, sequence.PosLogit - i);
 
+                        var candidates = new llama_token_data[llama_n_vocab(_model.Handle)];
                         for (var token = 0; token < candidates.Length; token++)
                         {
+                            if (cancellationToken.IsCancellationRequested)
+                                break;
+
                             candidates[token].id = token;
                             candidates[token].logit = logits[token];
                             candidates[token].p = 0.0f;
                         }
 
-                        fixed (PInvoke.llama_token_data* ptrCandidates = &candidates[0])
+                        if (cancellationToken.IsCancellationRequested)
+                            continue;
+
+                        fixed (llama_token_data* ptrCandidates = &candidates[0])
                         {
-                            candidatesPtr->data = ptrCandidates;
-                            candidatesPtr->size = (nuint)candidates.Length;
-                            candidatesPtr->sorted = false ? 1 : 0;
+                            var candidates_p = new llama_token_data_array
+                            {
+                                data = ptrCandidates,
+                                size = (nuint)candidates.Length,
+                                sorted = false ? 1 : 0,
+                            };
 
                             fixed (int* ptrTokens = &sequence.Tokens[Math.Max(0, sequence.PosTokens - sequence.SamplingOptions.PenaltyLastN)])
                             {
-                                PInvoke.llama_sample_repetition_penalties(
+                                llama_sample_repetition_penalties(
                                     _context.Handle,
-                                    candidatesPtr,
+                                    ref candidates_p,
                                     ptrTokens,
                                     (nuint)sequence.SamplingOptions.PenaltyLastN,
                                     sequence.SamplingOptions.PenaltyRepeat,
                                     sequence.SamplingOptions.PenaltyFreq,
-                                    sequence.SamplingOptions.PenaltyPresent);
+                                    sequence.SamplingOptions.PenaltyPresent
+                                );
                             }
 
-                            var token = default(int);
+                            var token = llama_token_eos(_model.Handle);
 
                             if (sequence.SamplingOptions.Temperature < 0.0f)
                             {
-                                PInvoke.llama_sample_softmax(_context.Handle, candidatesPtr);
-                                token = candidatesPtr->data[0].id;
+                                llama_sample_softmax(_context.Handle, ref candidates_p);
+                                token = candidates_p.data[0].id;
                             }
                             else if (sequence.SamplingOptions.Temperature == 0.0f)
                             {
-                                token = PInvoke.llama_sample_token_greedy(_context.Handle, candidatesPtr);
+                                token = llama_sample_token_greedy(_context.Handle, ref candidates_p);
                             }
                             else if (sequence.SamplingOptions.Mirostat == Mirostat.MirostatV1)
                             {
-                                PInvoke.llama_sample_temp(_context.Handle, candidatesPtr, sequence.SamplingOptions.Temperature);
-                                token = PInvoke.llama_sample_token_mirostat(
+                                llama_sample_temp(_context.Handle, ref candidates_p, sequence.SamplingOptions.Temperature);
+                                token = llama_sample_token_mirostat(
                                     _context.Handle,
-                                    candidatesPtr,
+                                    ref candidates_p,
                                     sequence.SamplingOptions.MirostatTau,
                                     sequence.SamplingOptions.MirostatEta,
                                     sequence.MirostatM,
@@ -273,10 +287,10 @@ namespace LlamaCppLib
                             }
                             else if (sequence.SamplingOptions.Mirostat == Mirostat.MirostatV2)
                             {
-                                PInvoke.llama_sample_temp(_context.Handle, candidatesPtr, sequence.SamplingOptions.Temperature);
-                                token = PInvoke.llama_sample_token_mirostat_v2(
+                                llama_sample_temp(_context.Handle, ref candidates_p, sequence.SamplingOptions.Temperature);
+                                token = llama_sample_token_mirostat_v2(
                                     _context.Handle,
-                                    candidatesPtr,
+                                    ref candidates_p,
                                     sequence.SamplingOptions.MirostatTau,
                                     sequence.SamplingOptions.MirostatEta,
                                     ref sequence.MirostatMu
@@ -284,29 +298,35 @@ namespace LlamaCppLib
                             }
                             else
                             {
-                                PInvoke.llama_sample_top_k(_context.Handle, candidatesPtr, sequence.SamplingOptions.TopK, 1);
-                                PInvoke.llama_sample_tail_free(_context.Handle, candidatesPtr, sequence.SamplingOptions.TfsZ, 1);
-                                PInvoke.llama_sample_typical(_context.Handle, candidatesPtr, sequence.SamplingOptions.TypicalP, 1);
-                                PInvoke.llama_sample_top_p(_context.Handle, candidatesPtr, sequence.SamplingOptions.TopP, 1);
-                                PInvoke.llama_sample_temp(_context.Handle, candidatesPtr, sequence.SamplingOptions.Temperature);
-                                token = PInvoke.llama_sample_token(_context.Handle, candidatesPtr);
+                                llama_sample_top_k(_context.Handle, ref candidates_p, sequence.SamplingOptions.TopK, 1);
+                                llama_sample_tail_free(_context.Handle, ref candidates_p, sequence.SamplingOptions.TfsZ, 1);
+                                llama_sample_typical(_context.Handle, ref candidates_p, sequence.SamplingOptions.TypicalP, 1);
+                                llama_sample_top_p(_context.Handle, ref candidates_p, sequence.SamplingOptions.TopP, 1);
+                                llama_sample_temp(_context.Handle, ref candidates_p, sequence.SamplingOptions.Temperature);
+                                token = llama_sample_token(_context.Handle, ref candidates_p);
                             }
 
                             sequence.Tokens[sequence.PosTokens++] = token;
 
-                            if (!sequence.Request.Tokens.Writer.TryWrite(Interop.llama_token_to_piece(_model.Handle, token).ToArray()))
+                            if (!sequence.Request.Tokens.Writer.TryWrite(llama_token_to_piece(_model.Handle, token).ToArray()))
                                 throw new Exception("Unable to write next token to request channel.");
 
-                            if (token == eosToken)
+                            if (token == llama_token_eos(_model.Handle))
                             {
-                                PInvoke.llama_kv_cache_seq_rm(_context.Handle, sequence.Id, -1, -1);
                                 sequence.Request.Tokens.Writer.Complete();
+                                llama_kv_cache_seq_rm(_context.Handle, sequence.Id, -1, -1);
                             }
                         }
                     }
                 }
 
-                sequences.RemoveAll(r => r.Tokens[r.PosTokens - 1] == eosToken);
+                sequences.RemoveAll(r => r.Tokens[r.PosTokens - 1] == llama_token_eos(_model.Handle));
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                foreach (var sequence in sequences)
+                    sequence.Request.Tokens.Writer.Complete(new OperationCanceledException());
             }
         }
     }

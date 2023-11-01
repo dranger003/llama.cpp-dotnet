@@ -180,7 +180,7 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial void llama_sample_repetition_penalties(
             llama_context ctx,
-            llama_token_data_array* candidates,
+            ref llama_token_data_array candidates,
             llama_token* last_tokens,
             nuint penalty_last_n,
             float penalty_repeat,
@@ -190,23 +190,23 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial llama_token llama_sample_token_greedy(
             llama_context ctx,
-            llama_token_data_array* candidates);
+            ref llama_token_data_array candidates);
 
         [LibraryImport(LibName)]
         public static partial void llama_sample_softmax(
             llama_context ctx,
-            llama_token_data_array* candidates);
+            ref llama_token_data_array candidates);
 
         [LibraryImport(LibName)]
         public static partial void llama_sample_temp(
             llama_context ctx,
-            llama_token_data_array* candidates,
+            ref llama_token_data_array candidates,
             float temp);
 
         [LibraryImport(LibName)]
         public static partial llama_token llama_sample_token_mirostat(
             llama_context ctx,
-            llama_token_data_array* candidates,
+            ref llama_token_data_array candidates,
             float tau,
             float eta,
             int m,
@@ -215,7 +215,7 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial llama_token llama_sample_token_mirostat_v2(
             llama_context ctx,
-            llama_token_data_array* candidates,
+            ref llama_token_data_array candidates,
             float tau,
             float eta,
             ref float mu);
@@ -223,34 +223,34 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial void llama_sample_top_k(
             llama_context ctx,
-            llama_token_data_array* candidates,
+            ref llama_token_data_array candidates,
             int k,
             nuint min_keep);
 
         [LibraryImport(LibName)]
         public static partial void llama_sample_tail_free(
             llama_context ctx,
-            llama_token_data_array* candidates,
+            ref llama_token_data_array candidates,
             float z,
             nuint min_keep);
 
         [LibraryImport(LibName)]
         public static partial void llama_sample_typical(
             llama_context ctx,
-            llama_token_data_array* candidates,
+            ref llama_token_data_array candidates,
             float p,
             nuint min_keep);
 
         [LibraryImport(LibName)]
         public static partial void llama_sample_top_p(
             llama_context ctx,
-            llama_token_data_array* candidates,
+            ref llama_token_data_array candidates,
             float p,
             nuint min_keep);
 
         [LibraryImport(LibName)]
         public static partial llama_token llama_sample_token(
             llama_context ctx,
-            llama_token_data_array* candidates);
+            ref llama_token_data_array candidates);
     }
 }
