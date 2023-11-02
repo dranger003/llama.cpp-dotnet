@@ -9,7 +9,7 @@ namespace LlamaCppLib
 {
     public class LlmEngine : IDisposable
     {
-        private bool _disposed;
+        private bool _disposed = default;
 
         private UnmanagedResource _backend = new();
         private UnmanagedResource<nint> _model = new();
@@ -22,12 +22,15 @@ namespace LlamaCppLib
         private ConcurrentQueue<LlmRequest> _requests = new();
 
         private CancellationTokenSource _cancellationTokenSource = new();
-        private Task? _task;
+        private Task? _mainTask = default;
 
-        public LlmEngine() { }
-        public LlmEngine(EngineOptions backendOptions) => _engineOptions = backendOptions;
+        public LlmEngine(EngineOptions? engineOptions = default)
+        {
+            if (engineOptions != default)
+                _engineOptions = engineOptions;
+        }
 
-        ~LlmEngine() => Dispose(disposing: false);
+        ~LlmEngine() => Dispose(false);
 
         protected virtual void Dispose(bool disposing)
         {
@@ -51,7 +54,7 @@ namespace LlamaCppLib
 
         public void Dispose()
         {
-            Dispose(disposing: true);
+            Dispose(true);
             GC.SuppressFinalize(this);
         }
 
@@ -111,25 +114,25 @@ namespace LlamaCppLib
 
         public Task RunAsync()
         {
-            if (_task != default)
+            if (_mainTask != default)
                 throw new InvalidOperationException("Already running.");
 
-            return _task = Task.Run(_Run);
+            return _mainTask = Task.Run(_Run);
         }
 
         public async Task StopAsync()
         {
-            if (_task == default)
+            if (_mainTask == default)
                 return;
 
             _cancellationTokenSource.Cancel();
-            await (_task ?? Task.CompletedTask);
+            await (_mainTask ?? Task.CompletedTask);
             _cancellationTokenSource = new();
 
-            _task = default;
+            _mainTask = default;
         }
 
-        public bool IsRunning => _task?.Status == TaskStatus.Running;
+        public bool IsRunning => _mainTask?.Status == TaskStatus.Running;
 
         public async Task WaitForRunningAsync(int pollingRateMs = 10)
         {
@@ -328,6 +331,7 @@ namespace LlamaCppLib
 
             if (cancellationToken.IsCancellationRequested)
             {
+                // Notify outstanding requests of cancellation
                 foreach (var sequence in sequences)
                     sequence.Request.Tokens.Writer.Complete(new OperationCanceledException());
             }
