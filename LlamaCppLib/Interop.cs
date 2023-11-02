@@ -9,7 +9,7 @@ namespace LlamaCppLib
 
     public static unsafe class Interop
     {
-        public static void llama_batch_add(ref PInvoke.llama_batch batch, llama_token id, llama_pos pos, llama_seq_id[] seq_ids, bool logits)
+        public static void llama_batch_add(ref Native.llama_batch batch, llama_token id, llama_pos pos, llama_seq_id[] seq_ids, bool logits)
         {
             batch.token[batch.n_tokens] = id;
             batch.pos[batch.n_tokens] = pos;
@@ -28,13 +28,13 @@ namespace LlamaCppLib
             var result = new llama_token[n_tokens];
             fixed (llama_token* p1 = &result[0])
             {
-                n_tokens = PInvoke.llama_tokenize(model, text, text.Length, p1, result.Length, (byte)(add_bos ? 1 : 0), (byte)(special ? 1 : 0));
+                n_tokens = Native.llama_tokenize(model, text, text.Length, p1, result.Length, (byte)(add_bos ? 1 : 0), (byte)(special ? 1 : 0));
                 if (n_tokens < 0)
                 {
                     result = new llama_token[-n_tokens];
                     fixed (llama_token* p2 = &result[0])
                     {
-                        var check = PInvoke.llama_tokenize(model, text, text.Length, p2, result.Length, (byte)(add_bos ? 1 : 0), (byte)(special ? 1 : 0));
+                        var check = Native.llama_tokenize(model, text, text.Length, p2, result.Length, (byte)(add_bos ? 1 : 0), (byte)(special ? 1 : 0));
                         Debug.Assert(check == -n_tokens);
                         n_tokens = result.Length;
                     }
@@ -50,13 +50,13 @@ namespace LlamaCppLib
             var result = new byte[8];
             fixed (byte* p1 = &result[0])
             {
-                n_pieces = PInvoke.llama_token_to_piece(model, token, p1, result.Length);
+                n_pieces = Native.llama_token_to_piece(model, token, p1, result.Length);
                 if (n_pieces < 0)
                 {
                     result = new byte[-n_pieces];
                     fixed (byte* p2 = &result[0])
                     {
-                        var check = PInvoke.llama_token_to_piece(model, token, p2, result.Length);
+                        var check = Native.llama_token_to_piece(model, token, p2, result.Length);
                         Debug.Assert(check == -n_pieces);
                         n_pieces = result.Length;
                     }
@@ -66,6 +66,5 @@ namespace LlamaCppLib
 
             return new(result, 0, n_pieces);
         }
-
     }
 }

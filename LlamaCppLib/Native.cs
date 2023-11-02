@@ -8,7 +8,7 @@ namespace LlamaCppLib
     using llama_pos = System.Int32;
     using llama_seq_id = System.Int32;
 
-    public static unsafe partial class PInvoke
+    public static unsafe partial class Native
     {
 #if WINDOWS
         private const string LibName = $"{nameof(LlamaCppLib)}/llama";

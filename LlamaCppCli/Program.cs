@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 using LlamaCppLib;
 
-using static LlamaCppLib.PInvoke;
+using static LlamaCppLib.Native;
 using static LlamaCppLib.Interop;
 
 namespace LlamaCppCli
