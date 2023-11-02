@@ -24,8 +24,8 @@ namespace LlamaCppCli
             // Multi-byte character encoding support (e.g. emojis)
             Console.OutputEncoding = Encoding.UTF8;
 
-            await RunSampleRawAsync(args);
-            //await RunSampleAsync(args);
+            //await RunSampleRawAsync(args);
+            await RunSampleAsync(args);
         }
 
         static async Task RunSampleRawAsync(string[] args)
@@ -235,19 +235,10 @@ namespace LlamaCppCli
         static async Task RunSampleAsync(string[] args)
         {
             using var llm = new LlmEngine(new EngineOptions { MaxParallel = 8 });
-
-            llm.LoadModel(
-                args[0],
-                new ModelOptions { Seed = 0, GpuLayers = 64 },
-                loadProgress => Console.Write($"{new string(' ', 32)}\rLoading model... {(byte)(loadProgress * 100)}%\r")
-            );
+            llm.LoadModel(args[0], new ModelOptions { Seed = 0, GpuLayers = 64 });
 
             var cancellationTokenSource = new CancellationTokenSource();
-            Console.CancelKeyPress += (s, e) =>
-            {
-                cancellationTokenSource.Cancel();
-                e.Cancel = true;
-            };
+            Console.CancelKeyPress += (s, e) => { cancellationTokenSource.Cancel(); e.Cancel = true; };
 
             var inputTask = Task.Run(
                 async () =>
@@ -266,6 +257,7 @@ namespace LlamaCppCli
                             break;
 
                         // Bulk parallel requests without streaming
+                        // i.e. `/load "prompt_file1.txt" "prompt_file2.txt" ...`
                         var match = Regex.Match(prompt, @"\/load\s+("".*?""(?:\s+|$))+");
                         if (match.Success)
                         {
@@ -327,34 +319,21 @@ namespace LlamaCppCli
                         }
 
                         // Single request with streaming
+                        // i.e. `<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\nHello there! How are you today?<|im_end|>\n<|im_start|>assistant\n`
                         var request = llm.NewRequest(prompt, new SamplingOptions { Temperature = 0.0f }, true, true);
-                        var buffer = new List<byte>();
+                        var assembler = new Utf8Assembler();
 
                         try
                         {
                             await foreach (var token in request.Tokens.Reader.ReadAllAsync(cancellationTokenSource.Token))
-                            {
-                                buffer.AddRange(token);
-                                if (buffer.ToArray().TryGetUtf8String(out var piece) && piece != null)
-                                {
-                                    Console.Write(piece);
-                                    buffer.Clear();
-                                }
-                            }
+                                Console.Write(assembler.Consume(token));
                         }
                         catch (OperationCanceledException)
                         {
                             Console.WriteLine(" [Cancelled]");
                         }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine(ex.ToString());
-                        }
 
-                        if (buffer.Any())
-                            Console.Write(Encoding.UTF8.GetString(buffer.ToArray()));
-
-                        Console.WriteLine();
+                        Console.WriteLine(assembler.Consume());
                     }
 
                     Console.WriteLine($"Shutting down...");
@@ -419,6 +398,16 @@ namespace LlamaCppCli
             }
 
             return result.ToString();
+        }
+
+        public string Consume()
+        {
+            if (_buffer.Count == 0)
+                return String.Empty;
+
+            var result = Encoding.UTF8.GetString(_buffer.ToArray());
+            _buffer.Clear();
+            return result;
         }
 
         private int _FindValidUtf8SequenceLength(byte[] bytes)

@@ -73,14 +73,17 @@ namespace LlamaCppLib
             if (!_backend.Created)
                 _backend.Create(() => llama_backend_init(_engineOptions.NumaOptimizations), llama_backend_free);
 
-            using var progressCallbackHandle = new UnmanagedResource<GCHandle>();
-            progressCallbackHandle.Create(() => GCHandle.Alloc(progressCallback), handle => handle.Free());
-
             var mparams = llama_model_default_params();
             mparams.n_gpu_layers = _modelOptions.GpuLayers;
             mparams.use_mmap = (byte)(_modelOptions.UseMemoryMap ? 1 : 0);
-            mparams.progress_callback = &LlmEngine._ProgressCallback;
-            mparams.progress_callback_user_data = GCHandle.ToIntPtr(progressCallbackHandle.Handle).ToPointer();
+
+            using var progressCallbackHandle = new UnmanagedResource<GCHandle>();
+            if (progressCallback != default)
+            {
+                progressCallbackHandle.Create(() => GCHandle.Alloc(progressCallback), handle => handle.Free());
+                mparams.progress_callback = &LlmEngine._ProgressCallback;
+                mparams.progress_callback_user_data = GCHandle.ToIntPtr(progressCallbackHandle.Handle).ToPointer();
+            }
 
             _model.Create(() => llama_load_model_from_file(modelPath, mparams), llama_free_model);
 
