@@ -24,8 +24,8 @@ namespace LlamaCppCli
             // Multi-byte character encoding support (e.g. emojis)
             Console.OutputEncoding = Encoding.UTF8;
 
-            //await RunSampleRawAsync(args);
-            await RunSampleAsync(args);
+            await RunSampleRawAsync(args);
+            //await RunSampleAsync(args);
         }
 
         static async Task RunSampleRawAsync(string[] args)
@@ -74,12 +74,15 @@ namespace LlamaCppCli
 
             var requests = new List<Request>();
 
-            //const string prompt = "<|im_start|>system\nYou are an emoji expert.<|im_end|>\n<|im_start|>user\nWhat are the top five emojis on the net?<|im_end|>\n<|im_start|>assistant\n";
-            const string prompt = "<|im_start|>system\nYou are an astrophysicist.<|im_end|>\n<|im_start|>user\nWrite a table listing the planets of the solar system in reverse order from the Sun. Then write another table listing the same planets but this time in order from the Sun. Lastly, provide an expert comment about the solar system and how it differs or not from the other planetary systems in the universe.<|im_end|>\n<|im_start|>assistant\n";
+            const string prompt = "<|im_start|>system\nYou are an emoji expert.<|im_end|>\n<|im_start|>user\nWhat are the top five emojis on the net?<|im_end|>\n<|im_start|>assistant\n";
+            //const string prompt = "<|im_start|>system\nYou are an astrophysicist.<|im_end|>\n<|im_start|>user\nWrite a table listing the planets of the solar system in reverse order from the Sun. Then write another table listing the same planets but this time in order from the Sun. Lastly, provide an expert comment about the solar system and how it differs or not from the other planetary systems in the universe.<|im_end|>\n<|im_start|>assistant\n";
             var tokens = (ReadOnlySpan<int>)llama_tokenize(mdl, prompt, true, true);
             Console.WriteLine($"{tokens.Length} token(s)");
-            for (var id = 0; id < 8; id++)
+            for (var id = 0; id < 1; id++)
                 requests.Add(new Request(llama_n_ctx(ctx), tokens) { Id = id });
+
+            var stream = true;
+            var pieces_buf = new List<byte[]>();
 
             while (true)
             {
@@ -189,6 +192,17 @@ namespace LlamaCppCli
 
                             request.Tokens[request.PosToken++] = token;
 
+                            if (stream)
+                            {
+                                var piece_bytes = llama_token_to_piece(mdl, token).ToArray();
+                                pieces_buf.Add(piece_bytes);
+                                if (pieces_buf.SelectMany(x => x).ToArray().TryGetUtf8String(out var piece_str))
+                                {
+                                    Console.Write(piece_str);
+                                    pieces_buf.Clear();
+                                }
+                            }
+
                             if (request.T1 == default)
                                 request.T1 = DateTime.Now;
 
@@ -200,13 +214,20 @@ namespace LlamaCppCli
 
                 foreach (var r in requests.Where(r => r.Tokens[r.PosToken - 1] == llama_token_eos(mdl)))
                 {
-                    Console.WriteLine(new String('=', 128));
-                    Console.WriteLine($"request id {r.Id} [{r.PosToken / r.Elapsed.TotalMilliseconds * 1000:F2} t/s]");
-                    Console.WriteLine(new String('-', 128));
-                    Console.WriteLine(Encoding.UTF8.GetString(r.Tokens.Take(r.PosToken).SelectMany(token => llama_token_to_piece(mdl, token).ToArray()).ToArray()));
-                    Console.WriteLine(new String('=', 128));
-
                     llama_kv_cache_seq_rm(ctx, r.Id, 0, -1);
+
+                    if (!stream)
+                    {
+                        Console.WriteLine(new String('=', 128));
+                        Console.WriteLine($"request id {r.Id} [{r.PosToken / r.Elapsed.TotalMilliseconds * 1000:F2} t/s]");
+                        Console.WriteLine(new String('-', 128));
+                        Console.WriteLine(Encoding.UTF8.GetString(r.Tokens.Take(r.PosToken).SelectMany(token => llama_token_to_piece(mdl, token).ToArray()).ToArray()));
+                        Console.WriteLine(new String('=', 128));
+                    }
+                    else
+                    {
+                        Console.WriteLine();
+                    }
                 }
 
                 requests.RemoveAll(r => r.Tokens[r.PosToken - 1] == llama_token_eos(mdl));

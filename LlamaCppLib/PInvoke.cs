@@ -39,9 +39,15 @@ namespace LlamaCppLib
             public uint n_batch;
             public uint n_threads;
             public uint n_threads_batch;
+            public sbyte rope_scaling_type;
 
             public float rope_freq_base;
             public float rope_freq_scale;
+            public float yarn_ext_factor;
+            public float yarn_attn_factor;
+            public float yarn_beta_fast;
+            public float yarn_beta_slow;
+            public uint yarn_orig_ctx;
 
             public byte mul_mat_q;
             public byte f16_kv;
