@@ -17,8 +17,9 @@ namespace LlamaCppCli
         {
             args = new[]
             {
-                "D:\\LLM_MODELS\\teknium\\ggml-openhermes-2-mistral-7b-q8_0.gguf",
-                //"D:\\LLM_MODELS\\codellama\\ggml-codellama-34b-instruct-q4_k.gguf",
+                @"D:\LLM_MODELS\openchat\ggml-openchat_3.5-q8_0.gguf",
+                @"D:\LLM_MODELS\teknium\ggml-openhermes-2-mistral-7b-q8_0.gguf",
+                @"D:\LLM_MODELS\codellama\ggml-codellama-34b-instruct-q4_k.gguf",
             };
 
             // Multi-byte character encoding support (e.g. emojis)
@@ -28,6 +29,10 @@ namespace LlamaCppCli
             await RunSampleAsync(args);
         }
 
+        /// <summary>
+        /// This barebone sample serves for testing the native API using raw function calls.
+        /// </summary>
+        /// <param name="args"></param>
         static async Task RunSampleRawAsync(string[] args)
         {
             RunSampleRaw(args);
@@ -74,15 +79,24 @@ namespace LlamaCppCli
 
             var requests = new List<Request>();
 
-            const string prompt = "<|im_start|>system\nYou are an emoji expert.<|im_end|>\n<|im_start|>user\nWhat are the top five emojis on the net?<|im_end|>\n<|im_start|>assistant\n";
+            const string prompt = "GPT4 User: Write a table listing the planets of the solar system in reverse order from the Sun. Then write another table listing the planets in order from the Sun.<|end_of_turn|>GPT4 Assistant:";
+            //const string prompt = "<|im_start|>system\nYou are an emoji expert.<|im_end|>\n<|im_start|>user\nWhat are the top five emojis on the net?<|im_end|>\n<|im_start|>assistant\n";
             //const string prompt = "<|im_start|>system\nYou are an astrophysicist.<|im_end|>\n<|im_start|>user\nWrite a table listing the planets of the solar system in reverse order from the Sun. Then write another table listing the same planets but this time in order from the Sun. Lastly, provide an expert comment about the solar system and how it differs or not from the other planetary systems in the universe.<|im_end|>\n<|im_start|>assistant\n";
+
             var tokens = (ReadOnlySpan<int>)llama_tokenize(mdl, prompt, true, true);
             Console.WriteLine($"{tokens.Length} token(s)");
+
             for (var id = 0; id < 1; id++)
                 requests.Add(new Request(llama_n_ctx(ctx), tokens) { Id = id });
 
             var stream = true;
-            var utf8Assembler = new Utf8Assembler();
+            var assembler = new MultibyteCharAssembler();
+
+            var stopTokens = new[]
+            {
+                llama_token_eos(mdl),
+                llama_tokenize(mdl, "<|end_of_turn|>", false, true)[0], // openchat-3.5
+            };
 
             while (true)
             {
@@ -193,18 +207,18 @@ namespace LlamaCppCli
                             request.Tokens[request.PosToken++] = token;
 
                             if (stream)
-                                Console.Write(utf8Assembler.Consume(llama_token_to_piece(mdl, token)));
+                                Console.Write(assembler.Consume(llama_token_to_piece(mdl, token)));
 
                             if (request.T1 == default)
                                 request.T1 = DateTime.Now;
 
-                            if (token == llama_token_eos(mdl))
+                            if (stopTokens.Contains(token))
                                 request.T2 = DateTime.Now;
                         }
                     }
                 }
 
-                foreach (var r in requests.Where(r => r.Tokens[r.PosToken - 1] == llama_token_eos(mdl)))
+                foreach (var r in requests.Where(r => stopTokens.Contains(r.Tokens[r.PosToken - 1])))
                 {
                     llama_kv_cache_seq_rm(ctx, r.Id, 0, -1);
 
@@ -222,7 +236,7 @@ namespace LlamaCppCli
                     }
                 }
 
-                requests.RemoveAll(r => r.Tokens[r.PosToken - 1] == llama_token_eos(mdl));
+                requests.RemoveAll(r => stopTokens.Contains(r.Tokens[r.PosToken - 1]));
             }
 
             llama_batch_free(bat);
@@ -232,10 +246,16 @@ namespace LlamaCppCli
             llama_backend_free();
         }
 
+        /// <summary>
+        /// This sample serves for testing the library wrapped native core functionality.
+        /// </summary>
+        /// <param name="args"></param>
         static async Task RunSampleAsync(string[] args)
         {
             using var llm = new LlmEngine(new EngineOptions { MaxParallel = 8 });
             llm.LoadModel(args[0], new ModelOptions { Seed = 0, GpuLayers = 64 });
+
+            var extraStopTokens = new[] { llm.Tokenize("<|end_of_turn|>", false, true)[0] };
 
             var cancellationTokenSource = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) => { cancellationTokenSource.Cancel(); e.Cancel = true; };
@@ -270,49 +290,33 @@ namespace LlamaCppCli
 
                             var requests = fileNames
                                 .Where(fileName => File.Exists(fileName))
-                                .Select(fileName => llm.NewRequest(File.ReadAllText(fileName), new SamplingOptions { Temperature = 0.0f }, true, true))
-                                .Select(async request =>
+                                .Select(fileName => llm.NewRequest(File.ReadAllText(fileName), new SamplingOptions { Temperature = 0.0f }, true, true, extraStopTokens))
+                                .Select(
+                                    async request =>
                                     {
-                                        var text = new StringBuilder();
-                                        var buffer = new List<byte>();
+                                        var response = new StringBuilder();
+                                        var assembler = new MultibyteCharAssembler();
 
-                                        try
-                                        {
-                                            await foreach (var token in request.Tokens.Reader.ReadAllAsync(cancellationTokenSource.Token))
-                                            {
-                                                buffer.AddRange(token);
-                                                if (buffer.ToArray().TryGetUtf8String(out var piece) && piece != null)
-                                                {
-                                                    text.Append(piece);
-                                                    buffer.Clear();
-                                                }
-                                            }
-                                        }
-                                        catch (OperationCanceledException)
-                                        {
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Console.WriteLine(ex.ToString());
-                                        }
+                                        await foreach (var token in request.NextToken(cancellationTokenSource.Token))
+                                            response.Append(assembler.Consume(token));
+                                        response.Append(assembler.Consume());
 
-                                        if (buffer.Any())
-                                            text.Append(Encoding.UTF8.GetString(buffer.ToArray()));
-
-                                        return (Request: request, Response: text.ToString(), Cancelled: cancellationTokenSource.IsCancellationRequested);
+                                        return (Request: request, Response: response.ToString(), request.Cancelled);
                                     }
                                 )
                                 .ToList();
 
                             var results = await Task.WhenAll(requests);
 
-                            Console.WriteLine(new String('=', 128));
+                            Console.WriteLine(new String('=', 196));
                             foreach (var result in results)
                             {
+                                Console.WriteLine($"Request {result.Request.GetHashCode()} | Prompting {result.Request.PromptingTime.TotalSeconds} | Sampling {result.Request.SamplingTime.TotalSeconds}");
+                                Console.WriteLine(new String('-', 196));
                                 Console.WriteLine(result.Request.Prompt);
-                                Console.WriteLine(new String('-', 64));
+                                Console.WriteLine(new String('-', 196));
                                 Console.WriteLine($"{result.Response}{(result.Cancelled ? " [Cancelled]" : "")}");
-                                Console.WriteLine(new String('=', 128));
+                                Console.WriteLine(new String('=', 196));
                             }
 
                             continue;
@@ -320,20 +324,15 @@ namespace LlamaCppCli
 
                         // Single request with streaming
                         // i.e. `<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\nHello there! How are you today?<|im_end|>\n<|im_start|>assistant\n`
-                        var request = llm.NewRequest(prompt, new SamplingOptions { Temperature = 0.0f }, true, true);
-                        var assembler = new Utf8Assembler();
+                        var request = llm.NewRequest(prompt, new SamplingOptions { Temperature = 0.0f }, true, true, extraStopTokens);
+                        var assembler = new MultibyteCharAssembler();
 
-                        try
-                        {
-                            await foreach (var token in request.Tokens.Reader.ReadAllAsync(cancellationTokenSource.Token))
-                                Console.Write(assembler.Consume(token));
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            Console.WriteLine(" [Cancelled]");
-                        }
-
+                        await foreach (var token in request.NextToken(cancellationTokenSource.Token))
+                            Console.Write(assembler.Consume(token));
                         Console.WriteLine(assembler.Consume());
+
+                        if (request.Cancelled)
+                            Console.WriteLine($" [Cancelled]");
                     }
 
                     Console.WriteLine($"Shutting down...");
@@ -348,7 +347,7 @@ namespace LlamaCppCli
         }
     }
 
-    internal class Request : IEquatable<Request>
+    file class Request : IEquatable<Request>
     {
         public int Id { get; set; }
 
@@ -376,65 +375,5 @@ namespace LlamaCppCli
 
         // IEquatable<T>
         public bool Equals(Request? other) => other?.Id == this.Id;
-    }
-
-    internal class Utf8Assembler
-    {
-        private List<byte> _buffer = new();
-
-        public string Consume(Span<byte> bytes)
-        {
-            var result = new StringBuilder();
-
-            _buffer.AddRange(bytes.ToArray());
-            while (_buffer.Count > 0)
-            {
-                var validUtf8Length = _FindValidUtf8SequenceLength(_buffer.ToArray());
-                if (validUtf8Length == 0)
-                    break;
-
-                result.Append(Encoding.UTF8.GetString(_buffer.GetRange(0, validUtf8Length).ToArray()));
-                _buffer.RemoveRange(0, validUtf8Length);
-            }
-
-            return result.ToString();
-        }
-
-        public string Consume()
-        {
-            if (_buffer.Count == 0)
-                return String.Empty;
-
-            var result = Encoding.UTF8.GetString(_buffer.ToArray());
-            _buffer.Clear();
-            return result;
-        }
-
-        private int _FindValidUtf8SequenceLength(byte[] bytes)
-        {
-            var index = 0;
-            while (index < bytes.Length)
-            {
-                var byteCount = _Utf8ByteCount(bytes[index]);
-                if (index + byteCount > bytes.Length)
-                    break;
-
-                index += byteCount;
-            }
-
-            return index;
-        }
-
-        private int _Utf8ByteCount(byte b)
-        {
-            return b switch
-            {
-                _ when (b & 0x80) == 0x00 => 1,     // 1-byte character
-                _ when (b & 0xE0) == 0xC0 => 2,     // 2-byte character
-                _ when (b & 0xF0) == 0xE0 => 3,     // 3-byte character
-                _ when (b & 0xF8) == 0xF0 => 4,     // 4-byte character
-                _ => 0                              // UTF-8 start byte invalid
-            };
-        }
     }
 }

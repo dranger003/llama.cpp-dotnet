@@ -163,6 +163,10 @@ namespace LlamaCppLib
             llama_model model);
 
         [LibraryImport(LibName)]
+        public static partial llama_token llama_token_eot(
+            llama_model model);
+
+        [LibraryImport(LibName)]
         public static partial void llama_kv_cache_clear(
             llama_context ctx);
 
