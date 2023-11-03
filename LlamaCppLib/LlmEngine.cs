@@ -19,7 +19,7 @@ namespace LlamaCppLib
         private EngineOptions _engineOptions = new();
         private ModelOptions _modelOptions = new();
 
-        private ConcurrentQueue<LlmRequest> _requests = new();
+        private ConcurrentQueue<LlmPrompt> _requests = new();
 
         private CancellationTokenSource _cancellationTokenSource = new();
         private Task? _mainTask = default;
@@ -112,12 +112,12 @@ namespace LlamaCppLib
         public Span<int> Tokenize(string prompt, bool prependBosToken = false, bool processSpecialTokens = false) =>
             llama_tokenize(_model.Handle, prompt, prependBosToken, processSpecialTokens);
 
-        public Task RunAsync()
+        public void StartAsync()
         {
             if (_mainTask != default)
                 throw new InvalidOperationException("Already running.");
 
-            return _mainTask = Task.Run(_Run);
+            _mainTask = Task.Run(_Run);
         }
 
         public async Task StopAsync()
@@ -140,7 +140,7 @@ namespace LlamaCppLib
                 await Task.Delay(pollingRateMs);
         }
 
-        public LlmRequest NewRequest(
+        public LlmPrompt Prompt(
             string prompt,
             SamplingOptions? samplingOptions = default,
             bool prependBosToken = false,
@@ -148,7 +148,7 @@ namespace LlamaCppLib
             int[]? extraStopTokens = default
         )
         {
-            var request = new LlmRequest(prompt, samplingOptions ?? new(), prependBosToken, processSpecialTokens) { ExtraStopTokens = extraStopTokens };
+            var request = new LlmPrompt(prompt, samplingOptions ?? new(), prependBosToken, processSpecialTokens) { ExtraStopTokens = extraStopTokens };
             _requests.Enqueue(request);
             return request;
         }
@@ -333,22 +333,21 @@ namespace LlamaCppLib
                                 token = llama_sample_token(_context.Handle, ref candidates_p);
                             }
 
-                            if (sequence.PosTokens == 0)
-                                sequence.T2 = DateTime.Now;
+                            sequence.T2 ??= DateTime.Now;
 
                             sequence.Tokens[sequence.PosTokens++] = token;
+                            sequence.Request.Tokens.Writer.TryWrite(llama_token_to_piece(_model.Handle, token).ToArray());
 
                             if (
-                                !sequence.Request.Tokens.Writer.TryWrite(llama_token_to_piece(_model.Handle, token).ToArray())
-                                || token == llama_token_eos(_model.Handle)
+                                token == llama_token_eos(_model.Handle)
                                 || sequence.Request.Cancelled
                                 || (sequence.Request.ExtraStopTokens?.Contains(token) ?? false)
                             )
                             {
                                 sequence.T3 = DateTime.Now;
 
-                                sequence.Request.PromptingTime = sequence.T2 - sequence.T1 ?? new();
-                                sequence.Request.SamplingTime = sequence.T3 - sequence.T2 ?? new();
+                                sequence.Request.PromptingTime = (sequence.T2 - sequence.T1) ?? new();
+                                sequence.Request.SamplingTime = (sequence.T3 - sequence.T2) ?? new();
                                 sequence.Request.Tokens.Writer.Complete();
 
                                 llama_kv_cache_seq_rm(_context.Handle, sequence.Id, -1, -1);
@@ -360,6 +359,7 @@ namespace LlamaCppLib
                 sequences.RemoveAll(
                     sequence =>
                         sequence.Tokens[sequence.PosTokens - 1] == llama_token_eos(_model.Handle)
+                        || sequence.Request.Cancelled
                         || (sequence.Request.ExtraStopTokens?.Contains(sequence.Tokens[sequence.PosTokens - 1]) ?? false)
                 );
             }

@@ -13,7 +13,7 @@ namespace LlamaCppLib
             _buffer.AddRange(bytes.ToArray());
             while (_buffer.Count > 0)
             {
-                var validUtf8Length = _FindValidUtf8SequenceLength(_buffer.ToArray());
+                var validUtf8Length = _Find(_buffer.ToArray());
                 if (validUtf8Length == 0)
                     break;
 
@@ -34,12 +34,12 @@ namespace LlamaCppLib
             return result;
         }
 
-        private int _FindValidUtf8SequenceLength(byte[] bytes)
+        private int _Find(byte[] bytes)
         {
             var index = 0;
             while (index < bytes.Length)
             {
-                var byteCount = _Utf8ByteCount(bytes[index]);
+                var byteCount = _Count(bytes[index]);
                 if (index + byteCount > bytes.Length)
                     break;
 
@@ -49,15 +49,15 @@ namespace LlamaCppLib
             return index;
         }
 
-        private int _Utf8ByteCount(byte b)
+        private int _Count(byte startByte)
         {
-            return b switch
+            return startByte switch
             {
-                _ when (b & 0x80) == 0x00 => 1,     // 1-byte character
-                _ when (b & 0xE0) == 0xC0 => 2,     // 2-byte character
-                _ when (b & 0xF0) == 0xE0 => 3,     // 3-byte character
-                _ when (b & 0xF8) == 0xF0 => 4,     // 4-byte character
-                _ => 0                              // UTF-8 start byte invalid
+                _ when (startByte & 0x80) == 0x00 => 1, // 1-byte character
+                _ when (startByte & 0xE0) == 0xC0 => 2, // 2-byte character
+                _ when (startByte & 0xF0) == 0xE0 => 3, // 3-byte character
+                _ when (startByte & 0xF8) == 0xF0 => 4, // 4-byte character
+                _ => 0                                  // Invalid start-byte
             };
         }
     }

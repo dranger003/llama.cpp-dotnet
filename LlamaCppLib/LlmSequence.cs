@@ -20,9 +20,9 @@ namespace LlamaCppLib
         public DateTime? T2 { get; set; }
         public DateTime? T3 { get; set; }
 
-        public LlmRequest Request { get; private set; }
+        public LlmPrompt Request { get; private set; }
 
-        public LlmSequence(LlmRequest request, int tokenCount, ReadOnlySpan<int> tokens, int mirostatM = 100)
+        public LlmSequence(LlmPrompt request, int tokenCount, ReadOnlySpan<int> tokens, int mirostatM = 100)
         {
             this.Tokens = new int[tokenCount];
             this.MirostatM = mirostatM;

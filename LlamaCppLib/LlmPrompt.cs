@@ -3,9 +3,9 @@ using System.Threading.Channels;
 
 namespace LlamaCppLib
 {
-    public class LlmRequest
+    public class LlmPrompt
     {
-        public LlmRequest(string prompt, bool preprendBosToken = false, bool processSpecialTokens = false)
+        public LlmPrompt(string prompt, bool preprendBosToken = false, bool processSpecialTokens = false)
         {
             this.Prompt = prompt;
             this.PrependBosToken = preprendBosToken;
@@ -14,7 +14,7 @@ namespace LlamaCppLib
             this.Tokens = Channel.CreateUnbounded<byte[]>();
         }
 
-        public LlmRequest(string prompt, SamplingOptions samplingOptions, bool preprendBosToken = false, bool processSpecialTokens = false) :
+        public LlmPrompt(string prompt, SamplingOptions samplingOptions, bool preprendBosToken = false, bool processSpecialTokens = false) :
             this(prompt, preprendBosToken, processSpecialTokens)
         {
             this.SamplingOptions = samplingOptions;
@@ -53,5 +53,21 @@ namespace LlamaCppLib
 
         public TimeSpan PromptingTime { get; set; }
         public TimeSpan SamplingTime { get; set; }
+    }
+
+    public class TokenEnumerator : IAsyncEnumerable<string>
+    {
+        private MultibyteCharAssembler _assembler = new();
+        private LlmPrompt _prompt;
+
+        public TokenEnumerator(LlmPrompt prompt) => _prompt = prompt;
+
+        public async IAsyncEnumerator<string> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+        {
+            await foreach (var token in _prompt.NextToken(cancellationToken))
+                yield return _assembler.Consume(token);
+
+            yield return _assembler.Consume();
+        }
     }
 }
