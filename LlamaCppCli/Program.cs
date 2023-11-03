@@ -28,6 +28,10 @@ namespace LlamaCppCli
 
             // Basic sample to demonstrate the library API
             {
+                int separatorWidth = 128;
+                string singleSeparator = new String('-', separatorWidth);
+                string doubleSeparator = new String('=', separatorWidth);
+
                 // Initialize
                 using var llm = new LlmEngine(new EngineOptions { MaxParallel = 8 });
                 llm.LoadModel(args[0], new ModelOptions { Seed = 0, GpuLayers = 32 });
@@ -38,7 +42,7 @@ namespace LlamaCppCli
                 // Prompting
                 var promptTemplate = "<|im_start|>system\n{0}<|im_end|>\n<|im_start|>user\n{1}<|im_end|>\n<|im_start|>assistant\n";
 
-                var promptTask = async (string systemPrompt, string userPrompt) =>
+                var promptTask = async (string systemPrompt, string userPrompt, bool streamTokens = false) =>
                 {
                     var prompt = llm.Prompt(
                         String.Format(promptTemplate, systemPrompt, userPrompt),
@@ -47,15 +51,32 @@ namespace LlamaCppCli
                         processSpecialTokens: true
                     );
 
-                    var response = new StringBuilder();
-                    await foreach (var token in new TokenEnumerator(prompt))
-                        response.Append(token);
+                    if (streamTokens)
+                    {
+                        Console.WriteLine(doubleSeparator);
+                        Console.WriteLine(userPrompt);
+                        Console.WriteLine(singleSeparator);
 
-                    Console.WriteLine($"{new String('=', 196)}");
+                        await foreach (var token in new TokenEnumerator(prompt))
+                            Console.Write(token);
+                    }
+                    else
+                    {
+                        var response = new StringBuilder();
+                        await foreach (var token in new TokenEnumerator(prompt))
+                            response.Append(token);
+
+                        Console.WriteLine(doubleSeparator);
+                        Console.WriteLine(userPrompt);
+                        Console.WriteLine(singleSeparator);
+                        Console.Write(response);
+                    }
+
+                    // Statistics
+                    Console.WriteLine();
+                    Console.WriteLine(singleSeparator);
                     Console.WriteLine($"{prompt.PromptingTime} / {prompt.SamplingTime}");
-                    Console.WriteLine($"{new String('-', 196)}");
-                    Console.Write(response.ToString());
-                    Console.WriteLine($"\n{new String('=', 196)}");
+                    Console.WriteLine(doubleSeparator);
                 };
 
                 // Requests
@@ -69,10 +90,21 @@ namespace LlamaCppCli
                         System: "You are an astrophysicist.",
                         User: "Write two tables listing the planets of the solar system, one in order from the Sun and the other in reverse order."
                     ),
+                    (
+                        System: "You are a helpful assistant.",
+                        User: "What do you think is the best way (briefly) to run a large language model using cutting edge technology?"
+                    ),
                 };
 
-                // Inference
-                await Task.WhenAll(requests.Select(request => promptTask(request.System, request.User)));
+                Console.WriteLine(doubleSeparator);
+
+                // Streaming (single)
+                Console.WriteLine($"Streaming inference...");
+                await Task.WhenAll(requests.Select(request => promptTask(request.System, request.User, true)).Skip(1).Take(1));
+
+                // Buffering (parallel)
+                Console.WriteLine($"Buffering inference...");
+                await Task.WhenAll(requests.Select(request => promptTask(request.System, request.User, false)));
 
                 // Stop
                 await llm.StopAsync();

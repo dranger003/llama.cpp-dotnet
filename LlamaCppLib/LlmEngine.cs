@@ -342,6 +342,7 @@ namespace LlamaCppLib
                                 token == llama_token_eos(_model.Handle)
                                 || sequence.Request.Cancelled
                                 || (sequence.Request.ExtraStopTokens?.Contains(token) ?? false)
+                                || sequence.PosTokens >= sequence.SamplingOptions.MaxSequenceLength
                             )
                             {
                                 sequence.T3 = DateTime.Now;

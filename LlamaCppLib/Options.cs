@@ -42,5 +42,7 @@ namespace LlamaCppLib
         public float PenaltyRepeat { get; set; } = 1.1f;
         public float PenaltyFreq { get; set; } = 0.0f;
         public float PenaltyPresent { get; set; } = 0.0f;
+
+        public int? MaxSequenceLength { get; set; } = default;
     }
 }
