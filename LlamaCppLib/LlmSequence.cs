@@ -10,6 +10,7 @@ namespace LlamaCppLib
         public int PosLogit { get; set; }
 
         public int PosTokens { get; set; }
+        public int PosResponse { get; set; }
         public int[] Tokens { get; set; }
 
         public SamplingOptions SamplingOptions { get; set; } = new();
@@ -20,17 +21,19 @@ namespace LlamaCppLib
         public DateTime? T2 { get; set; }
         public DateTime? T3 { get; set; }
 
-        public LlmPrompt Request { get; private set; }
+        public LlmPrompt Prompt { get; private set; }
 
-        public LlmSequence(LlmPrompt request, int tokenCount, ReadOnlySpan<int> tokens, int mirostatM = 100)
+        public LlmSequence(LlmPrompt prompt, int tokenCount, ReadOnlySpan<int> tokens, int mirostatM = 100)
         {
             this.Tokens = new int[tokenCount];
             this.MirostatM = mirostatM;
-            this.Request = request;
-            this.SamplingOptions = request.SamplingOptions;
+            this.Prompt = prompt;
+            this.SamplingOptions = prompt.SamplingOptions;
 
             tokens.CopyTo(Tokens);
             PosTokens += tokens.Length;
+
+            PosResponse = PosTokens;
         }
 
         public override bool Equals([NotNullWhen(true)] object? obj) => obj is LlmSequence request && Equals(request);

@@ -41,7 +41,7 @@ namespace LlamaCppLib
                     if ((result = await this.Tokens.Reader.ReadAsync(cancellationToken)).Length == 0)
                         break;
                 }
-                catch (OperationCanceledException)
+                catch (Exception ex) when (ex is OperationCanceledException || ex is ChannelClosedException)
                 {
                     this.Cancelled = true;
                     break;
@@ -51,8 +51,8 @@ namespace LlamaCppLib
             }
         }
 
-        public TimeSpan PromptingTime { get; set; }
-        public TimeSpan SamplingTime { get; set; }
+        public double PromptingSpeed { get; set; }
+        public double SamplingSpeed { get; set; }
     }
 
     public class TokenEnumerator : IAsyncEnumerable<string>

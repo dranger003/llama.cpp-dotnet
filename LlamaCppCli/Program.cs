@@ -75,12 +75,11 @@ namespace LlamaCppCli
                     // Statistics
                     Console.WriteLine();
                     Console.WriteLine(singleSeparator);
-                    Console.WriteLine($"{prompt.PromptingTime} / {prompt.SamplingTime}");
+                    Console.WriteLine($"Prompting: {prompt.PromptingSpeed:F2} t/s / Sampling: {prompt.SamplingSpeed:F2} t/s");
                     Console.WriteLine(doubleSeparator);
                 };
 
-                // Requests
-                var requests = new[]
+                var prompts = new[]
                 {
                     (
                         System: "You are an emoji expert.",
@@ -91,8 +90,12 @@ namespace LlamaCppCli
                         User: "Write two tables listing the planets of the solar system, one in order from the Sun and the other in reverse order."
                     ),
                     (
-                        System: "You are a helpful assistant.",
+                        System: "You are an AI scientist and researcher.",
                         User: "What do you think is the best way (briefly) to run a large language model using cutting edge technology?"
+                    ),
+                    (
+                        System: "Your task is to summarize the text provided in a bullet list of main topics.",
+                        User: File.ReadAllText(@"D:\LLM_MODELS\ESSAY.txt")
                     ),
                 };
 
@@ -100,11 +103,11 @@ namespace LlamaCppCli
 
                 // Streaming (single)
                 Console.WriteLine($"Streaming inference...");
-                await Task.WhenAll(requests.Select(request => promptTask(request.System, request.User, true)).Skip(1).Take(1));
+                await Task.WhenAll(prompts.Select(request => promptTask(request.System, request.User, true)).Skip(1).Take(1));
 
-                // Buffering (parallel)
+                // Buffering (multiple)
                 Console.WriteLine($"Buffering inference...");
-                await Task.WhenAll(requests.Select(request => promptTask(request.System, request.User, false)));
+                await Task.WhenAll(prompts.Select(request => promptTask(request.System, request.User, false)));
 
                 // Stop
                 await llm.StopAsync();

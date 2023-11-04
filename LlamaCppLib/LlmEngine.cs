@@ -170,10 +170,12 @@ namespace LlamaCppLib
 
                     if (_requests.TryDequeue(out var request))
                     {
-                        var sequence = new LlmSequence(request, llama_n_ctx(_context.Handle), Tokenize(request.Prompt, request.PrependBosToken, request.ProcessSpecialTokens))
-                        {
-                            T1 = DateTime.Now,
-                        };
+                        var sequence = new LlmSequence(
+                            request,
+                            llama_n_ctx(_context.Handle),
+                            Tokenize(request.Prompt, request.PrependBosToken, request.ProcessSpecialTokens)
+                        )
+                        { T1 = DateTime.Now };
 
                         var id = sequences.Add(sequence);
                         sequence.Id = id;
@@ -235,7 +237,7 @@ namespace LlamaCppLib
                     if (result != 0)
                     {
                         foreach (var sequence in sequences)
-                            sequence.Request.Tokens.Writer.Complete(new InsufficientMemoryException());
+                            sequence.Prompt.Tokens.Writer.Complete(new InsufficientMemoryException());
 
                         sequences.RemoveAll(sequence => true);
                         llama_kv_cache_clear(_context.Handle);
@@ -333,43 +335,46 @@ namespace LlamaCppLib
                                 token = llama_sample_token(_context.Handle, ref candidates_p);
                             }
 
-                            sequence.T2 ??= DateTime.Now;
+                            if (sequence.T2 == default)
+                            {
+                                sequence.T2 = DateTime.Now;
+                                sequence.Prompt.PromptingSpeed = sequence.PosResponse / ((sequence.T2 - sequence.T1) ?? new()).TotalSeconds;
+                            }
 
-                            sequence.Tokens[sequence.PosTokens++] = token;
-                            sequence.Request.Tokens.Writer.TryWrite(llama_token_to_piece(_model.Handle, token).ToArray());
+                            var prematureStop = false
+                                || sequence.Prompt.Cancelled
+                                || sequence.PosTokens >= sequence.Tokens.Length - 1
+                                || sequence.PosTokens - sequence.PosResponse >= sequence.SamplingOptions.ResponseMaxTokenCount;
 
-                            if (
-                                token == llama_token_eos(_model.Handle)
-                                || sequence.Request.Cancelled
-                                || (sequence.Request.ExtraStopTokens?.Contains(token) ?? false)
-                                || sequence.PosTokens >= sequence.SamplingOptions.MaxSequenceLength
-                            )
+                            if (!prematureStop)
+                            {
+                                sequence.Prompt.Tokens.Writer.TryWrite(llama_token_to_piece(_model.Handle, token).ToArray());
+                                sequence.Tokens[sequence.PosTokens++] = token;
+                            }
+
+                            if (prematureStop || token == llama_token_eos(_model.Handle) || (sequence.Prompt.ExtraStopTokens?.Contains(token) ?? false))
                             {
                                 sequence.T3 = DateTime.Now;
+                                sequence.Prompt.SamplingSpeed = (sequence.PosTokens - sequence.PosResponse - 1) / ((sequence.T3 - sequence.T2) ?? new()).TotalSeconds;
 
-                                sequence.Request.PromptingTime = (sequence.T2 - sequence.T1) ?? new();
-                                sequence.Request.SamplingTime = (sequence.T3 - sequence.T2) ?? new();
-                                sequence.Request.Tokens.Writer.Complete();
+                                if (prematureStop)
+                                    sequence.Prompt.Tokens.Writer.Complete(new OperationCanceledException());
+                                else
+                                    sequence.Prompt.Tokens.Writer.Complete();
 
                                 llama_kv_cache_seq_rm(_context.Handle, sequence.Id, -1, -1);
+                                sequences.Remove(sequence.Id);
                             }
                         }
                     }
                 }
-
-                sequences.RemoveAll(
-                    sequence =>
-                        sequence.Tokens[sequence.PosTokens - 1] == llama_token_eos(_model.Handle)
-                        || sequence.Request.Cancelled
-                        || (sequence.Request.ExtraStopTokens?.Contains(sequence.Tokens[sequence.PosTokens - 1]) ?? false)
-                );
             }
 
             if (cancellationToken.IsCancellationRequested)
             {
                 // Notify outstanding requests of cancellation
                 foreach (var sequence in sequences)
-                    sequence.Request.Tokens.Writer.Complete(new OperationCanceledException());
+                    sequence.Prompt.Tokens.Writer.Complete(new OperationCanceledException());
             }
         }
     }

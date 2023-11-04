@@ -68,7 +68,7 @@ namespace LlamaCppCli
                             Console.WriteLine(new String('=', 196));
                             foreach (var result in results)
                             {
-                                Console.WriteLine($"Request {result.Request.GetHashCode()} | Prompting {result.Request.PromptingTime.TotalSeconds} | Sampling {result.Request.SamplingTime.TotalSeconds}");
+                                Console.WriteLine($"Request {result.Request.GetHashCode()} | Prompting {result.Request.PromptingSpeed} t/s | Sampling {result.Request.SamplingSpeed} t/s");
                                 Console.WriteLine(new String('-', 196));
                                 Console.WriteLine(result.Request.Prompt);
                                 Console.WriteLine(new String('-', 196));
@@ -91,7 +91,7 @@ namespace LlamaCppCli
                         if (request.Cancelled)
                             Console.WriteLine($" [Cancelled]");
 
-                        Console.WriteLine($"Prompting {request.PromptingTime.TotalSeconds} | Sampling {request.SamplingTime.TotalSeconds}");
+                        Console.WriteLine($"Prompting {request.PromptingSpeed} t/s | Sampling {request.SamplingSpeed} t/s");
                     }
 
                     Console.WriteLine($"Shutting down...");
