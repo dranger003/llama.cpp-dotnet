@@ -4,7 +4,8 @@
 
 ### *Update 10/2023*
 *There has been a major overhaul of the upstream repo to support parallel decoding.*  
-*The upstream changes are currently being ported and therefore most of the code here needs to be refactored.*
+*The upstream changes are currently being ported and therefore most of the code here needs to be refactored.*  
+*Refactoring work currently happening in the `complete-refactor` branch.*
 
 ### Description
 
