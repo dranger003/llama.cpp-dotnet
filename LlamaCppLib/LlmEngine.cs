@@ -158,6 +158,7 @@ namespace LlamaCppLib
             _batch.GetResource(out var batch);
 
             var sequences = new Slots<LlmSequence>(_engineOptions.MaxParallel);
+            var batchView = new llama_batch();
 
             var cancellationToken = _cancellationTokenSource.Token;
             while (!cancellationToken.IsCancellationRequested)
@@ -217,22 +218,18 @@ namespace LlamaCppLib
 
                     var n_tokens = Math.Min(batchSize, batch.n_tokens - i);
 
-                    var result = llama_decode(
-                        _context.Handle,
-                        new llama_batch
-                        {
-                            n_tokens = n_tokens,
-                            token = batch.token + i,
-                            embd = null,
-                            pos = batch.pos + i,
-                            n_seq_id = batch.n_seq_id + i,
-                            seq_id = batch.seq_id + i,
-                            logits = batch.logits + i,
-                            all_pos_0 = 0,
-                            all_pos_1 = 0,
-                            all_seq_id = 0,
-                        }
-                    );
+                    batchView.n_tokens = n_tokens;
+                    batchView.token = batch.token + i;
+                    batchView.embd = null;
+                    batchView.pos = batch.pos + i;
+                    batchView.n_seq_id = batch.n_seq_id + i;
+                    batchView.seq_id = batch.seq_id + i;
+                    batchView.logits = batch.logits + i;
+                    batchView.all_pos_0 = 0;
+                    batchView.all_pos_1 = 0;
+                    batchView.all_seq_id = 0;
+
+                    var result = llama_decode(_context.Handle, batchView);
 
                     if (result != 0)
                     {
