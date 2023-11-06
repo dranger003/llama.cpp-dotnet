@@ -25,7 +25,7 @@ namespace LlamaCppCli
         static unsafe void RunSampleRaw(string[] args)
         {
             var requests = new List<Request>();
-            var extraStopTokens = new[] { "<|EOT|>" };
+            var extraStopTokens = new[] { "<|EOT|>", "<|end_of_turn|>", "<|endoftext|>" };
             var assembler = new MultibyteCharAssembler();
             var stream = true;
 
@@ -44,7 +44,7 @@ namespace LlamaCppCli
             var typical_p = 1.0f;
             var temp = 0.0f;
 
-            var mirostat = 2;
+            var mirostat = 0;
             var mirostat_tau = 5.0f;
             var mirostat_eta = 0.1f;
             var mirostat_m = 100;
@@ -55,7 +55,7 @@ namespace LlamaCppCli
             var penalty_present = 0.0f;
 
             var mparams = llama_model_default_params();
-            mparams.n_gpu_layers = 64;
+            mparams.n_gpu_layers = 48;
             mparams.progress_callback = &ProgressCallback;
 
             var cparams = llama_context_default_params();
@@ -83,12 +83,15 @@ namespace LlamaCppCli
                     Console.Write($"\n[{sw.Elapsed}]{(run++ == 1 ? "" : $"[{tc / sw.Elapsed.TotalSeconds:F2} t/s]")}> ");
                     var line = Console.ReadLine() ?? String.Empty;
 
-                    if (line == "quit")
+                    if (line == "q" || line == "quit")
+                    {
+                        Console.WriteLine("Bye.");
                         break;
+                    }
 
                     var prompt = File.ReadAllText(@"D:\LLM_MODELS\TEMPLATE.txt").Replace("{}", File.ReadAllText(@"D:\LLM_MODELS\PROMPT.txt")).Replace("\r\n", "\n");
 
-                    var tokens = llama_tokenize(mdl, prompt, true, true);
+                    var tokens = llama_tokenize(mdl, prompt, llama_vocab_type(mdl) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM, true);
                     Console.WriteLine($"{tokens.Length} token(s)");
                     requests.Add(new Request(llama_n_ctx(ctx), tokens));
 
@@ -109,6 +112,9 @@ namespace LlamaCppCli
 
                         request.PosLogit = bat.n_tokens - 1;
                         bat.logits[request.PosLogit] = true ? 1 : 0;
+
+                        if (request.T0 == default)
+                            request.T0 = DateTime.Now;
                     }
 
                     if (bat.n_tokens == 0)
@@ -144,7 +150,7 @@ namespace LlamaCppCli
                                 if (stream)
                                 {
                                     var progress = i / (double)bat.n_tokens * 100;
-                                    Console.Write($"{new String(' ', 32)}\rDecoding... {progress:F2}%\r");
+                                    Console.Write($"{new String(' ', 32)}\rDecoding... {progress:F2}% [{i}/{bat.n_tokens}][{i / (DateTime.Now - (request.T0 ?? DateTime.Now)).TotalSeconds:F2} t/s]\r");
                                 }
 
                                 continue;
@@ -212,20 +218,22 @@ namespace LlamaCppCli
                                     token = llama_sample_token(ctx, ref candidates_p);
                                 }
 
+                                if (request.PosResponse == 0)
+                                    request.PosResponse = request.PosToken;
+
+                                if (extraStopTokens.Select(extraStopToken => llama_tokenize(mdl, extraStopToken, false, true)[0]).Contains(token) || cancel)
+                                    token = llama_token_eos(mdl); // Override stop token with EOS token
+
                                 request.Tokens[request.PosToken++] = token;
                                 ++tc;
 
                                 if (stream)
+                                {
                                     Console.Write(assembler.Consume(llama_token_to_piece(mdl, token)));
 
-                                if (cancel || extraStopTokens.Select(est => llama_tokenize(mdl, est, false, true)[0]).Contains(token))
-                                {
-                                    token = llama_token_eos(mdl);
-                                    request.Tokens[request.PosToken++] = token;
+                                    if (cancel)
+                                        Console.Write(" [Cancelled]");
                                 }
-
-                                if (cancel && stream)
-                                    Console.Write(" [Cancelled]");
 
                                 if (request.T1 == default)
                                     request.T1 = DateTime.Now;
@@ -242,10 +250,15 @@ namespace LlamaCppCli
 
                         if (!stream)
                         {
+                            var promptTokens = r.Tokens.Take(r.PosResponse).SelectMany(token => llama_token_to_piece(mdl, token).ToArray()).ToArray();
+                            var responseTokens = r.Tokens.Skip(r.PosResponse).Take(r.PosToken - r.PosResponse).SelectMany(token => llama_token_to_piece(mdl, token).ToArray()).ToArray();
+
                             Console.WriteLine(new String('=', 128));
                             Console.WriteLine($"request id {r.Id} [{r.PosToken / r.Elapsed.TotalMilliseconds * 1000:F2} t/s]");
                             Console.WriteLine(new String('-', 128));
-                            Console.WriteLine(Encoding.UTF8.GetString(r.Tokens.Take(r.PosToken).SelectMany(token => llama_token_to_piece(mdl, token).ToArray()).ToArray()));
+                            Console.WriteLine(Encoding.UTF8.GetString(promptTokens));
+                            Console.WriteLine(new String('-', 128));
+                            Console.WriteLine(Encoding.UTF8.GetString(responseTokens));
                             Console.WriteLine(new String('=', 128));
                         }
                         else
@@ -273,13 +286,15 @@ namespace LlamaCppCli
         public int PosBatch { get; set; }
         public int PosLogit { get; set; }
 
+        public int PosResponse { get; set; }
         public int PosToken { get; set; }
         public int[] Tokens { get; set; }
 
         public float MirostatMU = 0.0f;
 
-        public DateTime? T1 { get; set; }
-        public DateTime? T2 { get; set; }
+        public DateTime? T0 { get; set; }   // Decoding
+        public DateTime? T1 { get; set; }   // Sampling
+        public DateTime? T2 { get; set; }   // End
         public TimeSpan Elapsed => (T2 - T1) ?? TimeSpan.FromSeconds(0);
 
         public Request(int n_ctx, ReadOnlySpan<int> tokens)

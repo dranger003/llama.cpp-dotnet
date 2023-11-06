@@ -7,6 +7,7 @@ namespace LlamaCppLib
     using llama_token = System.Int32;
     using llama_pos = System.Int32;
     using llama_seq_id = System.Int32;
+    using static LlamaCppLib.Native;
 
     public static unsafe partial class Native
     {
@@ -15,6 +16,8 @@ namespace LlamaCppLib
 #elif LINUX || MACOS
         private const string LibName = $"{nameof(LlamaCppLib)}/libllama";
 #endif
+
+        public enum llama_vocab_type_t { LLAMA_VOCAB_TYPE_SPM = 0, LLAMA_VOCAB_TYPE_BPE = 1 }
 
         [StructLayout(LayoutKind.Sequential)]
         public struct llama_model_params
@@ -122,6 +125,10 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial int llama_n_ctx(
             llama_context ctx);
+
+        [LibraryImport(LibName)]
+        public static partial llama_vocab_type_t llama_vocab_type(
+            llama_model model);
 
         [LibraryImport(LibName)]
         public static partial int llama_n_vocab(

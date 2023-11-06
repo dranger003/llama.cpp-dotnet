@@ -11,12 +11,18 @@ namespace LlamaCppCli
         {
             args = new[]
             {
-                @"D:\LLM_MODELS\teknium\ggml-openhermes-2.5-mistral-7b-q8_0.gguf",
-                @"D:\LLM_MODELS\CalderaAI\ggml-hexoteric-7b-q8_0.gguf",
-                @"D:\LLM_MODELS\teknium\ggml-openhermes-2-mistral-7b-q8_0.gguf",
-                @"D:\LLM_MODELS\openchat\ggml-openchat_3.5-q8_0.gguf",
-                @"D:\LLM_MODELS\NousResearch\ggml-yarn-mistral-7b-128k-q8_0.gguf",
+                @"D:\LLM_MODELS\codellama\ggml-codellama-13b-instruct-q4_k.gguf",
+                @"D:\LLM_MODELS\CausalLM\ggml-causallm-14b-q8_0.gguf",
+                @"D:\LLM_MODELS\CausalLM\ggml-causallm-7b-q8_0.gguf",                   // {context}<|im_start|>system\n{system}<|im_end|>\n<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n
+                @"D:\LLM_MODELS\teknium\ggml-yarn-llama-2-13b-64k-q4_k.gguf",
+                @"D:\LLM_MODELS\codellama\ggml-codellama-7b-instruct-q8_0.gguf",        // {context}[INST] {user} [/INST]\n
+                @"D:\LLM_MODELS\teknium\ggml-hermes-trismegistus-mistral-7b-q8_0.gguf",
                 @"D:\LLM_MODELS\codellama\ggml-codellama-34b-instruct-q4_k.gguf",
+                @"D:\LLM_MODELS\teknium\ggml-openhermes-2.5-mistral-7b-q8_0.gguf",
+                @"D:\LLM_MODELS\teknium\ggml-openhermes-2-mistral-7b-q8_0.gguf",
+                @"D:\LLM_MODELS\CalderaAI\ggml-hexoteric-7b-q8_0.gguf",                 // {context}<|im_start|>system\n{system}<|im_end|>\n<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n
+                @"D:\LLM_MODELS\NousResearch\ggml-yarn-mistral-7b-128k-q8_0.gguf",
+                @"D:\LLM_MODELS\openchat\ggml-openchat_3.5-q8_0.gguf",                  // {context}<|end_of_turn|>GPT4 Correct User: {user}<|end_of_turn|>GPT4 Correct Assistant:\n
             };
 
             // Multi-byte character encoding support (e.g. emojis)

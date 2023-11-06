@@ -143,12 +143,15 @@ namespace LlamaCppLib
         public LlmPrompt Prompt(
             string prompt,
             SamplingOptions? samplingOptions = default,
-            bool prependBosToken = false,
-            bool processSpecialTokens = false,
+            bool? prependBosToken = default,
+            bool? processSpecialTokens = default,
             int[]? extraStopTokens = default
         )
         {
-            var request = new LlmPrompt(prompt, samplingOptions ?? new(), prependBosToken, processSpecialTokens) { ExtraStopTokens = extraStopTokens };
+            prependBosToken ??= Native.llama_vocab_type(_model.Handle) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM;
+            processSpecialTokens ??= true;
+
+            var request = new LlmPrompt(prompt, samplingOptions ?? new(), prependBosToken.Value, processSpecialTokens.Value) { ExtraStopTokens = extraStopTokens };
             _requests.Enqueue(request);
             return request;
         }
