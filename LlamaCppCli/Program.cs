@@ -9,26 +9,37 @@ namespace LlamaCppCli
     {
         static async Task Main(string[] args)
         {
-            args = new[]
+            var models = new[]
             {
-                @"D:\LLM_MODELS\codellama\ggml-codellama-13b-instruct-q4_k.gguf",
-                @"D:\LLM_MODELS\CausalLM\ggml-causallm-14b-q8_0.gguf",
+                @"D:\LLM_MODELS\01-ai\ggml-yi-34b-q4_k.gguf",                           // none
+
+                @"D:\LLM_MODELS\CalderaAI\ggml-hexoteric-7b-q8_0.gguf",                 // {context}<|im_start|>system\n{system}<|im_end|>\n<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n
+                @"D:\LLM_MODELS\CalderaAI\ggml-naberius-7b-q8_0.gguf",
+
                 @"D:\LLM_MODELS\CausalLM\ggml-causallm-7b-q8_0.gguf",                   // {context}<|im_start|>system\n{system}<|im_end|>\n<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n
-                @"D:\LLM_MODELS\teknium\ggml-yarn-llama-2-13b-64k-q4_k.gguf",
+                @"D:\LLM_MODELS\CausalLM\ggml-causallm-14b-q8_0.gguf",
+
+                @"D:\LLM_MODELS\NousResearch\ggml-yarn-mistral-7b-64k-q8_0.gguf",       // none
+                @"D:\LLM_MODELS\NousResearch\ggml-yarn-mistral-7b-128k-q8_0.gguf",
+                @"D:\LLM_MODELS\NousResearch\ggml-yarn-llama-2-13b-64k-q4_k.gguf",
+
                 @"D:\LLM_MODELS\codellama\ggml-codellama-7b-instruct-q8_0.gguf",        // {context}[INST] {user} [/INST]\n
-                @"D:\LLM_MODELS\teknium\ggml-hermes-trismegistus-mistral-7b-q8_0.gguf",
+                @"D:\LLM_MODELS\codellama\ggml-codellama-13b-instruct-q4_k.gguf",
                 @"D:\LLM_MODELS\codellama\ggml-codellama-34b-instruct-q4_k.gguf",
+
+                @"D:\LLM_MODELS\teknium\ggml-hermes-trismegistus-mistral-7b-q8_0.gguf", // {context}<|end_of_turn|>GPT4 Correct User: {user}<|end_of_turn|>GPT4 Correct Assistant:\n
                 @"D:\LLM_MODELS\teknium\ggml-openhermes-2.5-mistral-7b-q8_0.gguf",
                 @"D:\LLM_MODELS\teknium\ggml-openhermes-2-mistral-7b-q8_0.gguf",
-                @"D:\LLM_MODELS\CalderaAI\ggml-hexoteric-7b-q8_0.gguf",                 // {context}<|im_start|>system\n{system}<|im_end|>\n<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n
-                @"D:\LLM_MODELS\NousResearch\ggml-yarn-mistral-7b-128k-q8_0.gguf",
+
                 @"D:\LLM_MODELS\openchat\ggml-openchat_3.5-q8_0.gguf",                  // {context}<|end_of_turn|>GPT4 Correct User: {user}<|end_of_turn|>GPT4 Correct Assistant:\n
             };
+
+            args = new[] { models[9] };
 
             // Multi-byte character encoding support (e.g. emojis)
             Console.OutputEncoding = Encoding.UTF8;
 
-            //// This sample serves for testing the native API using raw function calls
+            // This sample serves for testing the native API using raw function calls
             await RunSampleRawAsync(args);
 
             //// This sample serves for testing the library wrapped native core functionality
@@ -128,7 +139,7 @@ namespace LlamaCppCli
 
             //    // Initialize
             //    using var llm = new LlmEngine(new EngineOptions { MaxParallel = 8 });
-            //    llm.LoadModel(args[0], new ModelOptions { Seed = 0, GpuLayers = 32 });
+            //    llm.LoadModel(args[0], new ModelOptions { Seed = 0, GpuLayers = 64 });
 
             //    // Start
             //    llm.StartAsync();
@@ -136,38 +147,38 @@ namespace LlamaCppCli
             //    var cancellationTokenSource = new CancellationTokenSource();
             //    Console.CancelKeyPress += (s, e) => { cancellationTokenSource.Cancel(!(e.Cancel = true)); };
 
+            //    Console.Write($"{new String('=', 196)}");
+
             //    while (true)
             //    {
             //        // Input
             //        Console.Write($"\n> ");
             //        var userPrompt = Console.ReadLine() ?? String.Empty;
-            //        if (String.IsNullOrWhiteSpace(userPrompt))
-            //            break;
+            //        if (String.IsNullOrWhiteSpace(userPrompt)) break;
 
-            //        // File Load
+            //        var promptText = String.Format(promptTemplate, systemPrompt, userPrompt);
+
+            //        // Load (Optional)
             //        var match = Regex.Match(userPrompt, @"/load\s+""?([^""\s]+)""?");
-            //        if (match.Success)
-            //            userPrompt = File.ReadAllText(match.Groups[1].Value).Trim();
+            //        if (match.Success) promptText = File.ReadAllText(match.Groups[1].Value);
 
             //        // Prompting
-            //        var prompt = llm.Prompt(
-            //            String.Format(promptTemplate, systemPrompt, userPrompt),
-            //            new SamplingOptions { Temperature = 0.0f },
-            //            prependBosToken: true,
-            //            processSpecialTokens: true
-            //        );
+            //        var prompt = llm.Prompt(promptText, new SamplingOptions { Temperature = 0.0f });
 
             //        // Inference
-            //        Console.WriteLine(new String('=', 196));
-            //        await foreach (var token in new TokenEnumerator(prompt).WithCancellation(cancellationTokenSource.Token))
-            //            Console.Write(token);
-
-            //        // Cancellation
-            //        if (cancellationTokenSource.IsCancellationRequested)
+            //        Console.WriteLine($"{new String('=', 196)}");
             //        {
-            //            Console.Write($" [Cancelled]");
-            //            cancellationTokenSource = new();
+            //            await foreach (var token in new TokenEnumerator(prompt, cancellationTokenSource.Token))
+            //                Console.Write(token);
+
+            //            // Cancellation
+            //            if (cancellationTokenSource.IsCancellationRequested)
+            //            {
+            //                Console.Write($" [Cancelled]");
+            //                cancellationTokenSource = new();
+            //            }
             //        }
+            //        Console.Write($"\n{new String('=', 196)}");
             //    }
 
             //    // Stop

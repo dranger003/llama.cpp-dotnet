@@ -19,7 +19,7 @@ namespace LlamaCppLib
         private EngineOptions _engineOptions = new();
         private ModelOptions _modelOptions = new();
 
-        private ConcurrentQueue<LlmPrompt> _requests = new();
+        private ConcurrentQueue<LlmPrompt> _prompts = new();
 
         private CancellationTokenSource _cancellationTokenSource = new();
         private Task? _mainTask = default;
@@ -141,19 +141,23 @@ namespace LlamaCppLib
         }
 
         public LlmPrompt Prompt(
-            string prompt,
+            string promptText,
             SamplingOptions? samplingOptions = default,
             bool? prependBosToken = default,
             bool? processSpecialTokens = default,
             int[]? extraStopTokens = default
         )
         {
-            prependBosToken ??= Native.llama_vocab_type(_model.Handle) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM;
-            processSpecialTokens ??= true;
+            var prompt = new LlmPrompt(
+                promptText,
+                samplingOptions ?? new(),
+                prependBosToken ?? llama_vocab_type(_model.Handle) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM,
+                processSpecialTokens ?? true
+            )
+            { ExtraStopTokens = extraStopTokens };
 
-            var request = new LlmPrompt(prompt, samplingOptions ?? new(), prependBosToken.Value, processSpecialTokens.Value) { ExtraStopTokens = extraStopTokens };
-            _requests.Enqueue(request);
-            return request;
+            _prompts.Enqueue(prompt);
+            return prompt;
         }
 
         private unsafe void _Run()
@@ -161,23 +165,25 @@ namespace LlamaCppLib
             _batch.GetResource(out var batch);
 
             var sequences = new Slots<LlmSequence>(_engineOptions.MaxParallel);
+
+            var candidates = new llama_token_data[llama_n_vocab(_model.Handle)];
             var batchView = new llama_batch();
 
             var cancellationToken = _cancellationTokenSource.Token;
             while (!cancellationToken.IsCancellationRequested)
             {
                 // Fill as many sequence slots as possible given pending requests
-                while (sequences.HasFreeSlot && _requests.Count > 0)
+                while (sequences.HasFreeSlot && _prompts.Count > 0)
                 {
                     if (cancellationToken.IsCancellationRequested)
                         break;
 
-                    if (_requests.TryDequeue(out var request))
+                    if (_prompts.TryDequeue(out var prompt))
                     {
                         var sequence = new LlmSequence(
-                            request,
+                            prompt,
                             llama_n_ctx(_context.Handle),
-                            Tokenize(request.Prompt, request.PrependBosToken, request.ProcessSpecialTokens)
+                            Tokenize(prompt.PromptText, prompt.PrependBosToken, prompt.ProcessSpecialTokens)
                         )
                         { T1 = DateTime.Now };
 
@@ -237,7 +243,7 @@ namespace LlamaCppLib
                     if (result != 0)
                     {
                         foreach (var sequence in sequences)
-                            sequence.Prompt.Tokens.Writer.Complete(new InsufficientMemoryException());
+                            sequence.Prompt.TokenChannel.Writer.Complete(new InsufficientMemoryException());
 
                         sequences.RemoveAll(sequence => true);
                         llama_kv_cache_clear(_context.Handle);
@@ -255,7 +261,6 @@ namespace LlamaCppLib
 
                         var logits = llama_get_logits_ith(_context.Handle, sequence.PosLogit - i);
 
-                        var candidates = new llama_token_data[llama_n_vocab(_model.Handle)];
                         for (var token = 0; token < candidates.Length; token++)
                         {
                             if (cancellationToken.IsCancellationRequested)
@@ -341,26 +346,26 @@ namespace LlamaCppLib
                                 sequence.Prompt.PromptingSpeed = sequence.PosResponse / ((sequence.T2 - sequence.T1) ?? new()).TotalSeconds;
                             }
 
-                            var prematureStop = false
+                            var stop = false
                                 || sequence.Prompt.Cancelled
                                 || sequence.PosTokens >= sequence.Tokens.Length - 1
                                 || sequence.PosTokens - sequence.PosResponse >= sequence.SamplingOptions.ResponseMaxTokenCount;
 
-                            if (!prematureStop)
+                            if (!stop)
                             {
-                                sequence.Prompt.Tokens.Writer.TryWrite(llama_token_to_piece(_model.Handle, token).ToArray());
+                                sequence.Prompt.TokenChannel.Writer.TryWrite(llama_token_to_piece(_model.Handle, token).ToArray());
                                 sequence.Tokens[sequence.PosTokens++] = token;
                             }
 
-                            if (prematureStop || token == llama_token_eos(_model.Handle) || (sequence.Prompt.ExtraStopTokens?.Contains(token) ?? false))
+                            if (stop || token == llama_token_eos(_model.Handle) || (sequence.Prompt.ExtraStopTokens?.Contains(token) ?? false))
                             {
                                 sequence.T3 = DateTime.Now;
                                 sequence.Prompt.SamplingSpeed = (sequence.PosTokens - sequence.PosResponse - 1) / ((sequence.T3 - sequence.T2) ?? new()).TotalSeconds;
 
-                                if (prematureStop)
-                                    sequence.Prompt.Tokens.Writer.Complete(new OperationCanceledException());
+                                if (stop)
+                                    sequence.Prompt.TokenChannel.Writer.Complete(new OperationCanceledException());
                                 else
-                                    sequence.Prompt.Tokens.Writer.Complete();
+                                    sequence.Prompt.TokenChannel.Writer.Complete();
 
                                 llama_kv_cache_seq_rm(_context.Handle, sequence.Id, -1, -1);
                                 sequences.Remove(sequence.Id);
@@ -374,7 +379,7 @@ namespace LlamaCppLib
             {
                 // Notify outstanding requests of cancellation
                 foreach (var sequence in sequences)
-                    sequence.Prompt.Tokens.Writer.Complete(new OperationCanceledException());
+                    sequence.Prompt.TokenChannel.Writer.Complete(new OperationCanceledException());
             }
         }
     }

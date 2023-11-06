@@ -8,6 +8,7 @@ using LlamaCppLib;
 
 using static LlamaCppLib.Native;
 using static LlamaCppLib.Interop;
+using System;
 
 namespace LlamaCppCli
 {
@@ -25,7 +26,7 @@ namespace LlamaCppCli
         static unsafe void RunSampleRaw(string[] args)
         {
             var requests = new List<Request>();
-            var extraStopTokens = new[] { "<|EOT|>", "<|end_of_turn|>", "<|endoftext|>" };
+            var extraStopTokens = new List<string>(); //new[] { "<|EOT|>", "<|end_of_turn|>", "<|endoftext|>" };
             var assembler = new MultibyteCharAssembler();
             var stream = true;
 
@@ -55,13 +56,13 @@ namespace LlamaCppCli
             var penalty_present = 0.0f;
 
             var mparams = llama_model_default_params();
-            mparams.n_gpu_layers = 48;
+            mparams.n_gpu_layers = 64;
             mparams.progress_callback = &ProgressCallback;
 
             var cparams = llama_context_default_params();
             cparams.seed = 0;
             cparams.n_ctx = 0;
-            cparams.n_batch = 256;
+            cparams.n_batch = 512;
             cparams.n_threads = 1;
             cparams.n_threads_batch = 1;
             cparams.logits_all = false ? 1 : 0;
@@ -145,16 +146,17 @@ namespace LlamaCppCli
 
                         foreach (var request in requests)
                         {
-                            if (request.PosLogit < i || request.PosLogit >= i + n_tokens)
+                            if (stream && n_tokens > 1)
                             {
-                                if (stream)
-                                {
-                                    var progress = i / (double)bat.n_tokens * 100;
-                                    Console.Write($"{new String(' ', 32)}\rDecoding... {progress:F2}% [{i}/{bat.n_tokens}][{i / (DateTime.Now - (request.T0 ?? DateTime.Now)).TotalSeconds:F2} t/s]\r");
-                                }
-
-                                continue;
+                                var count = n_tokens + i;
+                                var progress = count / (double)bat.n_tokens * 100;
+                                var speed = count / (DateTime.Now - (request.T0 ?? DateTime.Now)).TotalSeconds;
+                                Console.Write($"{new String(' ', 32)}\rDecoding... {progress:F2}% [{count}/{bat.n_tokens}][{speed:F2} t/s]\r");
+                                if (count == bat.n_tokens) Console.WriteLine();
                             }
+
+                            if (request.PosLogit < i || request.PosLogit >= i + n_tokens)
+                                continue;
 
                             var logits = llama_get_logits_ith(ctx, request.PosLogit - i);
 

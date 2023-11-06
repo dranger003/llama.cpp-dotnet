@@ -70,7 +70,7 @@ namespace LlamaCppCli
                             {
                                 Console.WriteLine($"Request {result.Request.GetHashCode()} | Prompting {result.Request.PromptingSpeed} t/s | Sampling {result.Request.SamplingSpeed} t/s");
                                 Console.WriteLine(new String('-', 196));
-                                Console.WriteLine(result.Request.Prompt);
+                                Console.WriteLine(result.Request.PromptText);
                                 Console.WriteLine(new String('-', 196));
                                 Console.WriteLine($"{result.Response}{(result.Cancelled ? " [Cancelled]" : "")}");
                                 Console.WriteLine(new String('=', 196));
