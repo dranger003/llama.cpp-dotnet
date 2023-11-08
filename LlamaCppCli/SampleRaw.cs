@@ -8,7 +8,6 @@ using LlamaCppLib;
 
 using static LlamaCppLib.Native;
 using static LlamaCppLib.Interop;
-using System;
 
 namespace LlamaCppCli
 {

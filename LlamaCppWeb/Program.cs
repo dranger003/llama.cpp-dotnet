@@ -1,178 +1,92 @@
 using System.Net;
-using System.Text.Json;
-using System.Web;
+using System.Text;
 
 using LlamaCppLib;
 
-var builder = WebApplication.CreateBuilder(args);
+namespace LlamaCppWeb
+{
+    internal class Program
+    {
+        private static async Task Main(string[] args)
+        {
+            var builder = WebApplication.CreateBuilder(args);
 
-//builder.Services.AddSingleton<LlamaCppModelManager>();
-//builder.Services.AddSingleton<LlamaCppSessionManager>();
-builder.Services.AddCors();
+            builder.Services.AddSingleton(serviceProvider =>
+            {
+                var config = new LlmConfig(serviceProvider.GetRequiredService<IConfiguration>());
+                config.Load();
+                return config;
+            });
 
-var app = builder.Build();
+            builder.Services.AddSingleton<LlmEngine>(serviceProvider => new(new EngineOptions { MaxParallel = 8 }));
+            builder.Services.AddCors();
 
-app.UseCors(configure => configure.AllowAnyOrigin());
+            var app = builder.Build();
 
-//app.MapGet("/", async (HttpContext httpContext) =>
-//{
-//    await httpContext.Response.WriteAsync("Welcome to LLaMA C++!");
-//});
+            app.UseCors(configure => configure.AllowAnyOrigin());
 
-//app.MapGet("/model/list", async (HttpContext httpContext) =>
-//{
-//    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
-//    await httpContext.Response.WriteAsync(JsonSerializer.Serialize(new { manager.Models }, new JsonSerializerOptions { WriteIndented = true }));
-//});
+            app.MapGet("/", async (httpContext) => await httpContext.Response.WriteAsync("Welcome to LLaMA C++ (dotnet)!"));
 
-//app.MapGet("/model/load", async (HttpContext httpContext, string modelName, LlamaCppModelOptions modelOptions) =>
-//{
-//    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
-//    if (manager.Status != LlamaCppModelStatus.Loaded || manager.ModelName != modelName)
-//    {
-//        manager.LoadModel(modelName, modelOptions);
-//    }
-//    else if (manager.Model != null)
-//    {
-//        manager.Model.ResetState();
-//    }
+            app.MapGet("/load", async (HttpContext httpContext, LlmConfig config, LlmEngine engine, string name) =>
+            {
+                var path = config.Models.Single(model => model.Name == name).Path ?? throw new FileNotFoundException();
+                engine.LoadModel(path, new ModelOptions { Seed = 0, GpuLayers = 64 });
+                engine.StartAsync();
+                await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
+            });
 
-//    await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
-//});
+            app.MapGet("/unload", async (HttpContext httpContext, LlmEngine engine) =>
+            {
+                await engine.StopAsync();
+                engine.UnloadModel();
+                await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
+            });
 
-//app.MapGet("/model/unload", async (HttpContext httpContext) =>
-//{
-//    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
-//    manager.UnloadModel();
+            app.MapPost("/prompt", async (HttpContext httpContext, LlmEngine engine) =>
+            {
+                var lifetime = httpContext.RequestServices.GetRequiredService<IHostApplicationLifetime>();
+                using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(httpContext.RequestAborted, lifetime.ApplicationStopping);
 
-//    await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
-//});
+                var request = await httpContext.Request.ReadFromJsonAsync<LlmPromptRequest>(cancellationTokenSource.Token) ?? new();
+                var prompt = engine.Prompt(request.PromptText, request.SamplingOptions);
 
-//app.MapGet("/model/status", async (HttpContext httpContext) =>
-//{
-//    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
-//    await httpContext.Response.WriteAsync(JsonSerializer.Serialize(new { Status = Enum.GetName(manager.Status), manager.Model?.Options }, new JsonSerializerOptions { WriteIndented = true }));
-//});
+                httpContext.Response.ContentType = "text/event-stream; charset=utf-8";
 
-//app.MapGet("/model/tokenize", async (HttpContext httpContext, string prompt) =>
-//{
-//    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
-//    var model = manager.Model;
-//    if (model == null)
-//    {
-//        await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.BadRequest);
-//        return;
-//    }
+                try
+                {
+                    await foreach (var token in new TokenEnumerator(prompt, cancellationTokenSource.Token))
+                    {
+                        await httpContext.Response.WriteAsync($"data: {Convert.ToBase64String(Encoding.UTF8.GetBytes(token))}\n\n", cancellationTokenSource.Token);
+                    }
+                }
+                catch (OperationCanceledException)
+                { }
+            });
 
-//    var tokens = model.Tokenize(prompt);
-//    await httpContext.Response.WriteAsync(JsonSerializer.Serialize(new { TokenCount = tokens.Count, Tokens = tokens }, new JsonSerializerOptions { WriteIndented = true }));
-//});
+            await app.RunAsync();
+        }
+    }
 
-//app.MapGet("/model/reset", async (HttpContext httpContext) =>
-//{
-//    var manager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
-//    var model = manager.Model;
-//    if (model == null)
-//    {
-//        await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.BadRequest);
-//        return;
-//    }
+    file class LlmConfig
+    {
+        public class Model
+        {
+            public string? Name { get; set; }
+            public string? Path { get; set; }
+        }
 
-//    model.ResetState();
-//    await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
-//});
+        public List<Model> Models { get; set; } = new();
 
-//app.MapGet("/session/create", async (HttpContext httpContext) =>
-//{
-//    var modelManager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
-//    var model = modelManager.Model;
-//    if (model == null)
-//    {
-//        await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.BadRequest);
-//        return;
-//    }
+        public IConfiguration Configuration;
+        public LlmConfig(IConfiguration configuration) => Configuration = configuration;
 
-//    var sessionManager = httpContext.RequestServices.GetRequiredService<LlamaCppSessionManager>();
-//    var session = model.CreateSession();
-//    sessionManager.Sessions.Add(session.Id, session);
+        public void Load() => Configuration.GetSection(nameof(LlmConfig)).Bind(this);
+        public void Reload() => Load();
+    }
 
-//    await httpContext.Response.WriteAsync(JsonSerializer.Serialize($"{session.Id}"));
-//});
-
-//app.MapGet("/session/list", async (HttpContext httpContext) =>
-//{
-//    var sessionManager = httpContext.RequestServices.GetRequiredService<LlamaCppSessionManager>();
-//    await httpContext.Response.WriteAsync(JsonSerializer.Serialize(sessionManager.Sessions.Select(session => $"{session.Key}")));
-//});
-
-//app.MapGet("/session/get", async (HttpContext httpContext, Guid sessionId) =>
-//{
-//    var sessionManager = httpContext.RequestServices.GetRequiredService<LlamaCppSessionManager>();
-//    if (!sessionManager.Sessions.TryGetValue(sessionId, out var session))
-//    {
-//        await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.BadRequest);
-//        return;
-//    }
-
-//    await httpContext.Response.WriteAsync(HttpUtility.HtmlEncode(session.GetContextAsText()));
-//});
-
-//app.MapGet("/session/reset", async (HttpContext httpContext, Guid sessionId) =>
-//{
-//    var sessionManager = httpContext.RequestServices.GetRequiredService<LlamaCppSessionManager>();
-//    if (!sessionManager.Sessions.TryGetValue(sessionId, out var session))
-//    {
-//        await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.BadRequest);
-//        return;
-//    }
-
-//    session.Reset();
-//    await httpContext.Response.WriteAsJsonAsync(HttpStatusCode.OK);
-//});
-
-//app.MapPost("/model/generate", async (HttpContext httpContext) =>
-//{
-//    var lifetime = httpContext.RequestServices.GetRequiredService<IHostApplicationLifetime>();
-//    using var cts = CancellationTokenSource.CreateLinkedTokenSource(httpContext.RequestAborted, lifetime.ApplicationStopping);
-
-//    var content = await httpContext.Request.ReadFromJsonAsync<RequestBody>(cts.Token) ?? new();
-
-//    var modelManager = httpContext.RequestServices.GetRequiredService<LlamaCppModelManager>();
-//    var model = modelManager.Model;
-//    if (model == null)
-//    {
-//        httpContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-//        await httpContext.Response.WriteAsJsonAsync($"Model not loaded.");
-//        return;
-//    }
-
-//    var sessionManager = httpContext.RequestServices.GetRequiredService<LlamaCppSessionManager>();
-//    if (!sessionManager.Sessions.TryGetValue(content.SessionId, out var session))
-//    {
-//        httpContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-//        await httpContext.Response.WriteAsJsonAsync($"Session not found.");
-//        return;
-//    }
-
-//    httpContext.Response.ContentType = "text/event-stream; charset=utf-8";
-
-//    try
-//    {
-//        await foreach (var tokenString in session.GenerateTokenStringAsync(content.Prompt, content.GenerateOptions, cts.Token))
-//        {
-//            var encodedTokenString = tokenString.Replace("\n", "\\n").Replace("\t", "\\t");
-//            await httpContext.Response.WriteAsync($"data: {encodedTokenString}\n\n", cts.Token);
-//        }
-//    }
-//    catch (OperationCanceledException)
-//    { }
-//});
-
-await app.RunAsync();
-
-//internal class RequestBody
-//{
-//    public Guid SessionId { get; set; }
-//    public LlamaCppGenerateOptions GenerateOptions { get; set; } = new();
-//    public string Prompt { get; set; } = string.Empty;
-//}
+    file class LlmPromptRequest
+    {
+        public string PromptText { get; set; } = String.Empty;
+        public SamplingOptions SamplingOptions { get; set; } = new();
+    }
+}
