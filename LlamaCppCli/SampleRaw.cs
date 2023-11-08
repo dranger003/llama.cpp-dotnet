@@ -15,6 +15,12 @@ namespace LlamaCppCli
     {
         static async Task RunSampleRawAsync(string[] args)
         {
+            if (args.Length < 1)
+            {
+                Console.WriteLine($"Usage: RunSampleRawAsync <ModelPath>");
+                return;
+            }
+
             RunSampleRaw(args);
             await Task.CompletedTask;
         }

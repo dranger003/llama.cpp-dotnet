@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -16,15 +15,15 @@ namespace LlamaCppLib
         private UnmanagedResource<nint> _context = new();
         private UnmanagedResource<llama_batch> _batch = new();
 
-        private EngineOptions _engineOptions = new();
-        private ModelOptions _modelOptions = new();
+        private LlmEngineOptions _engineOptions = new();
+        private LlmModelOptions _modelOptions = new();
 
-        private ConcurrentQueue<LlmPrompt> _prompts = new();
+        private BlockingQueue<LlmPrompt> _prompts = new();
 
         private CancellationTokenSource _cancellationTokenSource = new();
-        private Task? _mainTask = default;
+        private Task? _mainLoop = default;
 
-        public LlmEngine(EngineOptions? engineOptions = default)
+        public LlmEngine(LlmEngineOptions? engineOptions = default)
         {
             if (engineOptions != default)
                 _engineOptions = engineOptions;
@@ -39,7 +38,7 @@ namespace LlamaCppLib
                 if (disposing)
                 {
                     // Managed
-                    StopAsync().Wait();
+                    _StopAsync().Wait();
                 }
 
                 // Unmanaged
@@ -58,14 +57,7 @@ namespace LlamaCppLib
             GC.SuppressFinalize(this);
         }
 
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        private static unsafe void _ProgressCallback(float progress, void* state)
-        {
-            var callback = (Action<float>?)GCHandle.FromIntPtr(new(state)).Target;
-            callback?.Invoke(progress * 100);
-        }
-
-        public unsafe void LoadModel(string modelPath, ModelOptions? modelOptions = default, Action<float>? progressCallback = default)
+        public unsafe void LoadModel(string modelPath, LlmModelOptions? modelOptions = default, Action<float>? progressCallback = default)
         {
             if (_model.Created)
                 throw new InvalidOperationException("Model already loaded.");
@@ -100,45 +92,22 @@ namespace LlamaCppLib
             _context.Create(() => llama_new_context_with_model(_model.Handle, cparams), llama_free);
 
             _batch.Create(() => llama_batch_init(llama_n_ctx(_context.Handle), 0, 1), llama_batch_free);
+
+            _StartAsync();
         }
 
         public void UnloadModel()
         {
+            _StopAsync().Wait();
+
             _batch.Dispose();
             _context.Dispose();
             _model.Dispose();
         }
 
-        public Span<int> Tokenize(string prompt, bool prependBosToken = false, bool processSpecialTokens = false) =>
-            llama_tokenize(_model.Handle, prompt, prependBosToken, processSpecialTokens);
+        public Span<int> Tokenize(string prompt, bool prependBosToken = false, bool processSpecialTokens = false) => llama_tokenize(_model.Handle, prompt, prependBosToken, processSpecialTokens);
 
-        public void StartAsync()
-        {
-            if (_mainTask != default)
-                throw new InvalidOperationException("Already running.");
-
-            _mainTask = Task.Run(_Run);
-        }
-
-        public async Task StopAsync()
-        {
-            if (_mainTask == default)
-                return;
-
-            _cancellationTokenSource.Cancel();
-            await (_mainTask ?? Task.CompletedTask);
-            _cancellationTokenSource = new();
-
-            _mainTask = default;
-        }
-
-        public bool IsRunning => _mainTask?.Status == TaskStatus.Running;
-
-        public async Task WaitForRunningAsync(int pollingRateMs = 10)
-        {
-            while (!this.IsRunning)
-                await Task.Delay(pollingRateMs);
-        }
+        public bool Loaded => _mainLoop?.Status == TaskStatus.Running;
 
         public LlmPrompt Prompt(
             string promptText,
@@ -160,6 +129,33 @@ namespace LlamaCppLib
             return prompt;
         }
 
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        private static unsafe void _ProgressCallback(float progress, void* state)
+        {
+            var callback = (Action<float>?)GCHandle.FromIntPtr(new(state)).Target;
+            callback?.Invoke(progress * 100);
+        }
+
+        private void _StartAsync()
+        {
+            if (_mainLoop != default)
+                return;
+
+            _mainLoop = Task.Run(_Run);
+        }
+
+        private async Task _StopAsync()
+        {
+            if (_mainLoop == default)
+                return;
+
+            _cancellationTokenSource.Cancel();
+            await (_mainLoop ?? Task.CompletedTask);
+            _cancellationTokenSource = new();
+
+            _mainLoop = default;
+        }
+
         private unsafe void _Run()
         {
             _batch.GetResource(out var batch);
@@ -173,23 +169,22 @@ namespace LlamaCppLib
             while (!cancellationToken.IsCancellationRequested)
             {
                 // Fill as many sequence slots as possible given pending requests
-                while (sequences.HasFreeSlot && _prompts.Count > 0)
+                while (sequences.HasFreeSlot && _prompts.Any())
                 {
                     if (cancellationToken.IsCancellationRequested)
                         break;
 
-                    if (_prompts.TryDequeue(out var prompt))
-                    {
-                        var sequence = new LlmSequence(
-                            prompt,
-                            llama_n_ctx(_context.Handle),
-                            Tokenize(prompt.PromptText, prompt.PrependBosToken, prompt.ProcessSpecialTokens)
-                        )
-                        { T1 = DateTime.Now };
+                    var prompt = _prompts.Dequeue();
 
-                        var id = sequences.Add(sequence);
-                        sequence.Id = id;
-                    }
+                    var sequence = new LlmSequence(
+                        prompt,
+                        llama_n_ctx(_context.Handle),
+                        Tokenize(prompt.PromptText, prompt.PrependBosToken, prompt.ProcessSpecialTokens)
+                    )
+                    { T1 = DateTime.Now };
+
+                    var id = sequences.Add(sequence);
+                    sequence.Id = id;
                 }
 
                 if (cancellationToken.IsCancellationRequested)
@@ -212,10 +207,9 @@ namespace LlamaCppLib
                 if (cancellationToken.IsCancellationRequested)
                     continue;
 
-                // Idle
                 if (batch.n_tokens == 0)
                 {
-                    Thread.Sleep(10);
+                    _prompts.WaitForNext(cancellationToken);
                     continue;
                 }
 

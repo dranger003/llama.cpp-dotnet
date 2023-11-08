@@ -26,5 +26,33 @@ namespace LlamaCppLib
                 return false;
             }
         }
+
+        public static Task<HttpResponseMessage> PostAsync(
+            this HttpClient client,
+            string? requestUri,
+            HttpContent? content,
+            HttpCompletionOption? completionOption = default,
+            CancellationToken? cancellationToken = default)
+        {
+            return client.SendAsync(
+                new HttpRequestMessage(HttpMethod.Post, requestUri) { Content = content },
+                completionOption ?? HttpCompletionOption.ResponseContentRead,
+                cancellationToken ?? default
+            );
+        }
+
+        public static Task<HttpResponseMessage> PostAsync(
+            this HttpClient client,
+            Uri? requestUri,
+            HttpContent? content,
+            HttpCompletionOption? completionOption = default,
+            CancellationToken? cancellationToken = default)
+        {
+            return client.SendAsync(
+                new HttpRequestMessage(HttpMethod.Post, requestUri) { Content = content },
+                completionOption ?? HttpCompletionOption.ResponseContentRead,
+                cancellationToken ?? default
+            );
+        }
     }
 }

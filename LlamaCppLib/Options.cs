@@ -1,12 +1,12 @@
 namespace LlamaCppLib
 {
-    public class EngineOptions
+    public class LlmEngineOptions
     {
         public bool NumaOptimizations { get; set; } = false;
         public int MaxParallel { get; set; } = 1;
     }
 
-    public class ModelOptions
+    public class LlmModelOptions
     {
         public int GpuLayers { get; set; } = 0;
         public int MainGpu { get; set; } = 0;
