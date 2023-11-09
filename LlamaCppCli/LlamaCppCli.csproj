@@ -13,7 +13,6 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\BertCppLib\BertCppLib.csproj" />
 		<ProjectReference Include="..\LlamaCppLib\LlamaCppLib.csproj" />
 	</ItemGroup>
 
