@@ -8,11 +8,13 @@
 
 ### Demo
 
+This shows `LlamaCppWeb.exe` hosting on the left and four `LlamaCppCli.exe` running in parallel on the right.
+
 ![demo](https://github.com/dranger003/llama.cpp-dotnet/assets/1760549/ad560ac5-31ca-4cf0-93a5-a1a6ccf9b446)
 
 ### Description
 
-Minimal C# bindings for llama.cpp including a .NET core library, API server/client and samples.
+High performance minimal C# bindings for llama.cpp including a .NET core library, API server/client and samples.
 
 ### Quick Start
 
@@ -24,7 +26,7 @@ dotnet build -c Release /p:Platform="Any CPU"
 ```
 If you don't need to compile the native libraries, you can also append `/p:NativeLibraries=OFF` to the `dotnet` build command above.
 
-### Minimal Sample
+### Basic Sample
 
 ```
 using LlamaCppLib;
@@ -46,6 +48,15 @@ await foreach (var token in new TokenEnumerator(prompt))
 
 The included CLI samples include more examples of using the library, to process prompts in parallel for example.
 
+### API Endpoints
+```
+GET /list
+GET /state
+POST /load [LlmLoadRequest]
+GET /unload
+POST /prompt [LlmPromptRequest]
+```
+
 ### Models
 
 You will need a model in GGUF format, the 13B parameters appears to perform well if you have the memory (8-12GB depending on the quantized model).
@@ -55,10 +66,12 @@ A lot of models can be found below.
 
 - [TheBloke on Hugging Face](https://huggingface.co/TheBloke)
 
-### Todo
+### Features
 
-- [x] Refactor the Web API stack to match the new Library API
-- [x] Support parallel decoding
+- [X] Model loading/unloading
+- [x] Parallel decoding
+- [x] Minimal API host/client
+- [X] Support Windows/Linux
 
 ### Acknowledgments
 
