@@ -7,7 +7,6 @@ namespace LlamaCppLib
     using llama_token = System.Int32;
     using llama_pos = System.Int32;
     using llama_seq_id = System.Int32;
-    using static LlamaCppLib.Native;
 
     public static unsafe partial class Native
     {
@@ -167,6 +166,14 @@ namespace LlamaCppLib
 
         [LibraryImport(LibName)]
         public static partial llama_token llama_token_eos(
+            llama_model model);
+
+        [LibraryImport(LibName)]
+        public static partial int llama_add_bos_token(
+            llama_model model);
+
+        [LibraryImport(LibName)]
+        public static partial int llama_add_eos_token(
             llama_model model);
 
         [LibraryImport(LibName)]

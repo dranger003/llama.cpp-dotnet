@@ -120,7 +120,7 @@ namespace LlamaCppLib
             var prompt = new LlmPrompt(
                 promptText,
                 samplingOptions ?? new(),
-                prependBosToken ?? llama_vocab_type(_model.Handle) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM,
+                prependBosToken ?? llama_add_bos_token(_model.Handle) > 0 ? true : llama_vocab_type(_model.Handle) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM,
                 processSpecialTokens ?? true
             )
             { ExtraStopTokens = extraStopTokens };

@@ -15,9 +15,9 @@ namespace LlamaCppCli
     {
         static async Task RunSampleRawAsync(string[] args)
         {
-            if (args.Length < 1)
+            if (args.Length < 2)
             {
-                Console.WriteLine($"Usage: RunSampleRawAsync <ModelPath>");
+                Console.WriteLine($"Usage: RunSampleRawAsync <ModelPath> <PromptFilePath> [CtxLength] [GpuLayers]");
                 return;
             }
 
@@ -26,7 +26,7 @@ namespace LlamaCppCli
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static unsafe void ProgressCallback(float progress, void* state) => Console.Write($"{new string(' ', 32)}\rLoading model... {(byte)(progress * 100)}%\r");
+        static unsafe void ProgressCallback(float progress, void* state) => Console.Write($"{new string(' ', 32)}\rLoading model... {(byte)(progress * 100)}%\r");        
 
         static unsafe void RunSampleRaw(string[] args)
         {
@@ -61,12 +61,12 @@ namespace LlamaCppCli
             var penalty_present = 0.0f;
 
             var mparams = llama_model_default_params();
-            mparams.n_gpu_layers = 64;
+            mparams.n_gpu_layers = args.Length > 3 ? Int32.Parse(args[3]) : 64;
             mparams.progress_callback = &ProgressCallback;
 
             var cparams = llama_context_default_params();
             cparams.seed = 0;
-            cparams.n_ctx = 0;
+            cparams.n_ctx = args.Length > 2 ? UInt32.Parse(args[2]) : 0;
             cparams.n_batch = 512;
             cparams.n_threads = 1;
             cparams.n_threads_batch = 1;
@@ -95,10 +95,18 @@ namespace LlamaCppCli
                         break;
                     }
 
-                    var prompt = File.ReadAllText(@"D:\LLM_MODELS\TEMPLATE.txt").Replace("{}", File.ReadAllText(@"D:\LLM_MODELS\PROMPT.txt")).Replace("\r\n", "\n");
+                    var prompt = File.ReadAllText(args[1]).Replace("\r\n", "\n");
 
-                    var tokens = llama_tokenize(mdl, prompt, llama_vocab_type(mdl) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM, true);
-                    Console.WriteLine($"{tokens.Length} token(s)");
+                    var add_bos = llama_add_bos_token(mdl) > 0;
+                    if (!add_bos) add_bos = llama_vocab_type(mdl) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM;
+                    var tokens = llama_tokenize(mdl, prompt, add_bos, true);
+                    Console.WriteLine($"{tokens.Length}/{llama_n_ctx(ctx)} token(s)");
+                    if (tokens.Length >= llama_n_ctx(ctx))
+                    {
+                        Console.WriteLine("Out of context.");
+                        continue;
+                    }
+
                     requests.Add(new Request(llama_n_ctx(ctx), tokens));
 
                     sw.Restart();
@@ -231,15 +239,26 @@ namespace LlamaCppCli
                                 if (extraStopTokens.Select(extraStopToken => llama_tokenize(mdl, extraStopToken, false, true)[0]).Contains(token) || cancel)
                                     token = llama_token_eos(mdl); // Override stop token with EOS token
 
-                                request.Tokens[request.PosToken++] = token;
-                                ++tc;
-
-                                if (stream)
+                                if (request.PosToken >= request.Tokens.Length)
                                 {
-                                    Console.Write(assembler.Consume(llama_token_to_piece(mdl, token)));
+                                    if (stream)
+                                        Console.Write(" [Out of context]");
 
-                                    if (cancel)
-                                        Console.Write(" [Cancelled]");
+                                    request.Tokens[request.Tokens.Length - 1] = llama_token_eos(mdl);
+                                    break;
+                                }
+                                else
+                                {
+                                    request.Tokens[request.PosToken++] = token;
+                                    ++tc;
+
+                                    if (stream)
+                                    {
+                                        Console.Write(assembler.Consume(llama_token_to_piece(mdl, token)));
+
+                                        if (cancel)
+                                            Console.Write(" [Cancelled]");
+                                    }
                                 }
 
                                 if (request.T1 == default)
