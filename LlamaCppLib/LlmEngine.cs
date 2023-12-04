@@ -113,8 +113,7 @@ namespace LlamaCppLib
             string promptText,
             SamplingOptions? samplingOptions = default,
             bool? prependBosToken = default,
-            bool? processSpecialTokens = default,
-            int[]? extraStopTokens = default
+            bool? processSpecialTokens = default
         )
         {
             var prompt = new LlmPrompt(
@@ -122,8 +121,7 @@ namespace LlamaCppLib
                 samplingOptions ?? new(),
                 prependBosToken ?? llama_add_bos_token(_model.Handle) > 0 ? true : llama_vocab_type(_model.Handle) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM,
                 processSpecialTokens ?? true
-            )
-            { ExtraStopTokens = extraStopTokens };
+            );
 
             _prompts.Enqueue(prompt);
             return prompt;
@@ -179,7 +177,8 @@ namespace LlamaCppLib
                     var sequence = new LlmSequence(
                         prompt,
                         llama_n_ctx(_context.Handle),
-                        Tokenize(prompt.PromptText, prompt.PrependBosToken, prompt.ProcessSpecialTokens)
+                        Tokenize(prompt.PromptText, prompt.PrependBosToken, prompt.ProcessSpecialTokens),
+                        prompt.SamplingOptions.ExtraStopTokens?.Select(tokenText => Tokenize(tokenText, false, true)[0]).ToArray() ?? Array.Empty<int>()
                     )
                     { T1 = DateTime.Now };
 
@@ -343,7 +342,8 @@ namespace LlamaCppLib
                             var stop = false
                                 || sequence.Prompt.Cancelled
                                 || sequence.PosTokens >= sequence.Tokens.Length - 1
-                                || sequence.PosTokens - sequence.PosResponse >= sequence.SamplingOptions.ResponseMaxTokenCount;
+                                || sequence.PosTokens - sequence.PosResponse >= sequence.SamplingOptions.ResponseMaxTokenCount
+                                || (sequence.StopTokens?.Contains(token) ?? false);
 
                             if (!stop)
                             {
@@ -351,7 +351,7 @@ namespace LlamaCppLib
                                 sequence.Tokens[sequence.PosTokens++] = token;
                             }
 
-                            if (stop || token == llama_token_eos(_model.Handle) || (sequence.Prompt.ExtraStopTokens?.Contains(token) ?? false))
+                            if (stop || token == llama_token_eos(_model.Handle))
                             {
                                 sequence.T3 = DateTime.Now;
                                 sequence.Prompt.SamplingSpeed = (sequence.PosTokens - sequence.PosResponse - 1) / ((sequence.T3 - sequence.T2) ?? new()).TotalSeconds;

@@ -8,7 +8,7 @@ namespace LlamaCppCli
         {
             if (args.Length < 2)
             {
-                Console.WriteLine($"Usage: RunSampleClientAsync <Endpoint> <Prompt>");
+                Console.WriteLine($"Usage: RunSampleClientAsync <Endpoint> <PromptFilePath> [ModelName]");
                 return;
             }
 
@@ -24,7 +24,7 @@ namespace LlamaCppCli
             modelNames.ForEach(modelName => Console.WriteLine($"    {modelName}"));
 
             // Model select
-            var modelName = modelNames.First();
+            var modelName = args.Length > 2 ? args[2] : modelNames.First();
 
             // Model state
             Console.WriteLine($"State:");
@@ -52,10 +52,13 @@ namespace LlamaCppCli
 
             // Model prompt
             Console.WriteLine($"Prompting:");
-            var promptText = args[1].Replace("\\n", "\n");
-            await foreach (var token in client.PromptAsync(promptText, new SamplingOptions { Temperature = 0.0f }, cancellationTokenSource.Token))
+            var promptText = File.ReadAllText(args[1]).Replace("\r\n", "\n");
+            var samplingOptions = new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>"] };
+
+            await foreach (var token in client.PromptAsync(promptText, samplingOptions, cancellationTokenSource.Token))
                 Console.Write(token);
-            Console.WriteLine($" {(cancellationTokenSource.IsCancellationRequested ? " [Cancelled]" : String.Empty)}");
+
+            Console.WriteLine($"{(cancellationTokenSource.IsCancellationRequested ? " [Cancelled]" : String.Empty)}");
         }
     }
 }

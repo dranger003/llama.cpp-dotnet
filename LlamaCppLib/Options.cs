@@ -44,5 +44,6 @@ namespace LlamaCppLib
         public float PenaltyPresent { get; set; } = 0.0f;
 
         public int? ResponseMaxTokenCount { get; set; } = default;
+        public string[]? ExtraStopTokens { get; set; } = default;
     }
 }

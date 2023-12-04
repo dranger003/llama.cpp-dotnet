@@ -12,6 +12,7 @@ namespace LlamaCppLib
         public int PosTokens { get; set; }
         public int PosResponse { get; set; }
         public int[] Tokens { get; set; }
+        public int[] StopTokens { get; set; }
 
         public SamplingOptions SamplingOptions { get; set; } = new();
         public int MirostatM { get; private set; }
@@ -23,16 +24,19 @@ namespace LlamaCppLib
 
         public LlmPrompt Prompt { get; private set; }
 
-        public LlmSequence(LlmPrompt prompt, int tokenCount, ReadOnlySpan<int> tokens, int mirostatM = 100)
+        public LlmSequence(LlmPrompt prompt, int tokenCount, ReadOnlySpan<int> tokens, ReadOnlySpan<int> stopTokens, int mirostatM = 100)
         {
             this.Tokens = new int[tokenCount];
+            tokens.CopyTo(Tokens);
+
+            this.StopTokens = new int[stopTokens.Length];
+            stopTokens.CopyTo(StopTokens);
+
             this.MirostatM = mirostatM;
             this.Prompt = prompt;
             this.SamplingOptions = prompt.SamplingOptions;
 
-            tokens.CopyTo(Tokens);
             PosTokens += tokens.Length;
-
             PosResponse = PosTokens;
         }
 

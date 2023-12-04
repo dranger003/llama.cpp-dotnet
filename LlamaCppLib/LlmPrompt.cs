@@ -26,7 +26,6 @@ namespace LlamaCppLib
         public string PromptText { get; private set; }
         public bool PrependBosToken { get; private set; }
         public bool ProcessSpecialTokens { get; private set; }
-        public int[]? ExtraStopTokens { get; set; }
 
         public Channel<byte[]> TokenChannel { get; private set; }
 

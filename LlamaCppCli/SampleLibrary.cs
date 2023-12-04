@@ -85,7 +85,7 @@ namespace LlamaCppCli
                     // Single prompt w/streaming - e.g.
                     // `<|im_start|>system\nYou are an astrophysicist.<|im_end|>\n<|im_start|>user\nDescribe the solar system.<|im_end|>\n<|im_start|>assistant\n`
                     // `[INST] <<SYS>>\nYou are an astrophysicist.\n<</SYS>>\n\nDescribe the solar system. [/INST]\n`
-                    var prompt = llm.Prompt(promptText, new SamplingOptions { Temperature = 0.0f });
+                    var prompt = llm.Prompt(promptText, new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>"] });
 
                     // In streaming mode, we must re-assemble multibyte characters using a TokenEnumerator
                     await foreach (var token in new TokenEnumerator(prompt, cancellationTokenSource.Token))
