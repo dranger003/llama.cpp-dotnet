@@ -33,7 +33,7 @@ namespace LlamaCppCli
             Console.WriteLine($"    Status: {state.ModelStatus}");
 
             // Model unload
-            if (state.ModelStatus == LlmModelStatus.Loaded)
+            if (state.ModelStatus == LlmModelStatus.Loaded && modelName != state.ModelName)
             {
                 Console.WriteLine($"Unloading model:");
                 state = await client.UnloadAsync();
