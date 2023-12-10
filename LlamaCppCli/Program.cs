@@ -15,7 +15,7 @@ namespace LlamaCppCli
                 Console.WriteLine($"SampleNo:");
                 Console.WriteLine($"    1. {nameof(RunSampleRawAsync)} <ModelPath> <PromptFilePath> [CtxLength] [GpuLayers]");
                 Console.WriteLine($"    2. {nameof(RunSampleLibraryAsync)} <ModelPath>");
-                Console.WriteLine($"    3. {nameof(RunSampleClientAsync)} <Endpoint> <Prompt>");
+                Console.WriteLine($"    3. {nameof(RunSampleClientAsync)} <Endpoint> <PromptFilePath> [ModelName]");
                 return;
             }
 

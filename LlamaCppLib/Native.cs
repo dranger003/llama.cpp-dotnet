@@ -18,6 +18,38 @@ namespace LlamaCppLib
 
         public enum llama_vocab_type_t { LLAMA_VOCAB_TYPE_SPM = 0, LLAMA_VOCAB_TYPE_BPE = 1 }
 
+        public enum llama_model_kv_override_type { LLAMA_KV_OVERRIDE_INT, LLAMA_KV_OVERRIDE_FLOAT, LLAMA_KV_OVERRIDE_BOOL };
+
+        public enum ggml_type
+        {
+            GGML_TYPE_F32 = 0,
+            GGML_TYPE_F16 = 1,
+            GGML_TYPE_Q4_0 = 2,
+            GGML_TYPE_Q4_1 = 3,
+            GGML_TYPE_Q5_0 = 6,
+            GGML_TYPE_Q5_1 = 7,
+            GGML_TYPE_Q8_0 = 8,
+            GGML_TYPE_Q8_1 = 9,
+            GGML_TYPE_Q2_K = 10,
+            GGML_TYPE_Q3_K = 11,
+            GGML_TYPE_Q4_K = 12,
+            GGML_TYPE_Q5_K = 13,
+            GGML_TYPE_Q6_K = 14,
+            GGML_TYPE_Q8_K = 15,
+            GGML_TYPE_I8,
+            GGML_TYPE_I16,
+            GGML_TYPE_I32,
+            GGML_TYPE_COUNT,
+        };
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct llama_model_kv_override
+        {
+            public char* key; // char[128]
+            public llama_model_kv_override_type tag;
+            public void* value; // union { int64_t int_value; double float_value; bool bool_value; };
+        };
+
         [StructLayout(LayoutKind.Sequential)]
         public struct llama_model_params
         {
@@ -27,6 +59,8 @@ namespace LlamaCppLib
 
             public delegate* unmanaged[Cdecl]<float, void*, void> progress_callback;
             public void* progress_callback_user_data;
+
+            public llama_model_kv_override* kv_overrides;
 
             public byte vocab_only;
             public byte use_mmap;
@@ -51,10 +85,13 @@ namespace LlamaCppLib
             public float yarn_beta_slow;
             public uint yarn_orig_ctx;
 
+            public ggml_type type_k;
+            public ggml_type type_v;
+
             public byte mul_mat_q;
-            public byte f16_kv;
             public byte logits_all;
             public byte embedding;
+            public int offload_kqv;
         }
 
         [StructLayout(LayoutKind.Sequential)]
