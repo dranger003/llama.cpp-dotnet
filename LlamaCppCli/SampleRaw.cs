@@ -236,7 +236,13 @@ namespace LlamaCppCli
                                 if (request.PosResponse == 0)
                                     request.PosResponse = request.PosToken;
 
-                                if (extraStopTokens.Select(extraStopToken => llama_tokenize(mdl, extraStopToken, false, true)[0]).Contains(token) || cancel)
+                                var stop = extraStopTokens
+                                    .Select(extraStopToken => llama_tokenize(mdl, extraStopToken, false, true).ToArray())
+                                    .Where(tokens => tokens.Length == 0)
+                                    .Select(tokens => tokens[0])
+                                    .Contains(token);
+
+                                if (cancel || stop)
                                     token = llama_token_eos(mdl); // Override stop token with EOS token
 
                                 if (request.PosToken >= request.Tokens.Length)

@@ -174,11 +174,17 @@ namespace LlamaCppLib
 
                     var prompt = _prompts.Dequeue();
 
+                    var extraStopTokens = prompt.SamplingOptions.ExtraStopTokens?
+                        .Select(tokenText => Tokenize(tokenText, false, true).ToArray())
+                        .Where(tokens => tokens.Length == 1)
+                        .Select(tokens => tokens.Single())
+                        .ToArray();
+
                     var sequence = new LlmSequence(
                         prompt,
                         llama_n_ctx(_context.Handle),
                         Tokenize(prompt.PromptText, prompt.PrependBosToken, prompt.ProcessSpecialTokens),
-                        prompt.SamplingOptions.ExtraStopTokens?.Select(tokenText => Tokenize(tokenText, false, true)[0]).ToArray() ?? Array.Empty<int>()
+                        extraStopTokens
                     )
                     { T1 = DateTime.Now };
 
