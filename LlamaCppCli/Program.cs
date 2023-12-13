@@ -13,9 +13,9 @@ namespace LlamaCppCli
             {
                 Console.WriteLine($"Usage: LlamaCppCli <SampleNo> [SampleOpt1] [SampleOpt2] [...]");
                 Console.WriteLine($"SampleNo:");
-                Console.WriteLine($"    1. {nameof(RunSampleRawAsync)} <ModelPath> <PromptFilePath> [CtxLength] [GpuLayers]");
-                Console.WriteLine($"    2. {nameof(RunSampleLibraryAsync)} <ModelPath>");
-                Console.WriteLine($"    3. {nameof(RunSampleClientAsync)} <Endpoint> <PromptFilePath> [ModelName]");
+                Console.WriteLine($"    1. {nameof(RunSampleRawAsync)}");
+                Console.WriteLine($"    2. {nameof(RunSampleLibraryAsync)}");
+                Console.WriteLine($"    3. {nameof(RunSampleClientAsync)}");
                 return;
             }
 

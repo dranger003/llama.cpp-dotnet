@@ -17,7 +17,7 @@ namespace LlamaCppCli
         {
             if (args.Length < 2)
             {
-                Console.WriteLine($"Usage: RunSampleRawAsync <ModelPath> <PromptFilePath> [CtxLength] [GpuLayers]");
+                Console.WriteLine($"Usage: RunSampleRawAsync <ModelPath> <PromptFilePath> [GpuLayers] [CtxLength]");
                 return;
             }
 
@@ -26,7 +26,7 @@ namespace LlamaCppCli
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static unsafe void ProgressCallback(float progress, void* state) => Console.Write($"{new string(' ', 32)}\rLoading model... {(byte)(progress * 100)}%\r");        
+        static unsafe void ProgressCallback(float progress, void* state) => Console.Write($"{new string(' ', 32)}\rLoading model... {(byte)(progress * 100)}%\r");
 
         static unsafe void RunSampleRaw(string[] args)
         {
@@ -61,16 +61,18 @@ namespace LlamaCppCli
             var penalty_present = 0.0f;
 
             var mparams = llama_model_default_params();
-            mparams.n_gpu_layers = args.Length > 3 ? Int32.Parse(args[3]) : 64;
+            mparams.n_gpu_layers = args.Length > 2 ? Int32.Parse(args[2]) : 64;
             mparams.progress_callback = &ProgressCallback;
 
             var cparams = llama_context_default_params();
             cparams.seed = 0;
-            cparams.n_ctx = args.Length > 2 ? UInt32.Parse(args[2]) : 0;
-            cparams.n_batch = 512;
-            cparams.n_threads = 1;
-            cparams.n_threads_batch = 1;
+            cparams.n_ctx = args.Length > 3 ? UInt32.Parse(args[3]) : 0;
+            cparams.n_batch = 64;
+            cparams.n_threads = 8;
+            cparams.n_threads_batch = 8;
             cparams.logits_all = false ? 1 : 0;
+            cparams.type_k = ggml_type.GGML_TYPE_Q8_0;
+            cparams.type_v = ggml_type.GGML_TYPE_F16;
 
             llama_backend_init(false);
 
@@ -163,8 +165,10 @@ namespace LlamaCppCli
                             {
                                 var count = n_tokens + i;
                                 var progress = count / (double)bat.n_tokens * 100;
-                                var speed = count / (DateTime.Now - (request.T0 ?? DateTime.Now)).TotalSeconds;
-                                Console.Write($"{new String(' ', 32)}\rDecoding... {progress:F2}% [{count}/{bat.n_tokens}][{speed:F2} t/s]\r");
+                                var elapsed = DateTime.Now - (request.T0 ?? DateTime.Now);
+                                var speed = count / elapsed.TotalSeconds;
+                                var remaining = TimeSpan.FromSeconds((bat.n_tokens - count) / speed);
+                                Console.Write($"{new String(' ', 32)}\rDecoding... {progress:F2}% [C:{count}/{bat.n_tokens}][S:{speed:F2} t/s][E:{elapsed:hh\\:mm\\:ss\\.fff}][R:{remaining:hh\\:mm\\:ss\\.fff}]\r");
                                 if (count == bat.n_tokens) Console.WriteLine();
                             }
 
@@ -260,7 +264,9 @@ namespace LlamaCppCli
 
                                     if (stream)
                                     {
-                                        Console.Write(assembler.Consume(llama_token_to_piece(mdl, token)));
+                                        var tokenText = assembler.Consume(llama_token_to_piece(mdl, token));
+                                        if (tc == 1) tokenText = tokenText.TrimStart();
+                                        Console.Write(tokenText);
 
                                         if (cancel)
                                             Console.Write(" [Cancelled]");
