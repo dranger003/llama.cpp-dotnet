@@ -31,7 +31,7 @@ namespace LlamaCppCli
         static unsafe void RunSampleRaw(string[] args)
         {
             var requests = new List<Request>();
-            var extraStopTokens = new[] { "<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>" };
+            var extraStopTokens = new[] { "<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|end_of_text|>", "<|im_end|>" };
             var assembler = new MultibyteCharAssembler();
             var stream = true;
 
