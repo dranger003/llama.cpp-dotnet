@@ -11,7 +11,7 @@ namespace LlamaCppCli
         {
             if (args.Length < 1)
             {
-                Console.WriteLine($"Usage: RunSampleLibraryAsync <ModelPath>");
+                Console.WriteLine($"Usage: RunSampleLibraryAsync <ModelPath> [GpuLayers] [CtxLength]");
                 return;
             }
 
@@ -19,9 +19,10 @@ namespace LlamaCppCli
             Console.CancelKeyPress += (s, e) => { cancellationTokenSource.Cancel(); e.Cancel = true; };
 
             using var llm = new LlmEngine(new LlmEngineOptions { MaxParallel = 8 });
-            llm.LoadModel(args[0], new LlmModelOptions { Seed = 0, GpuLayers = 64 });
+            var modelOptions = new LlmModelOptions { Seed = 0, ContextLength = args.Length > 2 ? Int32.Parse(args[2]) : 0, GpuLayers = args.Length > 1 ? Int32.Parse(args[1]) : 64 };
+            llm.LoadModel(args[0], modelOptions);
 
-            Console.WriteLine("Press <Ctrl+C> to cancel/quit.");
+            Console.WriteLine("Press <Ctrl+C> to cancel or press <Enter> with an empty input to quit.");
 
             while (true)
             {
@@ -67,13 +68,13 @@ namespace LlamaCppCli
                         {
                             var task = await Task.WhenAny(promptTasks);
 
-                            Console.WriteLine(new String('=', 196));
+                            Console.WriteLine(new String('=', Console.WindowWidth));
                             Console.WriteLine($"Request {task.Result.Request.GetHashCode()} | Prompting {task.Result.Request.PromptingSpeed:F2} t/s | Sampling {task.Result.Request.SamplingSpeed:F2} t/s");
-                            //Console.WriteLine(new String('-', 196));
+                            //Console.WriteLine(new String('-', Console.WindowWidth));
                             //Console.WriteLine(result.Request.PromptText);
-                            Console.WriteLine(new String('-', 196));
+                            Console.WriteLine(new String('-', Console.WindowWidth));
                             Console.WriteLine($"{task.Result.Response}{(task.Result.Request.Cancelled ? " [Cancelled]" : "")}");
-                            Console.WriteLine(new String('=', 196));
+                            Console.WriteLine(new String('=', Console.WindowWidth));
 
                             promptTasks.Remove(task);
                         }
