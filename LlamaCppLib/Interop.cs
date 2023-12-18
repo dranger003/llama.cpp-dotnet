@@ -18,7 +18,7 @@ namespace LlamaCppLib
             for (var i = 0; i < seq_ids.Length; ++i)
                 batch.seq_id[batch.n_tokens][i] = seq_ids[i];
 
-            batch.logits[batch.n_tokens] = (byte)(logits ? 1 : 0);
+            batch.logits[batch.n_tokens] = (sbyte)(logits ? 1 : 0);
             batch.n_tokens++;
         }
 

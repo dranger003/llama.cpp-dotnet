@@ -67,11 +67,10 @@ namespace LlamaCppCli
             var cparams = llama_context_default_params();
             cparams.seed = 0;
             cparams.n_ctx = args.Length > 3 ? UInt32.Parse(args[3]) : 0;
-            cparams.n_batch = 64;
+            cparams.n_batch = 512;
             cparams.n_threads = 8;
             cparams.n_threads_batch = 8;
-            cparams.logits_all = false ? 1 : 0;
-            cparams.type_k = ggml_type.GGML_TYPE_Q8_0;
+            cparams.type_k = ggml_type.GGML_TYPE_F16;
             cparams.type_v = ggml_type.GGML_TYPE_F16;
 
             llama_backend_init(false);
@@ -97,7 +96,7 @@ namespace LlamaCppCli
                         break;
                     }
 
-                    var prompt = File.ReadAllText(args[1]).Replace("\r\n", "\n");
+                    var prompt = String.IsNullOrWhiteSpace(line) ? File.ReadAllText(args[1]).Replace("\r\n", "\n") : line;
 
                     var add_bos = llama_add_bos_token(mdl) > 0;
                     if (!add_bos) add_bos = llama_vocab_type(mdl) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM;
@@ -124,7 +123,7 @@ namespace LlamaCppCli
                     foreach (var request in requests)
                     {
                         for (; request.PosBatch < request.PosToken; request.PosBatch++)
-                            llama_batch_add(ref bat, request.Tokens[request.PosBatch], request.PosBatch, new[] { request.Id }, false);
+                            llama_batch_add(ref bat, request.Tokens[request.PosBatch], request.PosBatch, [request.Id], false);
 
                         request.PosLogit = bat.n_tokens - 1;
                         bat.logits[request.PosLogit] = true ? 1 : 0;
@@ -266,7 +265,7 @@ namespace LlamaCppCli
                                     {
                                         var tokenText = assembler.Consume(llama_token_to_piece(mdl, token));
                                         if (tc == 1) tokenText = tokenText.TrimStart();
-                                        Console.Write(tokenText);
+                                        Console.Write($"[{tokenText}]");
 
                                         if (cancel)
                                             Console.Write(" [Cancelled]");

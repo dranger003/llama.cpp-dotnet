@@ -104,7 +104,7 @@ namespace LlamaCppLib
             public llama_pos* pos;
             public int* n_seq_id;
             public llama_seq_id** seq_id;
-            public byte* logits;
+            public sbyte* logits;
 
             public llama_pos all_pos_0;
             public llama_pos all_pos_1;
