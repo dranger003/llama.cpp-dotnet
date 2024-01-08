@@ -26,7 +26,11 @@ namespace LlamaCppCli
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        static unsafe void ProgressCallback(float progress, void* state) => Console.Write($"{new string(' ', 32)}\rLoading model... {(byte)(progress * 100)}%\r");
+        static unsafe byte ProgressCallback(float progress, void* state)
+        {
+            Console.Write($"{new string(' ', 32)}\rLoading model... {(byte)(progress * 100)}%\r");
+            return false ? 0 : 1;
+        }
 
         static unsafe void RunSampleRaw(string[] args)
         {
@@ -265,7 +269,7 @@ namespace LlamaCppCli
                                     {
                                         var tokenText = assembler.Consume(llama_token_to_piece(mdl, token));
                                         if (tc == 1) tokenText = tokenText.TrimStart();
-                                        Console.Write($"[{tokenText}]");
+                                        Console.Write($"{tokenText}");
 
                                         if (cancel)
                                             Console.Write(" [Cancelled]");

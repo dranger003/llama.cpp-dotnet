@@ -57,7 +57,7 @@ namespace LlamaCppLib
             public int main_gpu;
             public float* tensor_split;
 
-            public delegate* unmanaged[Cdecl]<float, void*, void> progress_callback;
+            public delegate* unmanaged[Cdecl]<float, void*, byte> progress_callback;
             public void* progress_callback_user_data;
 
             public llama_model_kv_override* kv_overrides;

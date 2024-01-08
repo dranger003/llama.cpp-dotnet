@@ -128,10 +128,11 @@ namespace LlamaCppLib
         }
 
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-        private static unsafe void _ProgressCallback(float progress, void* state)
+        private static unsafe byte _ProgressCallback(float progress, void* state)
         {
             var callback = (Action<float>?)GCHandle.FromIntPtr(new(state)).Target;
             callback?.Invoke(progress * 100);
+            return false ? 0 : 1;
         }
 
         private void _StartAsync()
