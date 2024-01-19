@@ -36,10 +36,19 @@ namespace LlamaCppLib
             GGML_TYPE_Q5_K = 13,
             GGML_TYPE_Q6_K = 14,
             GGML_TYPE_Q8_K = 15,
+            GGML_TYPE_IQ2_XXS = 16,
+            GGML_TYPE_IQ2_XS = 17,
             GGML_TYPE_I8,
             GGML_TYPE_I16,
             GGML_TYPE_I32,
             GGML_TYPE_COUNT,
+        };
+
+        public enum llama_split_mode
+        {
+            LLAMA_SPLIT_NONE = 0,
+            LLAMA_SPLIT_LAYER = 1,
+            LLAMA_SPLIT_ROW = 2,
         };
 
         [StructLayout(LayoutKind.Sequential)]
@@ -54,6 +63,8 @@ namespace LlamaCppLib
         public struct llama_model_params
         {
             public int n_gpu_layers;
+            public llama_split_mode split_mode;
+
             public int main_gpu;
             public float* tensor_split;
 
@@ -84,6 +95,9 @@ namespace LlamaCppLib
             public float yarn_beta_fast;
             public float yarn_beta_slow;
             public uint yarn_orig_ctx;
+
+            public delegate* unmanaged[Cdecl]<nint, byte, void*, byte> cb_eval;
+            public nint cb_eval_user_data;
 
             public ggml_type type_k;
             public ggml_type type_v;
