@@ -2,10 +2,6 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-### *Update 11/2023*
-*There has been a major overhaul of the upstream repo to support parallel decoding.*  
-*The upstream changes have been merged.*
-
 ### Demo
 
 This shows `LlamaCppWeb.exe` hosting on the left and four `LlamaCppCli.exe` running in parallel on the right.
@@ -14,7 +10,8 @@ This shows `LlamaCppWeb.exe` hosting on the left and four `LlamaCppCli.exe` runn
 
 ### Description
 
-High performance minimal C# bindings for llama.cpp including a .NET core library, API server/client and samples.
+High performance minimal C# bindings for llama.cpp including a .NET core library, API server/client and samples.  
+The imported API is kept to a bare minimum as the upstream API is changing quite rapidly.
 
 ### Quick Start
 
