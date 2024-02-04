@@ -86,7 +86,7 @@ namespace LlamaCppLib
             public uint n_batch;
             public uint n_threads;
             public uint n_threads_batch;
-            public sbyte rope_scaling_type;
+            public int rope_scaling_type;
 
             public float rope_freq_base;
             public float rope_freq_scale;
@@ -105,7 +105,7 @@ namespace LlamaCppLib
             public byte mul_mat_q;
             public byte logits_all;
             public byte embedding;
-            public int offload_kqv;
+            public byte offload_kqv;
         }
 
         [StructLayout(LayoutKind.Sequential)]
