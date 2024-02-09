@@ -38,6 +38,7 @@ namespace LlamaCppLib
             GGML_TYPE_Q8_K = 15,
             GGML_TYPE_IQ2_XXS = 16,
             GGML_TYPE_IQ2_XS = 17,
+            GGML_TYPE_IQ3_XXS = 18,
             GGML_TYPE_I8,
             GGML_TYPE_I16,
             GGML_TYPE_I32,

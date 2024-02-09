@@ -74,7 +74,8 @@ namespace LlamaCppCli
             cparams.n_batch = 512;
             cparams.n_threads = 8;
             cparams.n_threads_batch = 8;
-            //cparams.type_k = ggml_type.GGML_TYPE_F16;
+            //cparams.rope_freq_base = 1000000;
+            //cparams.type_k = ggml_type.GGML_TYPE_Q8_0;
             //cparams.type_v = ggml_type.GGML_TYPE_F16;
 
             llama_backend_init(false);
