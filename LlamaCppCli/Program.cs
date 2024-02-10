@@ -16,6 +16,7 @@ namespace LlamaCppCli
                 Console.WriteLine($"    1. {nameof(RunSampleRawAsync)}");
                 Console.WriteLine($"    2. {nameof(RunSampleLibraryAsync)}");
                 Console.WriteLine($"    3. {nameof(RunSampleClientAsync)}");
+                Console.WriteLine($"    4. {nameof(RunSampleEmbeddingAsync)}");
                 return;
             }
 
@@ -29,9 +30,20 @@ namespace LlamaCppCli
                 2 => RunSampleLibraryAsync(args),
                 // Remote API using wrapped client calls (first run `LlamaCppWeb.exe` for the API hosting)
                 3 => RunSampleClientAsync(args),
+                // Embeddings API using raw function calls (intfloat/e5-mistral-7b-instruct)
+                4 => RunSampleEmbeddingAsync(args),
 
                 _ => Console.Out.WriteLineAsync("Invalid sample no.")
             });
+        }
+    }
+
+    public static class Extensions
+    {
+        public static string TruncateWithEllipsis(this String text, float percentWidth = 0.75f)
+        {
+            var maxWidth = (int)(Console.WindowWidth * percentWidth);
+            return text.Length > maxWidth ? String.Concat(text.AsSpan(0, maxWidth - 3), "...") : text;
         }
     }
 }

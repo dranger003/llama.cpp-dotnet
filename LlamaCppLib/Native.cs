@@ -186,8 +186,19 @@ namespace LlamaCppLib
             llama_model model);
 
         [LibraryImport(LibName)]
+        public static partial int llama_n_embd(
+            llama_model model);
+
+        [LibraryImport(LibName)]
         public static partial llama_model llama_get_model(
             llama_context ctx);
+
+        [LibraryImport(LibName)]
+        public static partial llama_batch llama_batch_get_one(
+            llama_token* tokens,
+            int n_tokens,
+            llama_pos pos_0,
+            llama_seq_id seq_id);
 
         [LibraryImport(LibName)]
         public static partial llama_batch llama_batch_init(
@@ -252,6 +263,10 @@ namespace LlamaCppLib
         public static partial float* llama_get_logits_ith(
             llama_context ctx,
             int i);
+
+        [LibraryImport(LibName)]
+        public static partial float* llama_get_embeddings(
+            llama_context ctx);
 
         [LibraryImport(LibName)]
         public static partial void llama_sample_repetition_penalties(
