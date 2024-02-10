@@ -35,7 +35,7 @@ namespace LlamaCppCli
         static unsafe void RunSampleRaw(string[] args)
         {
             var requests = new List<Request>();
-            var extraStopTokens = new[] { "<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|end_of_text|>", "<|im_end|>" };
+            var extraStopTokens = new[] { "<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|end_of_text|>", "<|im_end|>", "<step>" };
             var assembler = new MultibyteCharAssembler();
             var stream = true;
 
@@ -112,6 +112,9 @@ namespace LlamaCppCli
                         Console.WriteLine("Out of context.");
                         continue;
                     }
+
+                    // Debug
+                    //Console.WriteLine(tokens.ToArray().Select(x => $"[{x}][{Encoding.UTF8.GetString(llama_token_to_piece(mdl, x))}]").Aggregate((a, b) => $"{a}{b}"));
 
                     requests.Add(new Request(llama_n_ctx(ctx), tokens));
 
@@ -246,7 +249,7 @@ namespace LlamaCppCli
 
                                 var stop = extraStopTokens
                                     .Select(extraStopToken => llama_tokenize(mdl, extraStopToken, false, true).ToArray())
-                                    .Where(tokens => tokens.Length == 0)
+                                    .Where(tokens => tokens.Length == 1)
                                     .Select(tokens => tokens[0])
                                     .Contains(token);
 
@@ -271,6 +274,9 @@ namespace LlamaCppCli
                                         var tokenText = assembler.Consume(llama_token_to_piece(mdl, token));
                                         if (tc == 1) tokenText = tokenText.TrimStart();
                                         Console.Write($"{tokenText}");
+
+                                        // Debug
+                                        //Console.Write($"[{token}:{tokenText}]");
 
                                         if (cancel)
                                             Console.Write(" [Cancelled]");
