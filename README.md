@@ -8,7 +8,7 @@ This shows `LlamaCppWeb.exe` hosting on the left and four `LlamaCppCli.exe` runn
 
 ![demo](https://github.com/dranger003/llama.cpp-dotnet/assets/1760549/ad560ac5-31ca-4cf0-93a5-a1a6ccf9b446)
 
-This one shows the new text embedding sample for feature extraction (https://huggingface.co/intfloat/e5-mistral-7b-instruct)
+This one shows the new text embedding sample for feature extraction (https://huggingface.co/dranger003/e5-mistral-7b-instruct-GGUF)
 
 ![Screenshot 2024-02-09 193353](https://github.com/dranger003/llama.cpp-dotnet/assets/1760549/432ce6d2-7e8b-41f5-861e-3170c368b95a)
 
