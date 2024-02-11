@@ -38,12 +38,11 @@ namespace LlamaCppCli
             var mdl = llama_load_model_from_file(args[0], mparams);
             var ctx = llama_new_context_with_model(mdl, cparams);
 
-            var TokenizeAndDecode = (string text) =>
+            var GetEmbeddings = (string text) =>
             {
-                var embd_inp = llama_tokenize(mdl, text, true, false).ToArray();
-                var tokens = embd_inp.Concat([llama_token_eos(mdl)]).ToArray();
                 llama_kv_cache_seq_rm(ctx, 0, 0, -1);
-                fixed (llama_token* ptr = &tokens[0]) llama_decode(ctx, llama_batch_get_one(ptr, tokens.Length, 0, 0));
+                var embd_inp = llama_tokenize(mdl, text, true, false, true).ToArray();
+                fixed (llama_token* ptr = &embd_inp[0]) llama_decode(ctx, llama_batch_get_one(ptr, embd_inp.Length, 0, 0));
                 return new Span<float>(llama_get_embeddings(ctx), llama_n_embd(mdl));
             };
 
@@ -68,9 +67,11 @@ namespace LlamaCppCli
                 "The Commonwealth of the Northern Mariana Islands is a group of islands in the Pacific Ocean that are a political division controlled by the United States. Its capital is Saipan.",
                 "Charlotte Amalie is the capital and largest city of the United States Virgin Islands. It has about 20,000 people. The city is on the island of Saint Thomas.",
                 "Washington, D.C. (also known as simply Washington or D.C., and officially as the District of Columbia) is the capital of the United States. It is a federal district.",
+                "Proteins are the building blocks of muscle tissue and other important structures in chickens, helping them grow strong and healthy!",
                 "Capital punishment (the death penalty) has existed in the United States since before the United States was a country. As of 2017, capital punishment is legal in 30 of the 50 states.",
                 "North Dakota is a state in the United States. 672,591 people lived in North Dakota in the year 2010. The capital and seat of government is Bismarck.",
                 "As a general guideline, the CDC's average requirement of protein for women ages 19 to 70 is 46 grams per day. But, as you can see from this chart, you'll need to increase that if you're expecting or training for a marathon. Check out the chart below to see how much protein you should be eating each day.",
+                "The World Summit on Climate Change is an international conference aimed at addressing global warming and promoting sustainable development efforts around the globe.",
                 "Definition of summit for English Language Learners. : 1  the highest point of a mountain : the top of a mountain. : 2  the highest level. : 3  a meeting or series of meetings between the leaders of two or more governments.",
             };
 
@@ -86,24 +87,25 @@ namespace LlamaCppCli
             }.Select(x => String.Format(template, task, x)).ToList();
 
             var documentsEmbeddings = documents
-                .Select(x => TokenizeAndDecode(x).ToArray())
+                .Select(x => GetEmbeddings(x).ToArray())
                 .ToList();
 
             foreach (var query in queries)
             {
-                var queryEmbeddings = TokenizeAndDecode(query).ToArray();
+                var queryEmbeddings = GetEmbeddings(query).ToArray();
 
                 var cosineSimilarities = documentsEmbeddings
                     .Select(documentEmbeddings => CosineSimilarity(queryEmbeddings, documentEmbeddings))
                     .ToList();
 
-                var results = documents
+                var result = documents
                     .Zip(cosineSimilarities, (x, similarity) => new { Document = x, CosineSimilarity = similarity })
                     .OrderByDescending(x => x.CosineSimilarity)
-                    .ToList();
+                    .First();
 
                 Console.WriteLine($"\n[{query}]");
-                results.ForEach(x => Console.WriteLine($"    [{x.CosineSimilarity}][{x.Document.TruncateWithEllipsis()}]"));
+                Console.WriteLine($"    [{result.CosineSimilarity * 100:0.00}%][{result.Document.TruncateWithEllipsis()}]");
+                //results.ForEach(x => Console.WriteLine($"    [{x.CosineSimilarity}][{x.Document.TruncateWithEllipsis()}]"));
             }
 
             llama_free(ctx);

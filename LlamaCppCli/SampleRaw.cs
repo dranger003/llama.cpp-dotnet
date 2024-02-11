@@ -17,7 +17,7 @@ namespace LlamaCppCli
         {
             if (args.Length < 2)
             {
-                Console.WriteLine($"Usage: RunSampleRawAsync <ModelPath> <PromptFilePath> [GpuLayers] [CtxLength]");
+                Console.WriteLine($"Usage: RunSampleRawAsync <ModelPath> <PromptFilePath> [GpuLayers] [CtxLength] [UseTemplate]");
                 return;
             }
 
@@ -38,6 +38,7 @@ namespace LlamaCppCli
             var extraStopTokens = new[] { "<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|end_of_text|>", "<|im_end|>", "<step>" };
             var assembler = new MultibyteCharAssembler();
             var stream = true;
+            var template = "Source: system\n\n You are very formal and precise. <step> Source: user\n\n {0} <step> Source: assistant\nDestination: user\n\n";
 
             var cancel = false;
             Console.CancelKeyPress += (s, e) => { e.Cancel = cancel = true; };
@@ -102,6 +103,9 @@ namespace LlamaCppCli
                     }
 
                     var prompt = String.IsNullOrWhiteSpace(line) ? File.ReadAllText(args[1]).Replace("\r\n", "\n") : line;
+
+                    if (args.Length > 4 && Int32.Parse(args[4]) > 0)
+                        prompt = String.Format(template, prompt);
 
                     var add_bos = llama_add_bos_token(mdl) > 0;
                     if (!add_bos) add_bos = llama_vocab_type(mdl) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM;

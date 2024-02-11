@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Text;
 
 namespace LlamaCppLib
 {
@@ -22,7 +23,7 @@ namespace LlamaCppLib
             batch.n_tokens++;
         }
 
-        public static Span<llama_token> llama_tokenize(llama_model model, string text, bool add_bos = false, bool special = false)
+        public static Span<llama_token> llama_tokenize(llama_model model, string text, bool add_bos = false, bool special = false, bool add_eos = false)
         {
             var n_tokens = text.Length + (add_bos ? 1 : 0);
             var result = new llama_token[n_tokens];
@@ -41,7 +42,10 @@ namespace LlamaCppLib
                 }
             }
 
-            return new(result, 0, n_tokens);
+            if (add_eos)
+                result[n_tokens] = Native.llama_token_eos(model);
+
+            return new(result, 0, n_tokens + (add_eos ? 1 : 0));
         }
 
         public static Span<byte> llama_token_to_piece(llama_model model, llama_token token)
