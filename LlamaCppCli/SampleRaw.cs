@@ -8,6 +8,7 @@ using LlamaCppLib;
 
 using static LlamaCppLib.Native;
 using static LlamaCppLib.Interop;
+using System.Text.RegularExpressions;
 
 namespace LlamaCppCli
 {
@@ -102,7 +103,17 @@ namespace LlamaCppCli
                         break;
                     }
 
-                    var prompt = String.IsNullOrWhiteSpace(line) ? File.ReadAllText(args[1]).Replace("\r\n", "\n") : line;
+                    var prompt = String.Empty;
+                    var match = Regex.Match(line, @"\/load\s+("".*?""(?:\s+|$))");
+                    if (match.Success)
+                    {
+                        var fileName = Path.GetFullPath(Regex.Match(line, "\"(.*?)\"").Groups[1].Value);
+                        prompt = File.ReadAllText(fileName);
+                    }
+                    else
+                    {
+                        prompt = String.IsNullOrWhiteSpace(line) ? File.ReadAllText(args[1]).Replace("\r\n", "\n") : line;
+                    }
 
                     if (args.Length > 4 && Int32.Parse(args[4]) > 0)
                         prompt = String.Format(template, prompt);
