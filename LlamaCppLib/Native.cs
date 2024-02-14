@@ -16,7 +16,7 @@ namespace LlamaCppLib
         private const string LibName = $"{nameof(LlamaCppLib)}/libllama";
 #endif
 
-        public enum llama_vocab_type_t { LLAMA_VOCAB_TYPE_SPM = 0, LLAMA_VOCAB_TYPE_BPE = 1 }
+        public enum llama_vocab_type_t { LLAMA_VOCAB_TYPE_SPM = 0, LLAMA_VOCAB_TYPE_BPE = 1, LLAMA_VOCAB_TYPE_WPM = 2 }
 
         public enum llama_model_kv_override_type { LLAMA_KV_OVERRIDE_INT, LLAMA_KV_OVERRIDE_FLOAT, LLAMA_KV_OVERRIDE_BOOL };
 
@@ -107,6 +107,7 @@ namespace LlamaCppLib
             public byte logits_all;
             public byte embedding;
             public byte offload_kqv;
+            public byte do_pooling;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -267,6 +268,11 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial float* llama_get_embeddings(
             llama_context ctx);
+
+        [LibraryImport(LibName)]
+        public static partial float* llama_get_embeddings_ith(
+            llama_context ctx,
+            int i);
 
         [LibraryImport(LibName)]
         public static partial void llama_sample_repetition_penalties(
