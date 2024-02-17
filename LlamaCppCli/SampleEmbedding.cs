@@ -42,7 +42,7 @@ namespace LlamaCppCli
             {
                 llama_kv_cache_seq_rm(ctx, 0, 0, -1);
                 var embd_inp = llama_tokenize(mdl, text, true, false, true).ToArray();
-                fixed (llama_token* ptr = &embd_inp[0]) llama_decode(ctx, llama_batch_get_one(ptr, embd_inp.Length, 0, 0));
+                llama_decode(ctx, llama_batch_get_one(embd_inp, embd_inp.Length, 0, 0));
                 return new Span<float>(llama_get_embeddings(ctx), llama_n_embd(mdl));
             };
 

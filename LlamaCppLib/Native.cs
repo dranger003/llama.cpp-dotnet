@@ -196,7 +196,7 @@ namespace LlamaCppLib
 
         [LibraryImport(LibName)]
         public static partial llama_batch llama_batch_get_one(
-            llama_token* tokens,
+            llama_token[] tokens,
             int n_tokens,
             llama_pos pos_0,
             llama_seq_id seq_id);
@@ -278,7 +278,7 @@ namespace LlamaCppLib
         public static partial void llama_sample_repetition_penalties(
             llama_context ctx,
             ref llama_token_data_array candidates,
-            llama_token* last_tokens,
+            Span<llama_token> last_tokens,
             nuint penalty_last_n,
             float penalty_repeat,
             float penalty_freq,

@@ -9,6 +9,7 @@ using LlamaCppLib;
 using static LlamaCppLib.Native;
 using static LlamaCppLib.Interop;
 using System.Text.RegularExpressions;
+using System;
 
 namespace LlamaCppCli
 {
@@ -62,7 +63,7 @@ namespace LlamaCppCli
             var mirostat_m = 100;
 
             var penalty_last_n = 64;
-            var penalty_repeat = 1.1f;
+            var penalty_repeat = 1.05f;
             var penalty_freq = 0.0f;
             var penalty_present = 0.0f;
 
@@ -215,12 +216,12 @@ namespace LlamaCppCli
                                     sorted = false ? 1 : 0,
                                 };
 
-                                fixed (int* ptr2 = &request.Tokens[Math.Max(0, request.PosToken - penalty_last_n)])
                                 {
+                                    var index = Math.Max(0, request.PosToken - penalty_last_n);
                                     llama_sample_repetition_penalties(
                                         ctx,
                                         ref candidates_p,
-                                        ptr2,
+                                        new Span<int>(request.Tokens, index, request.Tokens.Length - index),
                                         (nuint)penalty_last_n,
                                         penalty_repeat,
                                         penalty_freq,

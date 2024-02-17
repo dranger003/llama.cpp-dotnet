@@ -283,12 +283,12 @@ namespace LlamaCppLib
                                 sorted = false ? 1 : 0,
                             };
 
-                            fixed (int* ptrTokens = &sequence.Tokens[Math.Max(0, sequence.PosTokens - sequence.SamplingOptions.PenaltyLastN)])
                             {
+                                var index = Math.Max(0, sequence.PosTokens - sequence.SamplingOptions.PenaltyLastN);
                                 llama_sample_repetition_penalties(
                                     _context.Handle,
                                     ref candidates_p,
-                                    ptrTokens,
+                                    new Span<int>(sequence.Tokens, index, sequence.Tokens.Length - index),
                                     (nuint)sequence.SamplingOptions.PenaltyLastN,
                                     sequence.SamplingOptions.PenaltyRepeat,
                                     sequence.SamplingOptions.PenaltyFreq,
