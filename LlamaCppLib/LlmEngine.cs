@@ -204,7 +204,7 @@ namespace LlamaCppLib
                         break;
 
                     for (; sequence.PosBatch < sequence.PosTokens; sequence.PosBatch++)
-                        llama_batch_add(ref batch, sequence.Tokens[sequence.PosBatch], sequence.PosBatch, new[] { sequence.Id }, false);
+                        llama_batch_add(ref batch, sequence.Tokens[sequence.PosBatch], sequence.PosBatch, [sequence.Id], false);
 
                     sequence.PosLogit = batch.n_tokens - 1;
                     batch.logits[sequence.PosLogit] = true ? 1 : 0;
@@ -347,7 +347,6 @@ namespace LlamaCppLib
                             }
 
                             var stop = false
-                                || sequence.Prompt.Cancelled
                                 || sequence.PosTokens >= sequence.Tokens.Length - 1
                                 || sequence.PosTokens - sequence.PosResponse >= sequence.SamplingOptions.ResponseMaxTokenCount
                                 || (sequence.StopTokens?.Contains(token) ?? false);
@@ -358,14 +357,14 @@ namespace LlamaCppLib
                                 sequence.Tokens[sequence.PosTokens++] = token;
                             }
 
-                            if (stop || token == llama_token_eos(_model.Handle))
+                            if (sequence.Prompt.Cancelled || token == llama_token_eos(_model.Handle) || stop)
                             {
                                 sequence.T3 = DateTime.Now;
                                 sequence.Prompt.SamplingSpeed = (sequence.PosTokens - sequence.PosResponse - 1) / ((sequence.T3 - sequence.T2) ?? new()).TotalSeconds;
 
-                                if (stop)
+                                if (sequence.Prompt.Cancelled)
                                     sequence.Prompt.TokenChannel.Writer.Complete(new OperationCanceledException());
-                                else
+                                else if (stop)
                                     sequence.Prompt.TokenChannel.Writer.Complete();
 
                                 llama_kv_cache_seq_rm(_context.Handle, sequence.Id, -1, -1);

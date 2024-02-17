@@ -40,9 +40,13 @@ namespace LlamaCppLib
                     if ((result = await this.TokenChannel.Reader.ReadAsync(cancellationToken)).Length == 0)
                         break;
                 }
-                catch (Exception ex) when (ex is OperationCanceledException || ex is ChannelClosedException)
+                catch (OperationCanceledException)
                 {
                     this.Cancelled = true;
+                    break;
+                }
+                catch (ChannelClosedException)
+                {
                     break;
                 }
 
