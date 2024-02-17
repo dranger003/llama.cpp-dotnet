@@ -214,9 +214,9 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial int llama_tokenize(
             llama_model model,
-            [MarshalAs(UnmanagedType.LPStr)] string text,
+            byte[] text,
             int text_len,
-            llama_token* tokens,
+            llama_token[] tokens,
             int n_max_tokens,
             byte add_bos,
             byte special);
@@ -225,7 +225,7 @@ namespace LlamaCppLib
         public static partial int llama_token_to_piece(
             llama_model model,
             llama_token token,
-            byte* buf,
+            byte[] buf,
             int length);
 
         [LibraryImport(LibName)]
