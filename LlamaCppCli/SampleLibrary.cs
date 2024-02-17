@@ -36,6 +36,7 @@ namespace LlamaCppCli
 
                 {
                     // Parallel prompts w/o streaming - e.g.
+                    // `/load "D:\LLM_MODELS\PROMPT.txt"`
                     // `/load "prompt_file-1.txt" "prompt_file-2.txt" ...`
                     var match = Regex.Match(promptText, @"\/load\s+("".*?""(?:\s+|$))+");
                     if (match.Success)
@@ -48,8 +49,8 @@ namespace LlamaCppCli
                             .ForEach(fileName => Console.WriteLine($"File \"{fileName}\" not found."));
 
                         var promptTasks = fileNames
-                            .Where(fileName => File.Exists(fileName))
-                            .Select(fileName => llm.Prompt(File.ReadAllText(fileName), new SamplingOptions { Temperature = 0.0f }))
+                            .Where(File.Exists)
+                            .Select(fileName => llm.Prompt(File.ReadAllText(fileName), new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|endoftext|>"] }))
                             .Select(
                                 async prompt =>
                                 {
@@ -86,7 +87,7 @@ namespace LlamaCppCli
                     // Single prompt w/streaming - e.g.
                     // `<|im_start|>system\nYou are an astrophysicist.<|im_end|>\n<|im_start|>user\nDescribe the solar system.<|im_end|>\n<|im_start|>assistant\n`
                     // `[INST] <<SYS>>\nYou are an astrophysicist.\n<</SYS>>\n\nDescribe the solar system. [/INST]\n`
-                    var prompt = llm.Prompt(promptText, new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>"] });
+                    var prompt = llm.Prompt(promptText, new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|endoftext|>"] });
 
                     // In streaming mode, we must re-assemble multibyte characters using a TokenEnumerator
                     await foreach (var token in new TokenEnumerator(prompt, cancellationTokenSource.Token))
