@@ -19,7 +19,7 @@ namespace LlamaCppCli
             Console.CancelKeyPress += (s, e) => { cancellationTokenSource.Cancel(); e.Cancel = true; };
 
             using var llm = new LlmEngine(new LlmEngineOptions { MaxParallel = 8 });
-            var modelOptions = new LlmModelOptions { Seed = 0, ContextLength = args.Length > 2 ? Int32.Parse(args[2]) : 0, GpuLayers = args.Length > 1 ? Int32.Parse(args[1]) : 64 };
+            var modelOptions = new LlmModelOptions { Seed = 0, ContextLength = args.Length > 2 ? Int32.Parse(args[2]) : 0, GpuLayers = args.Length > 1 ? Int32.Parse(args[1]) : 64, ThreadCount = 8, BatchThreadCount = 8 };
             llm.LoadModel(args[0], modelOptions);
 
             Console.WriteLine("Press <Ctrl+C> to cancel or press <Enter> with an empty input to quit.");
@@ -34,68 +34,68 @@ namespace LlamaCppCli
                 if (String.IsNullOrWhiteSpace(promptText))
                     break;
 
+                // Parallel prompts w/o streaming for multiple files - e.g.
+                // `/load "prompt_file-1.txt" "prompt_file-2.txt" ...`
+                var match = Regex.Match(promptText, @"\/load\s+("".*?""(?:\s+|$))+");
+                var fileNames = match.Success ? Regex.Matches(promptText, "\"(.*?)\"").Select(x => x.Groups[1].Value).ToList() : [];
+
+                if (fileNames.Count > 1)
                 {
-                    // Parallel prompts w/o streaming - e.g.
-                    // `/load "D:\LLM_MODELS\PROMPT.txt"`
-                    // `/load "prompt_file-1.txt" "prompt_file-2.txt" ...`
-                    var match = Regex.Match(promptText, @"\/load\s+("".*?""(?:\s+|$))+");
-                    if (match.Success)
+                    fileNames
+                        .Where(fileName => !File.Exists(fileName))
+                        .ToList()
+                        .ForEach(fileName => Console.WriteLine($"File \"{fileName}\" not found."));
+
+                    var promptTasks = fileNames
+                        .Where(File.Exists)
+                        .Select(fileName => llm.Prompt(File.ReadAllText(fileName), new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|endoftext|>"] }))
+                        .Select(
+                            async prompt =>
+                            {
+                                var response = new List<byte>();
+
+                                // In non-streaming mode, we can collect tokens as raw byte arrays and assemble the response at the end
+                                await foreach (var token in prompt.NextToken(cancellationTokenSource.Token))
+                                    response.AddRange(token);
+
+                                return (Request: prompt, Response: Encoding.UTF8.GetString(response.ToArray()));
+                            }
+                        )
+                        .ToList();
+
+                    while (promptTasks.Any())
                     {
-                        var fileNames = Regex.Matches(promptText, "\"(.*?)\"").Select(x => x.Groups[1].Value).ToList();
+                        var task = await Task.WhenAny(promptTasks);
 
-                        fileNames
-                            .Where(fileName => !File.Exists(fileName))
-                            .ToList()
-                            .ForEach(fileName => Console.WriteLine($"File \"{fileName}\" not found."));
+                        Console.WriteLine(new String('=', Console.WindowWidth));
+                        Console.WriteLine($"Request {task.Result.Request.GetHashCode()} | Prompting {task.Result.Request.PromptingSpeed:F2} t/s | Sampling {task.Result.Request.SamplingSpeed:F2} t/s");
+                        //Console.WriteLine(new String('-', Console.WindowWidth));
+                        //Console.WriteLine(result.Request.PromptText);
+                        Console.WriteLine(new String('-', Console.WindowWidth));
+                        Console.WriteLine($"{task.Result.Response}{(task.Result.Request.Cancelled ? " [Cancelled]" : "")}");
+                        Console.WriteLine(new String('=', Console.WindowWidth));
 
-                        var promptTasks = fileNames
-                            .Where(File.Exists)
-                            .Select(fileName => llm.Prompt(File.ReadAllText(fileName), new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|endoftext|>"] }))
-                            .Select(
-                                async prompt =>
-                                {
-                                    var response = new List<byte>();
-
-                                    // In non-streaming mode, we can collect tokens as raw byte arrays and assemble the response at the end
-                                    await foreach (var token in prompt.NextToken(cancellationTokenSource.Token))
-                                        response.AddRange(token);
-
-                                    return (Request: prompt, Response: Encoding.UTF8.GetString(response.ToArray()));
-                                }
-                            )
-                            .ToList();
-
-                        while (promptTasks.Any())
-                        {
-                            var task = await Task.WhenAny(promptTasks);
-
-                            Console.WriteLine(new String('=', Console.WindowWidth));
-                            Console.WriteLine($"Request {task.Result.Request.GetHashCode()} | Prompting {task.Result.Request.PromptingSpeed:F2} t/s | Sampling {task.Result.Request.SamplingSpeed:F2} t/s");
-                            //Console.WriteLine(new String('-', Console.WindowWidth));
-                            //Console.WriteLine(result.Request.PromptText);
-                            Console.WriteLine(new String('-', Console.WindowWidth));
-                            Console.WriteLine($"{task.Result.Response}{(task.Result.Request.Cancelled ? " [Cancelled]" : "")}");
-                            Console.WriteLine(new String('=', Console.WindowWidth));
-
-                            promptTasks.Remove(task);
-                        }
-
-                        continue;
+                        promptTasks.Remove(task);
                     }
-                }
-                {
-                    // Single prompt w/streaming - e.g.
-                    // `<|im_start|>system\nYou are an astrophysicist.<|im_end|>\n<|im_start|>user\nDescribe the solar system.<|im_end|>\n<|im_start|>assistant\n`
-                    // `[INST] <<SYS>>\nYou are an astrophysicist.\n<</SYS>>\n\nDescribe the solar system. [/INST]\n`
-                    var prompt = llm.Prompt(promptText, new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|endoftext|>"] });
 
-                    // In streaming mode, we must re-assemble multibyte characters using a TokenEnumerator
-                    await foreach (var token in new TokenEnumerator(prompt, cancellationTokenSource.Token))
-                        Console.Write(token);
-
-                    Console.WriteLine($"{(prompt.Cancelled ? " [Cancelled]" : "")}");
-                    Console.WriteLine($"Prompting {prompt.PromptingSpeed:F2} t/s | Sampling {prompt.SamplingSpeed:F2} t/s");
+                    continue;
                 }
+
+                // Single prompt w/streaming - e.g.
+                // `/load "D:\LLM_MODELS\PROMPT.txt"`
+                // `<|im_start|>system\nYou are an astrophysicist.<|im_end|>\n<|im_start|>user\nDescribe the solar system.<|im_end|>\n<|im_start|>assistant\n`
+                // `[INST] <<SYS>>\nYou are an astrophysicist.\n<</SYS>>\n\nDescribe the solar system. [/INST]\n`
+                if (fileNames.Count == 1)
+                    promptText = File.ReadAllText(fileNames[0]);
+
+                var prompt = llm.Prompt(promptText, new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|endoftext|>"] });
+
+                // In streaming mode, we must re-assemble multibyte characters using a TokenEnumerator
+                await foreach (var token in new TokenEnumerator(prompt, cancellationTokenSource.Token))
+                    Console.Write(token);
+
+                Console.WriteLine($"{(prompt.Cancelled ? " [Cancelled]" : "")}");
+                Console.WriteLine($"Prompting {prompt.PromptingSpeed:F2} t/s | Sampling {prompt.SamplingSpeed:F2} t/s");
             }
 
             Console.WriteLine("Bye.");
