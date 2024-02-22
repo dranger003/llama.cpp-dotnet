@@ -127,7 +127,7 @@ namespace LlamaCppLib
             return prompt;
         }
 
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
         private static unsafe byte _ProgressCallback(float progress, void* state)
         {
             var callback = (Action<float>?)GCHandle.FromIntPtr(new(state)).Target;
@@ -336,6 +336,7 @@ namespace LlamaCppLib
                                 llama_sample_tail_free(_context.Handle, ref candidates_p, sequence.SamplingOptions.TfsZ, 1);
                                 llama_sample_typical(_context.Handle, ref candidates_p, sequence.SamplingOptions.TypicalP, 1);
                                 llama_sample_top_p(_context.Handle, ref candidates_p, sequence.SamplingOptions.TopP, 1);
+                                llama_sample_min_p(_context.Handle, ref candidates_p, sequence.SamplingOptions.MinP, 1);
                                 llama_sample_temp(_context.Handle, ref candidates_p, sequence.SamplingOptions.Temperature);
                                 token = llama_sample_token(_context.Handle, ref candidates_p);
                             }

@@ -349,6 +349,13 @@ namespace LlamaCppLib
             nuint min_keep);
 
         [LibraryImport(LibName)]
+        public static partial void llama_sample_min_p(
+            llama_context ctx,
+            ref llama_token_data_array candidates,
+            float p,
+            nuint min_keep);
+
+        [LibraryImport(LibName)]
         public static partial llama_token llama_sample_token(
             llama_context ctx,
             ref llama_token_data_array candidates);

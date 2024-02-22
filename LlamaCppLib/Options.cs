@@ -16,9 +16,9 @@ namespace LlamaCppLib
 
         public int Seed { get; set; } = -1;
         public int ContextLength { get; set; } = 0;
-        public int BatchSize { get; set; } = 64;
-        public int ThreadCount { get; set; } = 1;
-        public int BatchThreadCount { get; set; } = 1;
+        public int BatchSize { get; set; } = 512;
+        public int ThreadCount { get; set; } = 4;
+        public int BatchThreadCount { get; set; } = 4;
 
         public float RopeFrequeceBase { get; set; } = 0.0f;
         public float RopeFrequenceScale { get; set; } = 0.0f;
@@ -30,6 +30,7 @@ namespace LlamaCppLib
     {
         public int TopK { get; set; } = 40;
         public float TopP { get; set; } = 0.95f;
+        public float MinP { get; set; } = 0.05f;
         public float TfsZ { get; set; } = 1.0f;
         public float TypicalP { get; set; } = 1.0f;
         public float Temperature { get; set; } = 0.8f;

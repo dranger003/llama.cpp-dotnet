@@ -19,8 +19,17 @@ namespace LlamaCppCli
             Console.CancelKeyPress += (s, e) => { cancellationTokenSource.Cancel(); e.Cancel = true; };
 
             using var llm = new LlmEngine(new LlmEngineOptions { MaxParallel = 8 });
-            var modelOptions = new LlmModelOptions { Seed = 0, ContextLength = args.Length > 2 ? Int32.Parse(args[2]) : 0, GpuLayers = args.Length > 1 ? Int32.Parse(args[1]) : 64, ThreadCount = 8, BatchThreadCount = 8 };
-            llm.LoadModel(args[0], modelOptions);
+            llm.LoadModel(
+                args[0],
+                new LlmModelOptions
+                {
+                    Seed = 0,
+                    ContextLength = args.Length > 2 ? Int32.Parse(args[2]) : 0,
+                    GpuLayers = args.Length > 1 ? Int32.Parse(args[1]) : 64,
+                    ThreadCount = 8,
+                    BatchThreadCount = 8,
+                }
+            );
 
             Console.WriteLine("Press <Ctrl+C> to cancel or press <Enter> with an empty input to quit.");
 
@@ -88,7 +97,15 @@ namespace LlamaCppCli
                 if (fileNames.Count == 1)
                     promptText = File.ReadAllText(fileNames[0]);
 
-                var prompt = llm.Prompt(promptText, new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|endoftext|>"] });
+                var prompt = llm.Prompt(
+                    promptText,
+                    new SamplingOptions
+                    {
+                        Temperature = 0.8f,
+                        PenaltyRepeat = 1.0f,
+                        ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|endoftext|>"]
+                    }
+                );
 
                 // In streaming mode, we must re-assemble multibyte characters using a TokenEnumerator
                 await foreach (var token in new TokenEnumerator(prompt, cancellationTokenSource.Token))

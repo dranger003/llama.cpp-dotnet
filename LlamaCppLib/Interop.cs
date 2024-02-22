@@ -23,6 +23,11 @@ namespace LlamaCppLib
             batch.n_tokens++;
         }
 
+        public static void llama_batch_clear(ref Native.llama_batch batch)
+        {
+            batch.n_tokens = 0;
+        }
+
         public static Span<llama_token> llama_tokenize(llama_model model, string text, bool add_bos = false, bool special = false, bool add_eos = false)
         {
             var n_tokens = text.Length + (add_bos ? 1 : 0);

@@ -3,13 +3,12 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 
 using LlamaCppLib;
 
 using static LlamaCppLib.Native;
 using static LlamaCppLib.Interop;
-using System.Text.RegularExpressions;
-using System;
 
 namespace LlamaCppCli
 {
@@ -27,7 +26,7 @@ namespace LlamaCppCli
             await Task.CompletedTask;
         }
 
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
         static unsafe byte ProgressCallback(float progress, void* state)
         {
             Console.Write($"{new string(' ', 32)}\rLoading model... {(byte)(progress * 100)}%\r");
@@ -40,7 +39,9 @@ namespace LlamaCppCli
             var extraStopTokens = new[] { "<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|end_of_text|>", "<|im_end|>", "<step>" };
             var assembler = new MultibyteCharAssembler();
             var stream = true;
-            var template = "Source: system\n\n You are very formal and precise. <step> Source: user\n\n {0} <step> Source: assistant\nDestination: user\n\n";
+            //var template = "<s>Source: system\n\n You are very formal and precise. <step> Source: user\n\n {0} <step> Source: assistant\nDestination: user\n\n ";
+            //var template = "[INST] {0} [/INST]";
+            var template = "<start_of_turn>user\n{0}<end_of_turn>\n<start_of_turn>model\n";
 
             var cancel = false;
             Console.CancelKeyPress += (s, e) => { e.Cancel = cancel = true; };
@@ -53,9 +54,10 @@ namespace LlamaCppCli
 
             var top_k = 40;
             var top_p = 0.95f;
+            var min_p = 0.05f;
             var tfs_z = 1.0f;
             var typical_p = 1.0f;
-            var temp = 0.0f;
+            var temp = 0.8f;
 
             var mirostat = 0;
             var mirostat_tau = 5.0f;
@@ -63,7 +65,7 @@ namespace LlamaCppCli
             var mirostat_m = 100;
 
             var penalty_last_n = 64;
-            var penalty_repeat = 1.05f;
+            var penalty_repeat = 1.0f;
             var penalty_freq = 0.0f;
             var penalty_present = 0.0f;
 
@@ -78,8 +80,9 @@ namespace LlamaCppCli
             cparams.n_threads = 8;
             cparams.n_threads_batch = 8;
             //cparams.rope_freq_base = 1000000;
-            //cparams.type_k = ggml_type.GGML_TYPE_Q8_0;
-            //cparams.type_v = ggml_type.GGML_TYPE_F16;
+            cparams.type_k = ggml_type.GGML_TYPE_F16;
+            cparams.type_v = ggml_type.GGML_TYPE_F16;
+            cparams.logits_all = false ? 1 : 0;
 
             llama_backend_init(false);
 
@@ -121,7 +124,10 @@ namespace LlamaCppCli
 
                     var add_bos = llama_add_bos_token(mdl) > 0;
                     if (!add_bos) add_bos = llama_vocab_type(mdl) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM;
-                    var tokens = llama_tokenize(mdl, prompt, add_bos, true);
+
+                    var tokens = llama_tokenize(mdl, prompt, add_bos, true, false);
+                    //Console.WriteLine($"{tokens.ToArray().Select(x => $"[{x}:{Encoding.UTF8.GetString(llama_token_to_piece(mdl, x))}]").Aggregate((a, b) => $"{a}\n{b}")}");
+
                     Console.WriteLine($"{tokens.Length}/{llama_n_ctx(ctx)} token(s)");
                     if (tokens.Length >= llama_n_ctx(ctx))
                     {
@@ -142,7 +148,7 @@ namespace LlamaCppCli
 
                 while (true)
                 {
-                    bat.n_tokens = 0;
+                    llama_batch_clear(ref bat);
 
                     foreach (var request in requests)
                     {
@@ -256,6 +262,7 @@ namespace LlamaCppCli
                                     llama_sample_tail_free(ctx, ref candidates_p, tfs_z, 1);
                                     llama_sample_typical(ctx, ref candidates_p, typical_p, 1);
                                     llama_sample_top_p(ctx, ref candidates_p, top_p, 1);
+                                    llama_sample_min_p(ctx, ref candidates_p, min_p, 1);
                                     llama_sample_temp(ctx, ref candidates_p, temp);
                                     token = llama_sample_token(ctx, ref candidates_p);
                                 }
@@ -288,8 +295,7 @@ namespace LlamaCppCli
                                     if (stream)
                                     {
                                         var tokenText = assembler.Consume(llama_token_to_piece(mdl, token));
-                                        if (tc == 1) tokenText = tokenText.TrimStart();
-                                        Console.Write($"{tokenText}");
+                                        Console.Write(tokenText);
 
                                         // Debug
                                         //Console.Write($"[{token}:{tokenText}]");
