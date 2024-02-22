@@ -67,7 +67,9 @@ If you have a lot of RAM (i.e. 48GB+) you could try a 65B version though it is m
 
 A lot of models can be found below.
 
-- [TheBloke on Hugging Face](https://huggingface.co/TheBloke)
+- [dranger003 on Hugging Face](https://huggingface.co/dranger003?sort_models=created#models)
+- [TheBloke on Hugging Face](https://huggingface.co/TheBloke?sort_models=created&search_models=GGUF#models)
+- [LoneStriker on Hugging Face](https://huggingface.co/LoneStriker?sort_models=created&search_models=GGUF#models)
 
 ### Features
 
