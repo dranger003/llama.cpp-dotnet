@@ -32,6 +32,7 @@ namespace LlamaCppLib
             GGML_TYPE_Q5_1 = 7,
             GGML_TYPE_Q8_0 = 8,
             GGML_TYPE_Q8_1 = 9,
+            // k-quantizations
             GGML_TYPE_Q2_K = 10,
             GGML_TYPE_Q3_K = 11,
             GGML_TYPE_Q4_K = 12,
@@ -42,6 +43,8 @@ namespace LlamaCppLib
             GGML_TYPE_IQ2_XS = 17,
             GGML_TYPE_IQ3_XXS = 18,
             GGML_TYPE_IQ1_S = 19,
+            GGML_TYPE_IQ4_NL = 20,
+            GGML_TYPE_IQ3_S = 21,
             GGML_TYPE_I8,
             GGML_TYPE_I16,
             GGML_TYPE_I32,
