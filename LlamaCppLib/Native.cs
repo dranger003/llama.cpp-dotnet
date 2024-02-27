@@ -45,6 +45,8 @@ namespace LlamaCppLib
             GGML_TYPE_IQ1_S = 19,
             GGML_TYPE_IQ4_NL = 20,
             GGML_TYPE_IQ3_S = 21,
+            GGML_TYPE_IQ2_S = 22,
+            GGML_TYPE_IQ4_XS = 23,
             GGML_TYPE_I8,
             GGML_TYPE_I16,
             GGML_TYPE_I32,
@@ -102,6 +104,7 @@ namespace LlamaCppLib
             public float yarn_beta_fast;
             public float yarn_beta_slow;
             public uint yarn_orig_ctx;
+            float defrag_thold;
 
             public delegate* unmanaged[Cdecl]<nint, byte, void*, byte> cb_eval;
             public nint cb_eval_user_data;
