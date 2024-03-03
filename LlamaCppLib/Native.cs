@@ -104,7 +104,7 @@ namespace LlamaCppLib
             public float yarn_beta_fast;
             public float yarn_beta_slow;
             public uint yarn_orig_ctx;
-            float defrag_thold;
+            public float defrag_thold;
 
             public delegate* unmanaged[Cdecl]<nint, byte, void*, byte> cb_eval;
             public nint cb_eval_user_data;
@@ -112,11 +112,13 @@ namespace LlamaCppLib
             public ggml_type type_k;
             public ggml_type type_v;
 
-            public byte mul_mat_q;
             public byte logits_all;
             public byte embedding;
             public byte offload_kqv;
             public byte do_pooling;
+
+            public delegate* unmanaged[Cdecl]<void*, byte> abort_callback;
+            public nint abort_callback_data;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -188,6 +190,10 @@ namespace LlamaCppLib
             llama_context ctx);
 
         [LibraryImport(LibName)]
+        public static partial int llama_n_ctx_train(
+            llama_model ctx);
+
+        [LibraryImport(LibName)]
         public static partial llama_vocab_type_t llama_vocab_type(
             llama_model model);
 
@@ -206,6 +212,13 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial llama_batch llama_batch_get_one(
             llama_token[] tokens,
+            int n_tokens,
+            llama_pos pos_0,
+            llama_seq_id seq_id);
+
+        [LibraryImport(LibName)]
+        public static partial llama_batch llama_batch_get_one(
+            Span<llama_token> tokens,
             int n_tokens,
             llama_pos pos_0,
             llama_seq_id seq_id);
