@@ -21,6 +21,8 @@ namespace LlamaCppLib
         private BlockingQueue<LlmPrompt> _prompts = new();
 
         private CancellationTokenSource _cancellationTokenSource = new();
+        private UnmanagedResource<GCHandle> _cancellationTokenHandle = new();
+
         private Task? _mainLoop = default;
 
         public LlmEngine(LlmEngineOptions? engineOptions = default)
@@ -89,6 +91,10 @@ namespace LlamaCppLib
             cparams.n_threads = (uint)_modelOptions.ThreadCount;
             cparams.n_threads_batch = (uint)_modelOptions.BatchThreadCount;
 
+            _cancellationTokenHandle.Create(() => GCHandle.Alloc(_cancellationTokenSource.Token), handle => handle.Free());
+            cparams.abort_callback = &AbortCallback;
+            cparams.abort_callback_data = GCHandle.ToIntPtr(_cancellationTokenHandle.Handle).ToPointer();
+
             _context.Create(() => llama_new_context_with_model(_model.Handle, cparams), llama_free);
 
             _batch.Create(() => llama_batch_init(llama_n_ctx(_context.Handle), 0, 1), llama_batch_free);
@@ -132,7 +138,14 @@ namespace LlamaCppLib
         {
             var callback = (Action<float>?)GCHandle.FromIntPtr(new(state)).Target;
             callback?.Invoke(progress * 100);
-            return false ? 0 : 1;
+            return (byte)(true ? 1 : 0);
+        }
+
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+        static unsafe byte AbortCallback(void* state)
+        {
+            var cancellationToken = (CancellationToken?)GCHandle.FromIntPtr(new(state)).Target;
+            return (byte)(cancellationToken?.IsCancellationRequested ?? false ? 1 : 0);
         }
 
         private void _StartAsync()
@@ -149,7 +162,7 @@ namespace LlamaCppLib
                 return;
 
             _cancellationTokenSource.Cancel();
-            await (_mainLoop ?? Task.CompletedTask);
+            await (_mainLoop ?? Task.CompletedTask).ConfigureAwait(false);
             _cancellationTokenSource = new();
 
             _mainLoop = default;
@@ -222,9 +235,6 @@ namespace LlamaCppLib
                 var batchSize = _modelOptions.BatchSize;
                 for (var i = 0; i < batch.n_tokens; i += batchSize)
                 {
-                    if (cancellationToken.IsCancellationRequested)
-                        break;
-
                     var n_tokens = Math.Min(batchSize, batch.n_tokens - i);
 
                     batchView.n_tokens = n_tokens;
@@ -239,6 +249,9 @@ namespace LlamaCppLib
                     batchView.all_seq_id = 0;
 
                     var result = llama_decode(_context.Handle, batchView);
+
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
 
                     if (result != 0)
                     {
@@ -283,6 +296,7 @@ namespace LlamaCppLib
                                 sorted = false ? 1 : 0,
                             };
 
+                            if (sequence.SamplingOptions.PenaltyRepeat != 1.0f)
                             {
                                 var index = Math.Max(0, sequence.PosTokens - sequence.SamplingOptions.PenaltyLastN);
                                 llama_sample_repetition_penalties(

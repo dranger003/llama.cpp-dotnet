@@ -60,6 +60,23 @@ namespace LlamaCppLib
             LLAMA_SPLIT_ROW = 2,
         };
 
+        public enum llama_rope_scaling_type
+        {
+            LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED = -1,
+            LLAMA_ROPE_SCALING_TYPE_NONE = 0,
+            LLAMA_ROPE_SCALING_TYPE_LINEAR = 1,
+            LLAMA_ROPE_SCALING_TYPE_YARN = 2,
+            LLAMA_ROPE_SCALING_TYPE_MAX_VALUE = LLAMA_ROPE_SCALING_TYPE_YARN,
+        };
+
+        public enum llama_pooling_type
+        {
+            LLAMA_POOLING_TYPE_UNSPECIFIED = -1,
+            LLAMA_POOLING_TYPE_NONE = 0,
+            LLAMA_POOLING_TYPE_MEAN = 1,
+            LLAMA_POOLING_TYPE_CLS = 2,
+        };
+
         [StructLayout(LayoutKind.Sequential)]
         public struct llama_model_kv_override
         {
@@ -95,7 +112,9 @@ namespace LlamaCppLib
             public uint n_batch;
             public uint n_threads;
             public uint n_threads_batch;
-            public int rope_scaling_type;
+
+            public llama_rope_scaling_type rope_scaling_type;
+            public llama_pooling_type pooling_type;
 
             public float rope_freq_base;
             public float rope_freq_scale;
@@ -107,18 +126,17 @@ namespace LlamaCppLib
             public float defrag_thold;
 
             public delegate* unmanaged[Cdecl]<nint, byte, void*, byte> cb_eval;
-            public nint cb_eval_user_data;
+            public void* cb_eval_user_data;
 
             public ggml_type type_k;
             public ggml_type type_v;
 
             public byte logits_all;
-            public byte embedding;
+            public byte embeddings;
             public byte offload_kqv;
-            public byte do_pooling;
 
             public delegate* unmanaged[Cdecl]<void*, byte> abort_callback;
-            public nint abort_callback_data;
+            public void* abort_callback_data;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -295,6 +313,11 @@ namespace LlamaCppLib
         public static partial float* llama_get_embeddings_ith(
             llama_context ctx,
             int i);
+
+        [LibraryImport(LibName)]
+        public static partial float* llama_get_embeddings_seq(
+            llama_context ctx,
+            llama_seq_id seq_id);
 
         [LibraryImport(LibName)]
         public static partial void llama_sample_repetition_penalties(

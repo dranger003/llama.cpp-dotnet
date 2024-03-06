@@ -23,15 +23,16 @@ namespace LlamaCppCli
                 args[0],
                 new LlmModelOptions
                 {
-                    Seed = 0,
+                    //Seed = 0,
                     ContextLength = args.Length > 2 ? Int32.Parse(args[2]) : 0,
-                    GpuLayers = args.Length > 1 ? Int32.Parse(args[1]) : 64,
+                    GpuLayers = args.Length > 1 ? Int32.Parse(args[1]) : 0,
                     ThreadCount = 8,
                     BatchThreadCount = 8,
-                }
+                },
+                (float progress) => { Console.Write($"{new string(' ', 32)}\rLoading model... {progress:0.00}%\r"); }
             );
 
-            Console.WriteLine("Press <Ctrl+C> to cancel or press <Enter> with an empty input to quit.");
+            Console.WriteLine("\nPress <Ctrl+C> to cancel or press <Enter> with an empty input to quit.");
 
             while (true)
             {
@@ -101,9 +102,11 @@ namespace LlamaCppCli
                     promptText,
                     new SamplingOptions
                     {
-                        Temperature = 0.8f,
+                        TopK = 50,
+                        TopP = 0.95f,
+                        Temperature = 0.7f,
                         PenaltyRepeat = 1.0f,
-                        ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|endoftext|>"]
+                        ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>"]
                     }
                 );
 
@@ -112,7 +115,7 @@ namespace LlamaCppCli
                     Console.Write(token);
 
                 Console.WriteLine($"{(prompt.Cancelled ? " [Cancelled]" : "")}");
-                Console.WriteLine($"Prompting {prompt.PromptingSpeed:F2} t/s | Sampling {prompt.SamplingSpeed:F2} t/s");
+                Console.WriteLine($"\nPrompting {prompt.PromptingSpeed:F2} t/s | Sampling {prompt.SamplingSpeed:F2} t/s");
             }
 
             Console.WriteLine("Bye.");

@@ -16,9 +16,9 @@ namespace LlamaCppCli
     {
         static async Task RunSampleRawAsync(string[] args)
         {
-            if (args.Length < 2)
+            if (args.Length < 1)
             {
-                Console.WriteLine($"Usage: RunSampleRawAsync <ModelPath> <PromptFilePath> [GpuLayers] [CtxLength] [UseTemplate]");
+                Console.WriteLine($"Usage: RunSampleRawAsync <ModelPath> [GpuLayers] [CtxLength]");
                 return;
             }
 
@@ -30,7 +30,14 @@ namespace LlamaCppCli
         static unsafe byte ProgressCallback(float progress, void* state)
         {
             Console.Write($"{new string(' ', 32)}\rLoading model... {(byte)(progress * 100)}%\r");
-            return false ? 0 : 1;
+            return (byte)(true ? 1 : 0);
+        }
+
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+        static unsafe byte AbortCallback(void* state)
+        {
+            var cancel = (bool?)GCHandle.FromIntPtr(new(state)).Target ?? false;
+            return (byte)(cancel ? 1 : 0);
         }
 
         static unsafe void RunSampleRaw(string[] args)
@@ -39,11 +46,14 @@ namespace LlamaCppCli
             var extraStopTokens = new[] { "<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|end_of_text|>", "<|im_end|>", "<step>" };
             var assembler = new MultibyteCharAssembler();
             var stream = true;
+
             //var template = "<s>Source: system\n\n You are very formal and precise. <step> Source: user\n\n {0} <step> Source: assistant\nDestination: user\n\n ";
-            //var template = "[INST] {0} [/INST]";
-            var template = "<start_of_turn>user\n{0}<end_of_turn>\n<start_of_turn>model\n";
+            //var template = "<s>[INST] {0} [/INST]";
+            //var template = "<s>user\n{0}</s>\n<s>assistant\n";
+            //var template = "<bos><start_of_turn>user\n{0}<end_of_turn>\n<start_of_turn>model\n";
 
             var cancel = false;
+            var cancel_handle = GCHandle.Alloc(cancel, GCHandleType.Pinned);
             Console.CancelKeyPress += (s, e) => { e.Cancel = cancel = true; };
 
             var sw = Stopwatch.StartNew();
@@ -52,12 +62,12 @@ namespace LlamaCppCli
 
             //================================================================================================================================================================================================
 
-            var top_k = 40;
+            var top_k = 50;
             var top_p = 0.95f;
             var min_p = 0.05f;
             var tfs_z = 1.0f;
             var typical_p = 1.0f;
-            var temp = 0.8f;
+            var temp = 0.7f;
 
             var mirostat = 0;
             var mirostat_tau = 5.0f;
@@ -70,19 +80,21 @@ namespace LlamaCppCli
             var penalty_present = 0.0f;
 
             var mparams = llama_model_default_params();
-            mparams.n_gpu_layers = args.Length > 2 ? Int32.Parse(args[2]) : 64;
+            mparams.n_gpu_layers = args.Length > 1 ? Int32.Parse(args[1]) : 128;
             mparams.progress_callback = &ProgressCallback;
 
             var cparams = llama_context_default_params();
-            cparams.seed = 0;
-            cparams.n_ctx = args.Length > 3 ? UInt32.Parse(args[3]) : 0;
-            cparams.n_batch = 512;
-            cparams.n_threads = 8;
-            cparams.n_threads_batch = 8;
+            cparams.n_ctx = args.Length > 2 ? UInt32.Parse(args[2]) : 0;
+            cparams.abort_callback = &AbortCallback;
+            cparams.abort_callback_data = GCHandle.ToIntPtr(cancel_handle).ToPointer();
+            //cparams.seed = unchecked((uint)-1);
+            //cparams.n_batch = 512;
+            //cparams.n_threads = 8;
+            //cparams.n_threads_batch = 8;
             //cparams.rope_freq_base = 1000000;
-            cparams.type_k = ggml_type.GGML_TYPE_F16;
-            cparams.type_v = ggml_type.GGML_TYPE_F16;
-            cparams.logits_all = false ? 1 : 0;
+            //cparams.type_k = ggml_type.GGML_TYPE_F16;
+            //cparams.type_v = ggml_type.GGML_TYPE_F16;
+            //cparams.logits_all = false ? 1 : 0;
 
             llama_backend_init(false);
 
@@ -116,17 +128,21 @@ namespace LlamaCppCli
                     }
                     else
                     {
-                        prompt = String.IsNullOrWhiteSpace(line) ? File.ReadAllText(args[1]).Replace("\r\n", "\n") : line;
+                        //prompt = String.IsNullOrWhiteSpace(line) ? File.ReadAllText(args[1]).Replace("\r\n", "\n") : line;
+                        prompt = line.Replace("\\n", "\n");
                     }
 
-                    if (args.Length > 4 && Int32.Parse(args[4]) > 0)
-                        prompt = String.Format(template, prompt);
+                    //if (args.Length > 4 && Int32.Parse(args[4]) > 0)
+                    //    prompt = String.Format(template, prompt);
 
-                    var add_bos = llama_add_bos_token(mdl) > 0;
-                    if (!add_bos) add_bos = llama_vocab_type(mdl) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM;
+                    if (String.IsNullOrWhiteSpace(prompt))
+                        continue;
 
-                    var tokens = llama_tokenize(mdl, prompt, add_bos, true, false);
-                    //Console.WriteLine($"{tokens.ToArray().Select(x => $"[{x}:{Encoding.UTF8.GetString(llama_token_to_piece(mdl, x))}]").Aggregate((a, b) => $"{a}\n{b}")}");
+                    //var add_bos = llama_add_bos_token(mdl) > 0;
+                    //if (!add_bos) add_bos = llama_vocab_type(mdl) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM;
+
+                    //Console.WriteLine($"[{prompt}]");
+                    var tokens = llama_tokenize(mdl, prompt, false, true, false);
 
                     Console.WriteLine($"{tokens.Length}/{llama_n_ctx(ctx)} token(s)");
                     if (tokens.Length >= llama_n_ctx(ctx))
@@ -135,8 +151,8 @@ namespace LlamaCppCli
                         continue;
                     }
 
-                    // Debug
-                    //Console.WriteLine(tokens.ToArray().Select(x => $"[{x}][{Encoding.UTF8.GetString(llama_token_to_piece(mdl, x))}]").Aggregate((a, b) => $"{a}{b}"));
+                    //// Debug
+                    //Console.WriteLine(tokens.ToArray().Select(x => $"[{x}:{Encoding.UTF8.GetString(llama_token_to_piece(mdl, x))}]").Aggregate((a, b) => $"{a}{b}"));
 
                     requests.Add(new Request(llama_n_ctx(ctx), tokens));
 
@@ -222,6 +238,7 @@ namespace LlamaCppCli
                                     sorted = false ? 1 : 0,
                                 };
 
+                                if (penalty_repeat != 1.0f)
                                 {
                                     var index = Math.Max(0, request.PosToken - penalty_last_n);
                                     llama_sample_repetition_penalties(
@@ -340,6 +357,8 @@ namespace LlamaCppCli
                     requests.RemoveAll(r => r.Tokens[r.PosToken - 1] == llama_token_eos(mdl));
                 }
             }
+
+            cancel_handle.Free();
 
             llama_batch_free(bat);
             llama_free(ctx);
