@@ -22,16 +22,16 @@ namespace LlamaCppCli
         static unsafe void RunSampleEmbedding(string[] args)
         {
             var mparams = llama_model_default_params();
-            mparams.n_gpu_layers = args.Length > 2 ? Int32.Parse(args[2]) : 64;
+            mparams.n_gpu_layers = args.Length > 1 ? Int32.Parse(args[1]) : 0;
             mparams.progress_callback = &ProgressCallback;
 
             var cparams = llama_context_default_params();
-            cparams.seed = 1;
+            cparams.seed = unchecked((uint)-1);
             cparams.n_ctx = 4096;
             cparams.n_batch = 4096;
-            cparams.n_threads = 1;
-            cparams.n_threads_batch = 1;
-            cparams.embedding = true ? 1 : 0;
+            cparams.n_threads = 8;
+            cparams.n_threads_batch = 8;
+            cparams.embeddings = true ? 1 : 0;
 
             llama_backend_init(false);
 
@@ -40,10 +40,27 @@ namespace LlamaCppCli
 
             var GetEmbeddings = (string text) =>
             {
-                llama_kv_cache_seq_rm(ctx, 0, 0, -1);
-                var embd_inp = llama_tokenize(mdl, text, true, false, true).ToArray();
-                llama_decode(ctx, llama_batch_get_one(embd_inp, embd_inp.Length, 0, 0));
-                return new Span<float>(llama_get_embeddings(ctx), llama_n_embd(mdl));
+                var batch = llama_batch_init((int)cparams.n_batch, 0, 1);
+
+                var embd_inp = llama_tokenize(mdl, text, true, false, true);
+                for (var i = 0; i < embd_inp.Length; i++)
+                    llama_batch_add(ref batch, embd_inp[i], i, [0], i == embd_inp.Length - 1);
+
+                llama_kv_cache_clear(ctx);
+                var res = llama_decode(ctx, batch);
+
+                float* embd = null;
+                for (var i = 0; i < batch.n_tokens; i++)
+                {
+                    if (batch.logits[i] == 0)
+                        continue;
+
+                    embd = llama_get_embeddings_seq(ctx, batch.seq_id[i][0]);
+                    if (embd == null)
+                        embd = llama_get_embeddings_ith(ctx, i);
+                }
+
+                return new Span<float>(embd, llama_n_embd(mdl));
             };
 
             var CosineSimilarity = (float[] vec1, float[] vec2) =>
@@ -98,14 +115,14 @@ namespace LlamaCppCli
                     .Select(documentEmbeddings => CosineSimilarity(queryEmbeddings, documentEmbeddings))
                     .ToList();
 
-                var result = documents
+                var topResults = documents
                     .Zip(cosineSimilarities, (x, similarity) => new { Document = x, CosineSimilarity = similarity })
                     .OrderByDescending(x => x.CosineSimilarity)
-                    .First();
+                    .Take(3)
+                    .ToList();
 
                 Console.WriteLine($"\n[{query}]");
-                Console.WriteLine($"    [{result.CosineSimilarity * 100:0.00}%][{result.Document.TruncateWithEllipsis()}]");
-                //results.ForEach(x => Console.WriteLine($"    [{x.CosineSimilarity}][{x.Document.TruncateWithEllipsis()}]"));
+                topResults.ForEach(result => Console.WriteLine($"    [{result.CosineSimilarity * 100:0.00}%][{result.Document.TruncateWithEllipsis()}]"));
             }
 
             llama_free(ctx);
