@@ -100,7 +100,7 @@ namespace LlamaCppCli
 
             var mdl = llama_load_model_from_file(args[0], mparams);
             var ctx = llama_new_context_with_model(mdl, cparams);
-            var bat = llama_batch_init(llama_n_ctx(ctx), 0, 1);
+            var bat = llama_batch_init((int)llama_n_ctx(ctx), 0, 1);
 
             var bat_view = new llama_batch();
             var candidates = new llama_token_data[llama_n_vocab(mdl)];
@@ -154,7 +154,7 @@ namespace LlamaCppCli
                     //// Debug
                     //Console.WriteLine(tokens.ToArray().Select(x => $"[{x}:{Encoding.UTF8.GetString(llama_token_to_piece(mdl, x))}]").Aggregate((a, b) => $"{a}{b}"));
 
-                    requests.Add(new Request(llama_n_ctx(ctx), tokens));
+                    requests.Add(new Request((int)llama_n_ctx(ctx), tokens));
 
                     sw.Restart();
                     tc = 0;

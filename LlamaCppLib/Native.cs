@@ -110,6 +110,7 @@ namespace LlamaCppLib
             public uint seed;
             public uint n_ctx;
             public uint n_batch;
+            public uint n_parallel;
             public uint n_threads;
             public uint n_threads_batch;
 
@@ -204,12 +205,16 @@ namespace LlamaCppLib
             llama_context ctx);
 
         [LibraryImport(LibName)]
-        public static partial int llama_n_ctx(
+        public static partial uint llama_n_ctx(
             llama_context ctx);
 
         [LibraryImport(LibName)]
-        public static partial int llama_n_ctx_train(
-            llama_model ctx);
+        public static partial uint llama_n_batch(
+            llama_context ctx);
+
+        [LibraryImport(LibName)]
+        public static partial uint llama_n_max_seq(
+            llama_context ctx);
 
         [LibraryImport(LibName)]
         public static partial llama_vocab_type_t llama_vocab_type(
@@ -217,6 +222,10 @@ namespace LlamaCppLib
 
         [LibraryImport(LibName)]
         public static partial int llama_n_vocab(
+            llama_model model);
+
+        [LibraryImport(LibName)]
+        public static partial int llama_n_ctx_train(
             llama_model model);
 
         [LibraryImport(LibName)]
@@ -289,7 +298,7 @@ namespace LlamaCppLib
             llama_context ctx);
 
         [LibraryImport(LibName)]
-        public static partial void llama_kv_cache_seq_rm(
+        public static partial byte llama_kv_cache_seq_rm(
             llama_context ctx,
             llama_seq_id seq_id,
             llama_pos p0,

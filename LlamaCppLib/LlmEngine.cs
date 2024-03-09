@@ -97,7 +97,7 @@ namespace LlamaCppLib
 
             _context.Create(() => llama_new_context_with_model(_model.Handle, cparams), llama_free);
 
-            _batch.Create(() => llama_batch_init(llama_n_ctx(_context.Handle), 0, 1), llama_batch_free);
+            _batch.Create(() => llama_batch_init((int)llama_n_ctx(_context.Handle), 0, 1), llama_batch_free);
 
             _StartAsync();
         }
@@ -186,7 +186,7 @@ namespace LlamaCppLib
                     if (cancellationToken.IsCancellationRequested)
                         break;
 
-                    var prompt = _prompts.Dequeue();
+                    var prompt = _prompts.Dequeue(cancellationToken);
 
                     var extraStopTokens = prompt.SamplingOptions.ExtraStopTokens?
                         .Select(tokenText => Tokenize(tokenText, false, true).ToArray())
@@ -196,7 +196,7 @@ namespace LlamaCppLib
 
                     var sequence = new LlmSequence(
                         prompt,
-                        llama_n_ctx(_context.Handle),
+                        (int)llama_n_ctx(_context.Handle),
                         Tokenize(prompt.PromptText, prompt.PrependBosToken, prompt.ProcessSpecialTokens),
                         extraStopTokens
                     )
