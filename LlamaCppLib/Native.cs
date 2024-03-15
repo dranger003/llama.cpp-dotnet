@@ -16,7 +16,13 @@ namespace LlamaCppLib
         private const string LibName = $"{nameof(LlamaCppLib)}/libllama";
 #endif
 
-        public enum llama_vocab_type_t { LLAMA_VOCAB_TYPE_SPM = 0, LLAMA_VOCAB_TYPE_BPE = 1, LLAMA_VOCAB_TYPE_WPM = 2 }
+        public enum llama_vocab_type_t
+        {
+            LLAMA_VOCAB_TYPE_NONE = 0,
+            LLAMA_VOCAB_TYPE_SPM = 1,
+            LLAMA_VOCAB_TYPE_BPE = 2,
+            LLAMA_VOCAB_TYPE_WPM = 3,
+        }
 
         public enum llama_model_kv_override_type { LLAMA_KV_OVERRIDE_INT, LLAMA_KV_OVERRIDE_FLOAT, LLAMA_KV_OVERRIDE_BOOL };
 
@@ -110,7 +116,8 @@ namespace LlamaCppLib
             public uint seed;
             public uint n_ctx;
             public uint n_batch;
-            public uint n_parallel;
+            public uint n_ubatch;
+            public uint n_seq_max;
             public uint n_threads;
             public uint n_threads_batch;
 
@@ -213,7 +220,11 @@ namespace LlamaCppLib
             llama_context ctx);
 
         [LibraryImport(LibName)]
-        public static partial uint llama_n_max_seq(
+        public static partial uint llama_n_ubatch(
+            llama_context ctx);
+
+        [LibraryImport(LibName)]
+        public static partial uint llama_n_seq_max(
             llama_context ctx);
 
         [LibraryImport(LibName)]
@@ -266,7 +277,7 @@ namespace LlamaCppLib
             byte[] text,
             int text_len,
             llama_token[] tokens,
-            int n_max_tokens,
+            int n_tokens_max,
             byte add_bos,
             byte special);
 
@@ -308,6 +319,10 @@ namespace LlamaCppLib
         public static partial int llama_decode(
             llama_context ctx,
             llama_batch batch);
+
+        [LibraryImport(LibName)]
+        public static partial void llama_synchronize(
+            llama_context ctx);
 
         [LibraryImport(LibName)]
         public static partial float* llama_get_logits_ith(
