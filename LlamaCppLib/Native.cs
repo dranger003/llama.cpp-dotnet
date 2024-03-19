@@ -244,6 +244,10 @@ namespace LlamaCppLib
             llama_model model);
 
         [LibraryImport(LibName)]
+        public static partial int llama_n_layer(
+            llama_model model);
+
+        [LibraryImport(LibName)]
         public static partial llama_model llama_get_model(
             llama_context ctx);
 
@@ -319,6 +323,11 @@ namespace LlamaCppLib
         public static partial int llama_decode(
             llama_context ctx,
             llama_batch batch);
+
+        [LibraryImport(LibName)]
+        public static partial void llama_set_causal_attn(
+            llama_context ctx,
+            byte causal_attn);
 
         [LibraryImport(LibName)]
         public static partial void llama_synchronize(
