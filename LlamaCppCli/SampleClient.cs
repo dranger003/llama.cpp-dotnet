@@ -1,4 +1,5 @@
 using LlamaCppLib;
+using System.Text.RegularExpressions;
 
 namespace LlamaCppCli
 {
@@ -6,59 +7,96 @@ namespace LlamaCppCli
     {
         static async Task RunSampleClientAsync(string[] args)
         {
-            if (args.Length < 2)
+            if (args.Length < 1)
             {
-                Console.WriteLine($"Usage: RunSampleClientAsync <Endpoint> <PromptFilePath> [ModelName]");
+                Console.WriteLine($"Usage: RunSampleClientAsync <Endpoint>");
                 return;
             }
 
             var cancellationTokenSource = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) => { cancellationTokenSource.Cancel(); e.Cancel = true; };
 
-            // Endpoint (match your hosting server)
             using var client = new LlmClient(args[0]);
 
-            // Model list
-            Console.WriteLine($"Model(s):");
+            Console.WriteLine($"Available model(s):");
             var modelNames = await client.ListAsync();
-            modelNames.ForEach(modelName => Console.WriteLine($"    {modelName}"));
-
-            // Model select
-            var modelName = args.Length > 2 ? args[2] : modelNames.First();
-
-            // Model state
-            Console.WriteLine($"State:");
             var state = await client.StateAsync();
-            Console.WriteLine($"    Name: {state.ModelName ?? "<None>"}");
-            Console.WriteLine($"    Status: {state.ModelStatus}");
+            modelNames
+                .Select((x, i) => (Name: x, Index: i))
+                .ToList()
+                .ForEach(model => Console.WriteLine($"    {model.Index}) {model.Name} {(state.ModelName == model.Name && state.ModelStatus == LlmModelStatus.Loaded ? "(loaded)" : "(unloaded)")}"));
+            Console.WriteLine();
 
-            // Model unload
-            if (state.ModelStatus == LlmModelStatus.Loaded && modelName != state.ModelName)
+            var GetSelection = () =>
             {
-                Console.WriteLine($"Unloading model:");
-                state = await client.UnloadAsync();
-                Console.WriteLine($"    Name: {state.ModelName}");
-                Console.WriteLine($"    Status: {state.ModelStatus}");
+                while (true)
+                {
+                    Console.Write($"Select model # to load: ");
+                    var key = Console.ReadKey();
+                    Console.WriteLine();
+
+                    if (Int32.TryParse($"{key.KeyChar}", out var index) && index >= 0 && index < modelNames.Count)
+                        return index;
+
+                    Console.WriteLine();
+                }
+            };
+
+            var index = GetSelection();
+
+            if (state.ModelStatus == LlmModelStatus.Loaded && state.ModelName != modelNames[index])
+            {
+                Console.Write("Unloading model...");
+                await client.UnloadAsync();
+                Console.WriteLine();
             }
 
-            // Model load
             if (state.ModelStatus == LlmModelStatus.Unloaded)
             {
-                Console.WriteLine("Loading model:");
-                state = await client.LoadAsync(modelName, new LlmModelOptions { Seed = 0, GpuLayers = 48 });
-                Console.WriteLine($"    Name: {state.ModelName}");
-                Console.WriteLine($"    Status: {state.ModelStatus}");
+                Console.Write("Loading model...");
+                state = await client.LoadAsync(modelNames[index], new LlmModelOptions { Seed = -1, GpuLayers = 128, ContextLength = 0 });
+                Console.WriteLine();
             }
 
-            // Model prompt
-            Console.WriteLine($"Prompting:");
-            var promptText = File.ReadAllText(args[1]).Replace("\r\n", "\n");
-            var samplingOptions = new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>"] };
+            Console.WriteLine($"Model name: {state.ModelName}");
+            Console.WriteLine($"Model status: {state.ModelStatus}");
 
-            await foreach (var token in client.PromptAsync(promptText, samplingOptions, cancellationTokenSource.Token))
-                Console.Write(token);
+            Console.WriteLine($"\nInput prompt below, including the template (or to load a prompt from a file, type '/load \"your_prompt_file.txt\"' without the single quotes).");
+            Console.WriteLine($"To quit, leave a blank input and press <Enter>.");
 
-            Console.WriteLine($"{(cancellationTokenSource.IsCancellationRequested ? " [Cancelled]" : String.Empty)}");
+            while (true)
+            {
+                Console.Write("\n> ");
+                var prompt = (Console.ReadLine() ?? String.Empty).Replace("\\n", "\n");
+                if (String.IsNullOrWhiteSpace(prompt))
+                    break;
+
+                var match = Regex.Match(prompt, @"/load\s+""?([^""\s]+)""?");
+                if (match.Success)
+                {
+                    if (File.Exists(match.Groups[1].Value))
+                    {
+                        Console.WriteLine($"Loading prompt from file \"{Path.GetFullPath(match.Groups[1].Value)}\"...");
+                        prompt = File.ReadAllText(match.Groups[1].Value);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"File not found \"{match.Groups[1].Value}\".");
+                        continue;
+                    }
+                }
+
+                //var samplingOptions = new SamplingOptions { Temperature = 0.3f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>"] };
+                var samplingOptions = new SamplingOptions { TopK = 50, TopP = 0.95f, Temperature = 0.7f };
+                await foreach (var token in client.PromptAsync(prompt, samplingOptions, cancellationTokenSource.Token))
+                    Console.Write(token);
+
+                if (cancellationTokenSource.IsCancellationRequested)
+                {
+                    Console.WriteLine(" [Cancelled]");
+                    cancellationTokenSource = new();
+                }
+            }
         }
     }
 }
