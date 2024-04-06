@@ -40,7 +40,7 @@ namespace LlamaCppLib
         public float MirostatEta { get; set; } = 0.1f;
 
         public int PenaltyLastN { get; set; } = 64;
-        public float PenaltyRepeat { get; set; } = 1.1f;
+        public float PenaltyRepeat { get; set; } = 1.0f;
         public float PenaltyFreq { get; set; } = 0.0f;
         public float PenaltyPresent { get; set; } = 0.0f;
 
