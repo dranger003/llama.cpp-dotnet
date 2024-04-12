@@ -94,7 +94,7 @@ namespace LlamaCppLib
         {
             [FieldOffset(0)] public long int_value;
             [FieldOffset(0)] public double float_value;
-            [FieldOffset(0)] public byte bool_value;
+            [FieldOffset(0)] public sbyte bool_value;
         }
 
         [StructLayout(LayoutKind.Sequential)]
