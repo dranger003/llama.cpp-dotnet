@@ -89,12 +89,20 @@ namespace LlamaCppLib
             LLAMA_POOLING_TYPE_CLS = 2,
         }
 
+        [StructLayout(LayoutKind.Explicit)]
+        public struct union_d5855d6a
+        {
+            [FieldOffset(0)] public long int_value;
+            [FieldOffset(0)] public double float_value;
+            [FieldOffset(0)] public byte bool_value;
+        }
+
         [StructLayout(LayoutKind.Sequential)]
         public struct llama_model_kv_override
         {
-            public char* key; // char[128]
+            public fixed char key[128];
             public llama_model_kv_override_type tag;
-            public void* value; // union { int64_t int_value; double float_value; bool bool_value; };
+            public union_d5855d6a value;
         }
 
         [StructLayout(LayoutKind.Sequential)]
