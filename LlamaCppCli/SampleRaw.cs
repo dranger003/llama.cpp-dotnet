@@ -27,17 +27,17 @@ namespace LlamaCppCli
         }
 
         [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-        static unsafe byte ProgressCallback(float progress, void* state)
+        static unsafe sbyte ProgressCallback(float progress, void* state)
         {
             Console.Write($"{new string(' ', 32)}\rLoading model... {(byte)(progress * 100)}%\r");
-            return (byte)(true ? 1 : 0);
+            return true ? 1 : 0;
         }
 
         [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-        static unsafe byte AbortCallback(void* state)
+        static unsafe sbyte AbortCallback(void* state)
         {
             var cancel = (bool?)GCHandle.FromIntPtr(new(state)).Target ?? false;
-            return (byte)(cancel ? 1 : 0);
+            return (sbyte)(cancel ? 1 : 0);
         }
 
         static unsafe void RunSampleRaw(string[] args)

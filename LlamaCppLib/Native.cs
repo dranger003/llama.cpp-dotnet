@@ -8,6 +8,10 @@ namespace LlamaCppLib
     using llama_pos = System.Int32;
     using llama_seq_id = System.Int32;
 
+    using unsafe llama_progress_callback = delegate* unmanaged[Cdecl]<float, void*, sbyte>;
+    using unsafe ggml_backend_sched_eval_callback = delegate* unmanaged[Cdecl]<nint, sbyte, void*, sbyte>;
+    using unsafe ggml_abort_callback = delegate* unmanaged[Cdecl]<void*, sbyte>;
+
     public static unsafe partial class Native
     {
 #if WINDOWS
@@ -59,14 +63,14 @@ namespace LlamaCppLib
             GGML_TYPE_F64 = 28,
             GGML_TYPE_IQ1_M = 29,
             GGML_TYPE_COUNT,
-        };
+        }
 
         public enum llama_split_mode
         {
             LLAMA_SPLIT_NONE = 0,
             LLAMA_SPLIT_LAYER = 1,
             LLAMA_SPLIT_ROW = 2,
-        };
+        }
 
         public enum llama_rope_scaling_type
         {
@@ -75,7 +79,7 @@ namespace LlamaCppLib
             LLAMA_ROPE_SCALING_TYPE_LINEAR = 1,
             LLAMA_ROPE_SCALING_TYPE_YARN = 2,
             LLAMA_ROPE_SCALING_TYPE_MAX_VALUE = LLAMA_ROPE_SCALING_TYPE_YARN,
-        };
+        }
 
         public enum llama_pooling_type
         {
@@ -83,7 +87,7 @@ namespace LlamaCppLib
             LLAMA_POOLING_TYPE_NONE = 0,
             LLAMA_POOLING_TYPE_MEAN = 1,
             LLAMA_POOLING_TYPE_CLS = 2,
-        };
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         public struct llama_model_kv_override
@@ -91,7 +95,7 @@ namespace LlamaCppLib
             public char* key; // char[128]
             public llama_model_kv_override_type tag;
             public void* value; // union { int64_t int_value; double float_value; bool bool_value; };
-        };
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         public struct llama_model_params
@@ -102,7 +106,7 @@ namespace LlamaCppLib
             public int main_gpu;
             public float* tensor_split;
 
-            public delegate* unmanaged[Cdecl]<float, void*, byte> progress_callback;
+            public llama_progress_callback progress_callback;
             public void* progress_callback_user_data;
 
             public llama_model_kv_override* kv_overrides;
@@ -135,7 +139,7 @@ namespace LlamaCppLib
             public uint yarn_orig_ctx;
             public float defrag_thold;
 
-            public delegate* unmanaged[Cdecl]<nint, byte, void*, byte> cb_eval;
+            public ggml_backend_sched_eval_callback cb_eval;
             public void* cb_eval_user_data;
 
             public ggml_type type_k;
@@ -145,7 +149,7 @@ namespace LlamaCppLib
             public byte embeddings;
             public byte offload_kqv;
 
-            public delegate* unmanaged[Cdecl]<void*, byte> abort_callback;
+            public ggml_abort_callback abort_callback;
             public void* abort_callback_data;
         }
 
@@ -280,12 +284,12 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial int llama_tokenize(
             llama_model model,
-            byte[] text,
+            [MarshalAs(UnmanagedType.LPStr)] string text,
             int text_len,
             llama_token[] tokens,
             int n_tokens_max,
-            byte add_bos,
-            byte special);
+            [MarshalAs(UnmanagedType.I1)] bool add_bos,
+            [MarshalAs(UnmanagedType.I1)] bool special);
 
         [LibraryImport(LibName)]
         public static partial int llama_token_to_piece(
@@ -329,7 +333,7 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial void llama_set_causal_attn(
             llama_context ctx,
-            byte causal_attn);
+            [MarshalAs(UnmanagedType.I1)] bool causal_attn);
 
         [LibraryImport(LibName)]
         public static partial void llama_synchronize(

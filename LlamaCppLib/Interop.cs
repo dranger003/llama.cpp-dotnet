@@ -31,15 +31,14 @@ namespace LlamaCppLib
         public static Span<llama_token> llama_tokenize(llama_model model, string text, bool add_bos = false, bool special = false, bool add_eos = false)
         {
             var n_tokens = text.Length + (add_bos ? 1 : 0);
-            var bytes = Encoding.ASCII.GetBytes(text);
             var result = new llama_token[n_tokens];
 
-            n_tokens = Native.llama_tokenize(model, bytes, bytes.Length, result, result.Length, (byte)(add_bos ? 1 : 0), (byte)(special ? 1 : 0));
+            n_tokens = Native.llama_tokenize(model, text, text.Length, result, result.Length, add_bos, special);
             if (n_tokens < 0)
             {
                 result = new llama_token[-n_tokens];
 
-                var check = Native.llama_tokenize(model, bytes, bytes.Length, result, result.Length, (byte)(add_bos ? 1 : 0), (byte)(special ? 1 : 0));
+                var check = Native.llama_tokenize(model, text, text.Length, result, result.Length, add_bos, special);
                 Debug.Assert(check == -n_tokens);
                 n_tokens = result.Length;
             }
