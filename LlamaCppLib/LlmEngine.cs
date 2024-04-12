@@ -68,7 +68,13 @@ namespace LlamaCppLib
                 _modelOptions = modelOptions;
 
             if (!_backend.Created)
-                _backend.Create(() => llama_backend_init(_engineOptions.NumaOptimizations), llama_backend_free);
+            {
+                _backend.Create(() =>
+                {
+                    llama_backend_init();
+                    llama_numa_init(_engineOptions.NumaOptimizations ? ggml_numa_strategy.GGML_NUMA_STRATEGY_DISTRIBUTE : ggml_numa_strategy.GGML_NUMA_STRATEGY_DISABLED);
+                }, llama_backend_free);
+            }
 
             var mparams = llama_model_default_params();
             mparams.n_gpu_layers = _modelOptions.GpuLayers;

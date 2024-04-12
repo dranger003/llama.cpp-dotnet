@@ -96,7 +96,8 @@ namespace LlamaCppCli
             //cparams.type_v = ggml_type.GGML_TYPE_F16;
             //cparams.logits_all = false ? 1 : 0;
 
-            llama_backend_init(false);
+            llama_backend_init();
+            llama_numa_init(ggml_numa_strategy.GGML_NUMA_STRATEGY_DISABLED);
 
             var mdl = llama_load_model_from_file(args[0], mparams);
             var ctx = llama_new_context_with_model(mdl, cparams);
