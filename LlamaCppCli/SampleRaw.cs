@@ -326,13 +326,13 @@ namespace LlamaCppCli
                                 if (request.T1 == default)
                                     request.T1 = DateTime.Now;
 
-                                if (token == llama_token_eos(mdl))
+                                if (llama_token_is_eog(mdl, token))
                                     request.T2 = DateTime.Now;
                             }
                         }
                     }
 
-                    foreach (var r in requests.Where(r => r.Tokens[r.PosToken - 1] == llama_token_eos(mdl)))
+                    foreach (var r in requests.Where(r => llama_token_is_eog(mdl, r.Tokens[r.PosToken - 1])))
                     {
                         llama_kv_cache_seq_rm(ctx, r.Id, 0, -1);
 
@@ -355,7 +355,7 @@ namespace LlamaCppCli
                         }
                     }
 
-                    requests.RemoveAll(r => r.Tokens[r.PosToken - 1] == llama_token_eos(mdl));
+                    requests.RemoveAll(r => llama_token_is_eog(mdl, r.Tokens[r.PosToken - 1]));
                 }
             }
 

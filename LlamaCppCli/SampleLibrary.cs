@@ -58,7 +58,7 @@ namespace LlamaCppCli
 
                     var promptTasks = fileNames
                         .Where(File.Exists)
-                        .Select(fileName => llm.Prompt(File.ReadAllText(fileName), new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|endoftext|>"] }))
+                        .Select(fileName => llm.Prompt(File.ReadAllText(fileName), new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|endoftext|>", "<|eot_id|>"] }))
                         .Select(
                             async prompt =>
                             {
@@ -106,7 +106,7 @@ namespace LlamaCppCli
                         TopP = 0.95f,
                         Temperature = 0.7f,
                         PenaltyRepeat = 1.0f,
-                        ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>"]
+                        ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|eot_id|>"]
                     }
                 );
 

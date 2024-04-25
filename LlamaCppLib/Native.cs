@@ -305,19 +305,26 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial int llama_tokenize(
             llama_model model,
-            [MarshalAs(UnmanagedType.LPStr)] string text,
+            [In] byte[] text,
             int text_len,
-            llama_token[] tokens,
+            [In, Out] llama_token[] tokens,
             int n_tokens_max,
-            [MarshalAs(UnmanagedType.I1)] bool add_bos,
-            [MarshalAs(UnmanagedType.I1)] bool special);
+            [MarshalAs(UnmanagedType.I1)] bool add_special,
+            [MarshalAs(UnmanagedType.I1)] bool parse_special);
 
         [LibraryImport(LibName)]
         public static partial int llama_token_to_piece(
             llama_model model,
             llama_token token,
             byte[] buf,
-            int length);
+            int length,
+            [MarshalAs(UnmanagedType.I1)] bool special);
+
+        [LibraryImport(LibName)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public static partial bool llama_token_is_eog(
+            llama_model model,
+            llama_token token);
 
         [LibraryImport(LibName)]
         public static partial llama_token llama_token_eos(
