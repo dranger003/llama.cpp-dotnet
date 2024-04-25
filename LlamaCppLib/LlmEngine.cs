@@ -370,7 +370,8 @@ namespace LlamaCppLib
                             var stop = false
                                 || sequence.PosTokens >= sequence.Tokens.Length - 1
                                 || sequence.PosTokens - sequence.PosResponse >= sequence.SamplingOptions.ResponseMaxTokenCount
-                                || (sequence.StopTokens?.Contains(token) ?? false);
+                                || (sequence.StopTokens?.Contains(token) ?? false)
+                                || llama_token_is_eog(_model.Handle, token);
 
                             if (!stop)
                             {
@@ -378,7 +379,7 @@ namespace LlamaCppLib
                                 sequence.Tokens[sequence.PosTokens++] = token;
                             }
 
-                            if (sequence.Prompt.Cancelled || llama_token_is_eog(_model.Handle, token) || stop)
+                            if (sequence.Prompt.Cancelled || stop)
                             {
                                 sequence.T3 = DateTime.Now;
                                 sequence.Prompt.SamplingSpeed = (sequence.PosTokens - sequence.PosResponse - 1) / ((sequence.T3 - sequence.T2) ?? new()).TotalSeconds;
