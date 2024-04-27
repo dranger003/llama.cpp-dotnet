@@ -78,7 +78,7 @@ namespace LlamaCppLib
 
             var mparams = llama_model_default_params();
             mparams.n_gpu_layers = _modelOptions.GpuLayers;
-            mparams.use_mmap = (byte)(_modelOptions.UseMemoryMap ? 1 : 0);
+            mparams.use_mmap = (sbyte)(_modelOptions.UseMemoryMap ? 1 : 0);
 
             using var progressCallbackHandle = new UnmanagedResource<GCHandle>();
             if (progressCallback != default)
@@ -96,6 +96,8 @@ namespace LlamaCppLib
             cparams.n_batch = (uint)_modelOptions.BatchSize;
             cparams.n_threads = (uint)_modelOptions.ThreadCount;
             cparams.n_threads_batch = (uint)_modelOptions.BatchThreadCount;
+            cparams.rope_freq_base = _modelOptions.RopeFrequeceBase;
+            cparams.rope_freq_scale = _modelOptions.RopeFrequenceScale;
 
             _cancellationTokenHandle.Create(() => GCHandle.Alloc(_cancellationTokenSource.Token), handle => handle.Free());
             cparams.abort_callback = &AbortCallback;

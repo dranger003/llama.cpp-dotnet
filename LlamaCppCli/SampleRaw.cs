@@ -91,7 +91,7 @@ namespace LlamaCppCli
             //cparams.n_batch = 512;
             //cparams.n_threads = 8;
             //cparams.n_threads_batch = 8;
-            //cparams.rope_freq_base = 1000000;
+            //cparams.rope_freq_base = 8000000;
             //cparams.type_k = ggml_type.GGML_TYPE_F16;
             //cparams.type_v = ggml_type.GGML_TYPE_F16;
             //cparams.logits_all = false ? 1 : 0;

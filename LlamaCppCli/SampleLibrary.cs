@@ -28,6 +28,7 @@ namespace LlamaCppCli
                     GpuLayers = args.Length > 1 ? Int32.Parse(args[1]) : 0,
                     ThreadCount = 8,
                     BatchThreadCount = 8,
+                    //RopeFrequeceBase = 8000000,
                 },
                 (float progress) => { Console.Write($"{new string(' ', 32)}\rLoading model... {progress:0.00}%\r"); }
             );
