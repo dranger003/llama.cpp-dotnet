@@ -231,7 +231,7 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial llama_model llama_load_model_from_file(
             [MarshalAs(UnmanagedType.LPStr)] string path_model,
-            llama_model_params cparams);
+            llama_model_params mparams);
 
         [LibraryImport(LibName)]
         public static partial void llama_free_model(
