@@ -19,6 +19,7 @@ namespace LlamaCppLib
         public int BatchSize { get; set; } = 512;
         public int ThreadCount { get; set; } = 4;
         public int BatchThreadCount { get; set; } = 4;
+        public bool UseFlashAttention { get; set; } = false;
 
         public float RopeFrequeceBase { get; set; } = 0.0f;
         public float RopeFrequenceScale { get; set; } = 0.0f;

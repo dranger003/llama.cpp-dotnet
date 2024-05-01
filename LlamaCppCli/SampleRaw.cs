@@ -85,6 +85,7 @@ namespace LlamaCppCli
 
             var cparams = llama_context_default_params();
             cparams.n_ctx = args.Length > 2 ? UInt32.Parse(args[2]) : 0;
+            cparams.flash_attn = true ? 1 : 0;
             cparams.abort_callback = &AbortCallback;
             cparams.abort_callback_data = GCHandle.ToIntPtr(cancel_handle).ToPointer();
             //cparams.seed = unchecked((uint)-1);

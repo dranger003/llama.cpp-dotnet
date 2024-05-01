@@ -54,7 +54,7 @@ namespace LlamaCppCli
             if (state.ModelStatus == LlmModelStatus.Unloaded)
             {
                 Console.Write("Loading model...");
-                state = await client.LoadAsync(modelNames[index], new LlmModelOptions { Seed = -1, GpuLayers = 128, ContextLength = 0 });
+                state = await client.LoadAsync(modelNames[index], new LlmModelOptions { Seed = -1, GpuLayers = 128, ContextLength = 0, UseFlashAttention = true });
                 Console.WriteLine();
             }
 

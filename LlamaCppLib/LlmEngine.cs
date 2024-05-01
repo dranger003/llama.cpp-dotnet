@@ -96,6 +96,7 @@ namespace LlamaCppLib
             cparams.n_batch = (uint)_modelOptions.BatchSize;
             cparams.n_threads = (uint)_modelOptions.ThreadCount;
             cparams.n_threads_batch = (uint)_modelOptions.BatchThreadCount;
+            cparams.flash_attn = (sbyte)(_modelOptions.UseFlashAttention ? 1 : 0);
             cparams.rope_freq_base = _modelOptions.RopeFrequeceBase;
             cparams.rope_freq_scale = _modelOptions.RopeFrequenceScale;
 

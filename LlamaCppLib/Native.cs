@@ -174,6 +174,7 @@ namespace LlamaCppLib
             public sbyte logits_all;
             public sbyte embeddings;
             public sbyte offload_kqv;
+            public sbyte flash_attn;
 
             public ggml_abort_callback abort_callback;
             public void* abort_callback_data;
