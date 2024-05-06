@@ -23,7 +23,7 @@ namespace LlamaCppLib
 
     public class LlmPromptRequest
     {
-        public string? PromptText { get; set; }
+        public List<LlmMessage>? Messages { get; set; }
         public SamplingOptions? SamplingOptions { get; set; }
     }
 
@@ -63,11 +63,11 @@ namespace LlamaCppLib
             return (await response.Content.ReadFromJsonAsync<LlmStateResponse>()) ?? new();
         }
 
-        public async IAsyncEnumerable<string> PromptAsync(string promptText, SamplingOptions? samplingOptions = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        public async IAsyncEnumerable<string> PromptAsync(List<LlmMessage> messages, SamplingOptions? samplingOptions = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             using var response = await _httpClient.PostAsync(
                 new Uri(_baseUri, $"/prompt"),
-                JsonContent.Create(new { PromptText = promptText, SamplingOptions = samplingOptions }),
+                JsonContent.Create(new { Messages = messages, SamplingOptions = samplingOptions }),
                 HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken
             );

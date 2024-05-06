@@ -1,5 +1,7 @@
-using LlamaCppLib;
+using System.Text;
 using System.Text.RegularExpressions;
+
+using LlamaCppLib;
 
 namespace LlamaCppCli
 {
@@ -54,15 +56,19 @@ namespace LlamaCppCli
             if (state.ModelStatus == LlmModelStatus.Unloaded)
             {
                 Console.Write("Loading model...");
-                state = await client.LoadAsync(modelNames[index], new LlmModelOptions { Seed = -1, GpuLayers = 128, ContextLength = 0, UseFlashAttention = true });
+                state = await client.LoadAsync(modelNames[index], new LlmModelOptions { GpuLayers = 81, ContextLength = 32768, RopeFrequeceBase = 8000000.0f, UseFlashAttention = true });
                 Console.WriteLine();
             }
 
             Console.WriteLine($"Model name: {state.ModelName}");
             Console.WriteLine($"Model status: {state.ModelStatus}");
 
-            Console.WriteLine($"\nInput prompt below, including the template (or to load a prompt from a file, type '/load \"your_prompt_file.txt\"' without the single quotes).");
-            Console.WriteLine($"To quit, leave a blank input and press <Enter>.");
+            Console.WriteLine();
+            Console.WriteLine($"Input prompt below (or to load a prompt from file, i.e. '/load \"prompt.txt\"').");
+            Console.WriteLine($"You can also type '/clear' to erase chat history.");
+            Console.WriteLine($"To quit, leave input blank and press <Enter>.");
+
+            var messages = new List<LlmMessage> { new() { Role = "system", Content = "You are a helpful assistant." } };
 
             while (true)
             {
@@ -70,6 +76,22 @@ namespace LlamaCppCli
                 var prompt = (Console.ReadLine() ?? String.Empty).Replace("\\n", "\n");
                 if (String.IsNullOrWhiteSpace(prompt))
                     break;
+
+                if (prompt == "/clear")
+                {
+                    messages = new(messages.Take(1));
+                    continue;
+                }
+
+                if (prompt == "/messages")
+                {
+                    foreach (var message in messages)
+                    {
+                        Console.WriteLine($"[{message.Role}][{message.Content}]");
+                    }
+
+                    continue;
+                }
 
                 var match = Regex.Match(prompt, @"/load\s+""?([^""\s]+)""?");
                 if (match.Success)
@@ -86,15 +108,26 @@ namespace LlamaCppCli
                     }
                 }
 
+                messages.Add(new() { Role = "user", Content = prompt });
+                var response = new StringBuilder();
+
                 //var samplingOptions = new SamplingOptions { Temperature = 0.3f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>"] };
-                var samplingOptions = new SamplingOptions { TopK = 50, TopP = 0.95f, Temperature = 0.7f };
-                await foreach (var token in client.PromptAsync(prompt, samplingOptions, cancellationTokenSource.Token))
+                var samplingOptions = new SamplingOptions() /*{ TopK = 50, TopP = 0.95f, Temperature = 0.7f }*/;
+
+                await foreach (var token in client.PromptAsync(messages, samplingOptions, cancellationTokenSource.Token))
+                {
                     Console.Write(token);
+                    response.Append(token);
+                }
 
                 if (cancellationTokenSource.IsCancellationRequested)
                 {
                     Console.WriteLine(" [Cancelled]");
                     cancellationTokenSource = new();
+                }
+                else
+                {
+                    messages.Add(new() { Role = "assistant", Content = response.ToString() });
                 }
             }
         }

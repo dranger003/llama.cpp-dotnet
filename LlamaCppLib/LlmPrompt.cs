@@ -3,19 +3,21 @@ using System.Threading.Channels;
 
 namespace LlamaCppLib
 {
+    public class LlmMessage
+    {
+        public string? Role { get; set; }
+        public string? Content { get; set; }
+    }
+
     public class LlmPrompt
     {
-        public LlmPrompt(string promptText, bool preprendBosToken = false, bool processSpecialTokens = false)
+        public LlmPrompt(List<LlmMessage> messages)
         {
-            this.PromptText = promptText;
-            this.PrependBosToken = preprendBosToken;
-            this.ProcessSpecialTokens = processSpecialTokens;
-
+            this.Messages = messages;
             this.TokenChannel = Channel.CreateUnbounded<byte[]>();
         }
 
-        public LlmPrompt(string prompt, SamplingOptions samplingOptions, bool preprendBosToken = false, bool processSpecialTokens = false) :
-            this(prompt, preprendBosToken, processSpecialTokens)
+        public LlmPrompt(List<LlmMessage> messages, SamplingOptions samplingOptions) : this(messages)
         {
             this.SamplingOptions = samplingOptions;
         }
@@ -23,9 +25,7 @@ namespace LlamaCppLib
         public bool Cancelled { get; private set; }
 
         public SamplingOptions SamplingOptions { get; private set; } = new();
-        public string PromptText { get; private set; }
-        public bool PrependBosToken { get; private set; }
-        public bool ProcessSpecialTokens { get; private set; }
+        public List<LlmMessage> Messages { get; private set; }
 
         public Channel<byte[]> TokenChannel { get; private set; }
 

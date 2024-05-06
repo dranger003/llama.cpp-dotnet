@@ -1,9 +1,11 @@
-﻿using System.Diagnostics;
+﻿using System.Buffers;
+using System.Diagnostics;
 using System.Text;
 
 namespace LlamaCppLib
 {
     using llama_model = System.IntPtr;
+    using llama_context = System.IntPtr;
     using llama_token = System.Int32;
     using llama_pos = System.Int32;
     using llama_seq_id = System.Int32;
@@ -66,6 +68,51 @@ namespace LlamaCppLib
             }
 
             return new(result, 0, n_pieces);
+        }
+
+        public static unsafe string llama_apply_template(llama_context context, List<LlmMessage> messages, bool appendAssistant = true)
+        {
+            var encoding = Encoding.UTF8;
+
+            var chat = new Native.llama_chat_message[messages.Count];
+
+            var pinnedRoles = new Memory<byte>[messages.Count];
+            var pinnedContents = new Memory<byte>[messages.Count];
+
+            var roleHandles = new MemoryHandle[messages.Count];
+            var contentHandles = new MemoryHandle[messages.Count];
+
+            try
+            {
+                for (var i = 0; i < messages.Count; i++)
+                {
+                    pinnedRoles[i] = encoding.GetBytes(messages[i].Role ?? String.Empty);
+                    pinnedContents[i] = encoding.GetBytes(messages[i].Content ?? String.Empty);
+
+                    roleHandles[i] = pinnedRoles[i].Pin();
+                    contentHandles[i] = pinnedContents[i].Pin();
+
+                    chat[i] = new()
+                    {
+                        role = (byte*)roleHandles[i].Pointer,
+                        content = (byte*)contentHandles[i].Pointer
+                    };
+                }
+
+                var buffer = new byte[Native.llama_n_ctx(context) * 4];
+                var length = Native.llama_chat_apply_template(Native.llama_get_model(context), null, chat, (nuint)chat.Length, appendAssistant, buffer, buffer.Length);
+                var text = encoding.GetString(buffer, 0, length);
+
+                return text;
+            }
+            finally
+            {
+                for (var i = 0; i < messages.Count; i++)
+                {
+                    roleHandles[i].Dispose();
+                    contentHandles[i].Dispose();
+                }
+            }
         }
     }
 }

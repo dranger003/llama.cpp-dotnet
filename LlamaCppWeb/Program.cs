@@ -4,7 +4,7 @@ using LlamaCppLib;
 
 namespace LlamaCppWeb
 {
-    file class LlmConfig
+    file class LlmConfig(IConfiguration configuration)
     {
         public class Model
         {
@@ -12,10 +12,9 @@ namespace LlamaCppWeb
             public string? Path { get; set; }
         }
 
-        public List<Model> Models { get; set; } = new();
+        public List<Model> Models { get; set; } = [];
 
-        public IConfiguration Configuration;
-        public LlmConfig(IConfiguration configuration) => Configuration = configuration;
+        public IConfiguration Configuration = configuration;
 
         public void Load() => Configuration.GetSection(nameof(LlmConfig)).Bind(this);
         public void Reload() => Load();
@@ -102,7 +101,7 @@ namespace LlamaCppWeb
                 using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(httpContext.RequestAborted, lifetime.ApplicationStopping);
 
                 var request = await httpContext.Request.ReadFromJsonAsync<LlmPromptRequest>(cancellationTokenSource.Token) ?? new();
-                var prompt = engine.Prompt(request.PromptText ?? String.Empty, request.SamplingOptions);
+                var prompt = engine.Prompt(request.Messages, request.SamplingOptions);
 
                 httpContext.Response.ContentType = "text/event-stream; charset=utf-8";
 

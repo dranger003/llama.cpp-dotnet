@@ -213,6 +213,13 @@ namespace LlamaCppLib
             public sbyte sorted;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct llama_chat_message
+        {
+            public byte* role;
+            public byte* content;
+        }
+
         [LibraryImport(LibName)]
         public static partial llama_model_params llama_model_default_params();
 
@@ -328,6 +335,16 @@ namespace LlamaCppLib
             [In, Out] byte[] buf,
             int length,
             [MarshalAs(UnmanagedType.I1)] bool special);
+
+        [LibraryImport(LibName)]
+        public static partial int llama_chat_apply_template(
+            nint model,
+            [In] byte[]? tmpl,
+            [In] llama_chat_message[] chat,
+            nuint n_msg,
+            [MarshalAs(UnmanagedType.I1)] bool add_ass,
+            [In, Out] byte[] buf,
+            int length);
 
         [LibraryImport(LibName)]
         [return: MarshalAs(UnmanagedType.I1)]

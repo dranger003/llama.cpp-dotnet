@@ -59,7 +59,7 @@ namespace LlamaCppLib
             GC.SuppressFinalize(this);
         }
 
-        public unsafe void LoadModel(string modelPath, LlmModelOptions? modelOptions = default, Action<float>? progressCallback = default)
+        public unsafe void LoadModel(string modelPath, LlmModelOptions? modelOptions = default, Action<float>? progressCallback = default, bool waitForMainLoop = true)
         {
             if (_model.Created)
                 throw new InvalidOperationException("Model already loaded.");
@@ -109,6 +109,14 @@ namespace LlamaCppLib
             _batch.Create(() => llama_batch_init((int)llama_n_ctx(_context.Handle), 0, 1), llama_batch_free);
 
             _StartAsync();
+
+            if (waitForMainLoop)
+            {
+                while (!Loaded)
+                {
+                    Task.Delay(TimeSpan.FromMilliseconds(100));
+                }
+            }
         }
 
         public void UnloadModel()
@@ -125,17 +133,18 @@ namespace LlamaCppLib
         public bool Loaded => _mainLoop?.Status == TaskStatus.Running;
 
         public LlmPrompt Prompt(
-            string promptText,
-            SamplingOptions? samplingOptions = default,
-            bool? prependBosToken = default,
-            bool? processSpecialTokens = default
+            List<LlmMessage>? messages,
+            SamplingOptions? samplingOptions = default
         )
         {
+            if (messages == null)
+            {
+                throw new InvalidDataException("No prompt was provided.");
+            }
+
             var prompt = new LlmPrompt(
-                promptText,
-                samplingOptions ?? new(),
-                prependBosToken ?? llama_add_bos_token(_model.Handle) > 0 ? true : llama_vocab_type(_model.Handle) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM,
-                processSpecialTokens ?? true
+                messages ?? [],
+                samplingOptions ?? new()
             );
 
             _prompts.Enqueue(prompt);
@@ -203,10 +212,12 @@ namespace LlamaCppLib
                         .Select(tokens => tokens.Single())
                         .ToArray();
 
+                    var text = llama_apply_template(_context.Handle, prompt.Messages);
+
                     var sequence = new LlmSequence(
                         prompt,
                         (int)llama_n_ctx(_context.Handle),
-                        Tokenize(prompt.PromptText, prompt.PrependBosToken, prompt.ProcessSpecialTokens),
+                        Tokenize(text, true, true),
                         extraStopTokens
                     )
                     { T1 = DateTime.Now };
