@@ -99,7 +99,7 @@ namespace LlamaCppLib
                     };
                 }
 
-                var buffer = new byte[Native.llama_n_ctx(context) * 4];
+                var buffer = new byte[Native.llama_n_ctx(context) * 8];
                 var length = Native.llama_chat_apply_template(Native.llama_get_model(context), null, chat, (nuint)chat.Length, appendAssistant, buffer, buffer.Length);
                 var text = encoding.GetString(buffer, 0, length);
 

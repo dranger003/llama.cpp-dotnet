@@ -148,6 +148,7 @@ namespace LlamaCppLib
             );
 
             _prompts.Enqueue(prompt);
+
             return prompt;
         }
 
@@ -212,18 +213,22 @@ namespace LlamaCppLib
                         .Select(tokens => tokens.Single())
                         .ToArray();
 
+                    var ctxLength = (int)llama_n_ctx(_context.Handle);
                     var text = llama_apply_template(_context.Handle, prompt.Messages);
+                    var tokens = Tokenize(text, true, true);
 
-                    var sequence = new LlmSequence(
-                        prompt,
-                        (int)llama_n_ctx(_context.Handle),
-                        Tokenize(text, true, true),
-                        extraStopTokens
-                    )
-                    { T1 = DateTime.Now };
-
-                    var id = sequences.Add(sequence);
-                    sequence.Id = id;
+                    // TODO: proper handling/logging
+                    if (tokens.Length < ctxLength - 512)
+                    {
+                        Console.WriteLine($"INFO: New sequence, {tokens.Length} token(s).");
+                        var sequence = new LlmSequence(prompt, ctxLength, tokens, extraStopTokens) { T1 = DateTime.Now };
+                        var id = sequences.Add(sequence);
+                        sequence.Id = id;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"ERROR: Sequence token limit reached, {tokens.Length} > ({ctxLength} - 512)");
+                    }
                 }
 
                 if (cancellationToken.IsCancellationRequested)
