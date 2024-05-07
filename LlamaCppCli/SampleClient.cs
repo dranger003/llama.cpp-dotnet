@@ -11,7 +11,7 @@ namespace LlamaCppCli
         {
             if (args.Length < 1)
             {
-                Console.WriteLine($"Usage: RunSampleClientAsync <Endpoint>");
+                Console.WriteLine($"Usage: RunSampleClientAsync <Endpoint> [<GpuLayers>] [<CtxLength>] [<RopeFreq>]");
                 return;
             }
 
@@ -26,7 +26,7 @@ namespace LlamaCppCli
             modelNames
                 .Select((x, i) => (Name: x, Index: i))
                 .ToList()
-                .ForEach(model => Console.WriteLine($"    {model.Index}) {model.Name} {(state.ModelName == model.Name && state.ModelStatus == LlmModelStatus.Loaded ? "(loaded)" : "(unloaded)")}"));
+                .ForEach(model => Console.WriteLine($"    {model.Index}) {model.Name} {(state.ModelName == model.Name && state.ModelStatus == LlmModelStatus.Loaded ? "(loaded)" : String.Empty)}"));
             Console.WriteLine();
 
             var GetSelection = () =>
@@ -45,18 +45,34 @@ namespace LlamaCppCli
             };
 
             var index = GetSelection();
+            var unload = state.ModelStatus == LlmModelStatus.Loaded && state.ModelName != modelNames[index];
 
-            if (state.ModelStatus == LlmModelStatus.Loaded && state.ModelName != modelNames[index])
+            if (state.ModelStatus == LlmModelStatus.Loaded && state.ModelName == modelNames[index])
+            {
+                Console.Write("Model already loaded, reload [y/N]? ");
+                var key = Console.ReadKey();
+                Console.WriteLine();
+
+                if (key.Key == ConsoleKey.Y)
+                    unload = true;
+            }
+
+            if (unload)
             {
                 Console.Write("Unloading model...");
                 await client.UnloadAsync();
                 Console.WriteLine();
+                state = await client.StateAsync();
             }
+
+            var gpuLayers = args.Length > 1 ? Int32.Parse(args[1]) : 0;
+            var ctxLength = args.Length > 2 ? Int32.Parse(args[2]) : 0;
+            var ropeFreq = args.Length > 3 ? Int32.Parse(args[3]) : 0.0f;
 
             if (state.ModelStatus == LlmModelStatus.Unloaded)
             {
                 Console.Write("Loading model...");
-                state = await client.LoadAsync(modelNames[index], new LlmModelOptions { GpuLayers = 81, ContextLength = 32768, RopeFrequeceBase = 8000000.0f, UseFlashAttention = true });
+                state = await client.LoadAsync(modelNames[index], new LlmModelOptions { GpuLayers = gpuLayers, ContextLength = ctxLength, RopeFrequeceBase = ropeFreq, UseFlashAttention = true });
                 Console.WriteLine();
             }
 
@@ -122,6 +138,8 @@ namespace LlamaCppCli
 
                 if (cancellationTokenSource.IsCancellationRequested)
                 {
+                    messages.Remove(messages.Last());
+
                     Console.WriteLine(" [Cancelled]");
                     cancellationTokenSource = new();
                 }
