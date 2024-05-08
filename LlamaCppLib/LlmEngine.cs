@@ -217,10 +217,9 @@ namespace LlamaCppLib
                     var text = llama_apply_template(_context.Handle, prompt.Messages);
                     var tokens = Tokenize(text, true, true);
 
-                    // TODO: proper handling/logging
+                    // TODO: implement proper error handling/logging
                     if (tokens.Length < ctxLength - 512)
                     {
-                        Console.WriteLine($"INFO: New sequence, {tokens.Length} token(s).");
                         var sequence = new LlmSequence(prompt, ctxLength, tokens, extraStopTokens) { T1 = DateTime.Now };
                         var id = sequences.Add(sequence);
                         sequence.Id = id;

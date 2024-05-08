@@ -43,14 +43,8 @@ namespace LlamaCppCli
         static unsafe void RunSampleRaw(string[] args)
         {
             var requests = new List<Request>();
-            var extraStopTokens = new[] { "<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|end_of_text|>", "<|im_end|>", "<step>" };
             var assembler = new MultibyteCharAssembler();
             var stream = true;
-
-            //var template = "<s>Source: system\n\n You are very formal and precise. <step> Source: user\n\n {0} <step> Source: assistant\nDestination: user\n\n ";
-            //var template = "<s>[INST] {0} [/INST]";
-            //var template = "<s>user\n{0}</s>\n<s>assistant\n";
-            //var template = "<bos><start_of_turn>user\n{0}<end_of_turn>\n<start_of_turn>model\n";
 
             var cancel = false;
             var cancel_handle = GCHandle.Alloc(cancel, GCHandleType.Pinned);
@@ -104,8 +98,8 @@ namespace LlamaCppCli
             var ctx = llama_new_context_with_model(mdl, cparams);
             var bat = llama_batch_init((int)llama_n_ctx(ctx), 0, 1);
 
-            var bat_view = new llama_batch();
             var candidates = new llama_token_data[llama_n_vocab(mdl)];
+            var messages = new List<LlmMessage> { new() { Role = "system", Content = "You are a helpful assistant." } };
 
             while (true)
             {
@@ -120,6 +114,11 @@ namespace LlamaCppCli
                         Console.WriteLine("Bye.");
                         break;
                     }
+                    else if (line == "/clear")
+                    {
+                        messages = new(messages.Take(1));
+                        continue;
+                    }
 
                     var prompt = String.Empty;
                     var match = Regex.Match(line, @"\/load\s+("".*?""(?:\s+|$))");
@@ -130,33 +129,26 @@ namespace LlamaCppCli
                     }
                     else
                     {
-                        //prompt = String.IsNullOrWhiteSpace(line) ? File.ReadAllText(args[1]).Replace("\r\n", "\n") : line;
                         prompt = line.Replace("\\n", "\n");
                     }
-
-                    //if (args.Length > 4 && Int32.Parse(args[4]) > 0)
-                    //    prompt = String.Format(template, prompt);
 
                     if (String.IsNullOrWhiteSpace(prompt))
                         continue;
 
-                    //var add_bos = llama_add_bos_token(mdl) > 0;
-                    //if (!add_bos) add_bos = llama_vocab_type(mdl) == llama_vocab_type_t.LLAMA_VOCAB_TYPE_SPM;
+                    messages.Add(new() { Role = "user", Content = prompt });
+                    prompt = llama_apply_template(ctx, messages);
 
-                    //Console.WriteLine($"[{prompt}]");
                     var tokens = llama_tokenize(mdl, prompt, false, true, false);
 
+                    var responseMargin = 512;
                     Console.WriteLine($"{tokens.Length}/{llama_n_ctx(ctx)} token(s)");
-                    if (tokens.Length >= llama_n_ctx(ctx))
+                    if (tokens.Length >= llama_n_ctx(ctx) - responseMargin)
                     {
-                        Console.WriteLine("Out of context.");
+                        Console.WriteLine($"Out of context (with response margin of {responseMargin}.");
                         continue;
                     }
 
-                    //// Debug
-                    //Console.WriteLine(tokens.ToArray().Select(x => $"[{x}:{Encoding.UTF8.GetString(llama_token_to_piece(mdl, x))}]").Aggregate((a, b) => $"{a}{b}"));
-
-                    requests.Add(new Request((int)llama_n_ctx(ctx), tokens));
+                    requests.Add(new Request((int)llama_n_ctx(ctx), tokens) { Messages = messages });
 
                     sw.Restart();
                     tc = 0;
@@ -188,18 +180,23 @@ namespace LlamaCppCli
                     {
                         var n_tokens = Math.Min(n_batch, bat.n_tokens - i);
 
-                        bat_view.n_tokens = n_tokens;
-                        bat_view.token = bat.token + i;
-                        bat_view.embd = null;
-                        bat_view.pos = bat.pos + i;
-                        bat_view.n_seq_id = bat.n_seq_id + i;
-                        bat_view.seq_id = bat.seq_id + i;
-                        bat_view.logits = bat.logits + i;
-                        bat_view.all_pos_0 = 0;
-                        bat_view.all_pos_1 = 0;
-                        bat_view.all_seq_id = 0;
+                        var res = llama_decode(
+                            ctx,
+                            new llama_batch
+                            {
+                                n_tokens = n_tokens,
+                                token = &bat.token[i],
+                                embd = null,
+                                pos = &bat.pos[i],
+                                n_seq_id = &bat.n_seq_id[i],
+                                seq_id = &bat.seq_id[i],
+                                logits = &bat.logits[i],
+                                all_pos_0 = 0,
+                                all_pos_1 = 0,
+                                all_seq_id = 0,
+                            }
+                        );
 
-                        var res = llama_decode(ctx, bat_view);
                         if (res != 0)
                         {
                             Console.WriteLine($"llama_decode() = {res}");
@@ -289,13 +286,7 @@ namespace LlamaCppCli
                                 if (request.PosResponse == 0)
                                     request.PosResponse = request.PosToken;
 
-                                var stop = extraStopTokens
-                                    .Select(extraStopToken => llama_tokenize(mdl, extraStopToken, false, true).ToArray())
-                                    .Where(tokens => tokens.Length == 1)
-                                    .Select(tokens => tokens[0])
-                                    .Contains(token);
-
-                                if (cancel || stop)
+                                if (cancel)
                                     token = llama_token_eos(mdl); // Override stop token with EOS token
 
                                 if (request.PosToken >= request.Tokens.Length)
@@ -311,13 +302,24 @@ namespace LlamaCppCli
                                     request.Tokens[request.PosToken++] = token;
                                     ++tc;
 
+                                    var tokenText = assembler.Consume(llama_token_to_piece(mdl, token));
+
+                                    if (request.Messages.Last().Role != "assistant")
+                                    {
+                                        request.Messages.Add(new() { Role = "assistant" });
+                                    }
+
+                                    if (!llama_token_is_eog(mdl, token))
+                                    {
+                                        request.Messages.Last().Content += tokenText;
+                                    }
+
                                     if (stream)
                                     {
-                                        var tokenText = assembler.Consume(llama_token_to_piece(mdl, token));
-                                        Console.Write(tokenText);
-
-                                        // Debug
-                                        //Console.Write($"[{token}:{tokenText}]");
+                                        if (!llama_token_is_eog(mdl, token))
+                                        {
+                                            Console.Write(tokenText);
+                                        }
 
                                         if (cancel)
                                             Console.Write(" [Cancelled]");
@@ -373,6 +375,7 @@ namespace LlamaCppCli
     file class Request : IEquatable<Request>
     {
         public int Id { get; set; }
+        public List<LlmMessage> Messages { get; set; } = [];
 
         public int PosBatch { get; set; }
         public int PosLogit { get; set; }

@@ -36,6 +36,8 @@ namespace LlamaCppCli
 
             Console.WriteLine("\nPress <Ctrl+C> to cancel or press <Enter> with an empty input to quit.");
 
+            var messages = new List<LlmMessage> { new() { Role = "system", Content = "You are a helpful assistant." } };
+
             while (true)
             {
                 if (cancellationTokenSource.IsCancellationRequested)
@@ -63,7 +65,7 @@ namespace LlamaCppCli
                         .Select(
                             fileName => llm.Prompt(
                                 [new LlmMessage { Role = "user", Content = File.ReadAllText(fileName) }],
-                                new SamplingOptions { Temperature = 0.0f, ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|endoftext|>", "<|eot_id|>"] }
+                                new SamplingOptions { Temperature = 0.5f }
                             )
                         )
                         .Select(
@@ -86,8 +88,6 @@ namespace LlamaCppCli
 
                         Console.WriteLine(new String('=', Console.WindowWidth));
                         Console.WriteLine($"Request {task.Result.Request.GetHashCode()} | Prompting {task.Result.Request.PromptingSpeed:F2} t/s | Sampling {task.Result.Request.SamplingSpeed:F2} t/s");
-                        //Console.WriteLine(new String('-', Console.WindowWidth));
-                        //Console.WriteLine(result.Request.PromptText);
                         Console.WriteLine(new String('-', Console.WindowWidth));
                         Console.WriteLine($"{task.Result.Response}{(task.Result.Request.Cancelled ? " [Cancelled]" : "")}");
                         Console.WriteLine(new String('=', Console.WindowWidth));
@@ -105,21 +105,18 @@ namespace LlamaCppCli
                 if (fileNames.Count == 1)
                     promptText = File.ReadAllText(fileNames[0]);
 
-                var prompt = llm.Prompt(
-                    [new LlmMessage { Role = "user", Content = promptText }],
-                    new SamplingOptions
-                    {
-                        TopK = 50,
-                        TopP = 0.95f,
-                        Temperature = 0.7f,
-                        PenaltyRepeat = 1.0f,
-                        ExtraStopTokens = ["<|EOT|>", "<|end_of_turn|>", "<|endoftext|>", "<|im_end|>", "<|eot_id|>"]
-                    }
-                );
+                messages.Add(new LlmMessage { Role = "user", Content = promptText });
+                var prompt = llm.Prompt(messages, new SamplingOptions { TopK = 50, TopP = 0.95f, Temperature = 0.7f });
 
                 // In streaming mode, we must re-assemble multibyte characters using a TokenEnumerator
                 await foreach (var token in new TokenEnumerator(prompt, cancellationTokenSource.Token))
+                {
+                    if (messages.Last().Role != "assistant")
+                        messages.Add(new() { Role = "assistant" });
+
                     Console.Write(token);
+                    messages.Last().Content += token;
+                }
 
                 Console.WriteLine($"{(prompt.Cancelled ? " [Cancelled]" : "")}");
                 Console.WriteLine($"\nPrompting {prompt.PromptingSpeed:F2} t/s | Sampling {prompt.SamplingSpeed:F2} t/s");
