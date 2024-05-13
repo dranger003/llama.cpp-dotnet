@@ -33,7 +33,9 @@ namespace LlamaCppLib
         private readonly Uri _baseUri;
 
         public LlmClient(string uri) : this(new Uri(uri))
-        { }
+        {
+            _httpClient.Timeout = TimeSpan.FromHours(1);
+        }
 
         public LlmClient(Uri uri) => _baseUri = uri;
 
