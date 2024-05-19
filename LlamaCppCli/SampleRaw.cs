@@ -74,7 +74,7 @@ namespace LlamaCppCli
             var penalty_present = 0.0f;
 
             var mparams = llama_model_default_params();
-            mparams.n_gpu_layers = args.Length > 1 ? Int32.Parse(args[1]) : 128;
+            mparams.n_gpu_layers = args.Length > 1 ? Int32.Parse(args[1]) : 0;
             mparams.progress_callback = &ProgressCallback;
 
             var cparams = llama_context_default_params();

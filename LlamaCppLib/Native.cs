@@ -131,6 +131,8 @@ namespace LlamaCppLib
             public int main_gpu;
             public float* tensor_split;
 
+            public byte* rpc_servers;
+
             public llama_progress_callback progress_callback;
             public void* progress_callback_user_data;
 
