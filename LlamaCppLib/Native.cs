@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.JavaScript;
 
 namespace LlamaCppLib
 {
@@ -375,12 +376,77 @@ namespace LlamaCppLib
             llama_context ctx);
 
         [LibraryImport(LibName)]
-        [return : MarshalAs(UnmanagedType.I1)]
+        [return: MarshalAs(UnmanagedType.I1)]
         public static partial bool llama_kv_cache_seq_rm(
             llama_context ctx,
             llama_seq_id seq_id,
             llama_pos p0,
             llama_pos p1);
+
+        [LibraryImport(LibName)]
+        public static partial nuint llama_state_get_size(
+            llama_context ctx);
+
+        [LibraryImport(LibName)]
+        public static partial nuint llama_state_get_data(
+            llama_context ctx,
+            byte[] dst);
+
+        [LibraryImport(LibName)]
+        public static partial nuint llama_state_set_data(
+            llama_context ctx,
+            byte[] dst);
+
+        [LibraryImport(LibName)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public static partial bool llama_state_load_file(
+            llama_context ctx,
+            byte[] path_session,
+            llama_token[] tokens_out,
+            nuint n_token_capacity,
+            ref nuint n_token_count_out);
+
+        [LibraryImport(LibName)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public static partial bool llama_state_save_file(
+            llama_context ctx,
+            byte[] path_session,
+            llama_token[] tokens,
+            nuint n_token_count);
+
+        [LibraryImport(LibName)]
+        public static partial nuint llama_state_seq_get_size(
+            llama_context ctx,
+            llama_seq_id seq_id);
+
+        [LibraryImport(LibName)]
+        public static partial nuint llama_state_seq_get_data(
+            llama_context ctx,
+            byte[] dst,
+            llama_seq_id seq_id);
+
+        [LibraryImport(LibName)]
+        public static partial nuint llama_state_seq_set_data(
+            llama_context ctx,
+            byte[] src,
+            llama_seq_id dest_seq_id);
+
+        [LibraryImport(LibName)]
+        public static partial nuint llama_state_seq_save_file(
+            llama_context ctx,
+            byte[] filepath,
+            llama_seq_id seq_id,
+            llama_token[] tokens,
+            nuint n_token_count);
+
+        [LibraryImport(LibName)]
+        public static partial nuint llama_state_seq_load_file(
+            llama_context ctx,
+            byte[] filepath,
+            llama_seq_id dest_seq_id,
+            llama_token[] tokens_out,
+            nuint n_token_capacity,
+            ref nuint n_token_count_out);
 
         [LibraryImport(LibName)]
         public static partial int llama_decode(
