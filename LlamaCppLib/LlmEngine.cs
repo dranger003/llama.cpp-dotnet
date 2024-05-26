@@ -132,6 +132,10 @@ namespace LlamaCppLib
 
         public bool Loaded => _mainLoop?.Status == TaskStatus.Running;
 
+        public int ContextLength => Loaded ? (int)llama_n_ctx(_context.Handle) : 0;
+        public int TrainingContextLength => Loaded ? llama_n_ctx_train(_model.Handle) : 0;
+        public int LayerCount => Loaded ? llama_n_layer(_model.Handle) : 0;
+
         public LlmPrompt Prompt(
             List<LlmMessage>? messages,
             SamplingOptions? samplingOptions = default

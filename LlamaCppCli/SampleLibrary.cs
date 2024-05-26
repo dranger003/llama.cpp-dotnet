@@ -34,7 +34,12 @@ namespace LlamaCppCli
                 (float progress) => { Console.Write($"{new string(' ', 32)}\rLoading model... {progress:0.00}%\r"); }
             );
 
-            Console.WriteLine("\nPress <Ctrl+C> to cancel or press <Enter> with an empty input to quit.");
+            Console.WriteLine();
+            Console.WriteLine($"Model context length: {llm.ContextLength}");
+            Console.WriteLine($"Model training context length: {llm.TrainingContextLength}");
+            Console.WriteLine($"Model layer count: {llm.LayerCount}");
+            Console.WriteLine();
+            Console.WriteLine("Press <Ctrl+C> to cancel or press <Enter> with an empty input to quit.");
 
             var messages = new List<LlmMessage> { new() { Role = "system", Content = "You are a helpful assistant." } };
 
