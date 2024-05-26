@@ -130,6 +130,12 @@ namespace LlamaCppLib
 
         public Span<int> Tokenize(string prompt, bool prependBosToken = false, bool processSpecialTokens = false) => llama_tokenize(_model.Handle, prompt, prependBosToken, processSpecialTokens);
 
+        public Span<int> Tokenize(List<LlmMessage> messages, bool prependBosToken = false, bool processSpecialTokens = false)
+        {
+            var text = llama_apply_template(_context.Handle, messages);
+            return Tokenize(text, prependBosToken, processSpecialTokens);
+        }
+
         public bool Loaded => _mainLoop?.Status == TaskStatus.Running;
 
         public int ContextLength => Loaded ? (int)llama_n_ctx(_context.Handle) : 0;
@@ -218,8 +224,7 @@ namespace LlamaCppLib
                         .ToArray();
 
                     var ctxLength = (int)llama_n_ctx(_context.Handle);
-                    var text = llama_apply_template(_context.Handle, prompt.Messages);
-                    var tokens = Tokenize(text, true, true);
+                    var tokens = Tokenize(prompt.Messages, llama_add_bos_token(_model.Handle) > 0, true);
 
                     // TODO: implement proper error handling/logging
                     if (tokens.Length < ctxLength - 512)

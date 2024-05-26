@@ -48,7 +48,7 @@ namespace LlamaCppCli
                 if (cancellationTokenSource.IsCancellationRequested)
                     cancellationTokenSource = new();
 
-                Console.Write("> ");
+                Console.Write($"[{llm.Tokenize(messages).Length}/{llm.ContextLength}]> ");
                 var promptText = (Console.ReadLine() ?? String.Empty).Replace("\\n", "\n");
                 if (String.IsNullOrWhiteSpace(promptText))
                     break;
