@@ -136,6 +136,9 @@ namespace LlamaCppLib
             return Tokenize(text, prependBosToken, processSpecialTokens);
         }
 
+        public nint ModelNativeHandle { get => _model.Handle; }
+        public nint ContextNativeHandle { get => _context.Handle; }
+
         public bool Loaded => _mainLoop?.Status == TaskStatus.Running;
 
         public int ContextLength => Loaded ? (int)llama_n_ctx(_context.Handle) : 0;
