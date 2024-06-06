@@ -1,4 +1,6 @@
-﻿using System.Text;
+﻿using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text;
 
 namespace LlamaCppCli
 {
@@ -8,6 +10,10 @@ namespace LlamaCppCli
         {
             // Multibyte encoding handling (e.g. emojis, etc.)
             Console.OutputEncoding = Encoding.UTF8;
+
+            // If you need to support runtime native library loading,
+            // uncomment this line and implement `ResolveLibrary()` below.
+            //NativeLibrary.SetDllImportResolver(typeof(LlamaCppLib.Native).Assembly, ResolveLibrary);
 
             if (args.Length < 1 || !Int32.TryParse(args[0], out var i))
             {
@@ -36,9 +42,24 @@ namespace LlamaCppCli
                 _ => Console.Out.WriteLineAsync("Invalid sample no.")
             });
         }
+
+        static nint ResolveLibrary(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
+        {
+            // TODO: Determine which DLL to load here, i.e.:
+            //if (cpuOnly) libraryName = "CPU-Only.dll";
+            //else if (nvidiaGpu) libraryName = "nVIDIA-CUDA.dll";
+            //else if (amdGpu) libraryName = "AMD-ROCm.dll";
+
+            if (NativeLibrary.TryLoad(libraryName, out var handle))
+            {
+                return handle;
+            }
+
+            throw new DllNotFoundException($"Unable to load library: {libraryName}");
+        }
     }
 
-    public static class Extensions
+    internal static class Extensions
     {
         public static string TruncateWithEllipsis(this String text, float percentWidth = 0.75f)
         {
