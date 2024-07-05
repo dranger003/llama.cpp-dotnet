@@ -30,44 +30,24 @@ namespace LlamaCppLib
             batch.n_tokens = 0;
         }
 
-        public static Span<llama_token> llama_tokenize(llama_model model, string text, bool add_bos = false, bool special = false, bool add_eos = false)
+        public static int[] llama_tokenize(llama_model model, byte[] text, bool add_special = false, bool parse_special = false)
         {
-            var n_tokens = text.Length + (add_bos ? 1 : 0);
-            var bytes = Encoding.UTF8.GetBytes(text);
-            var result = new llama_token[n_tokens];
+            var length = -Native.llama_tokenize(model, text, text.Length, [], 0, add_special, parse_special);
 
-            n_tokens = Native.llama_tokenize(model, bytes, bytes.Length, result, result.Length, add_bos, special);
-            if (n_tokens < 0)
-            {
-                result = new llama_token[-n_tokens];
+            var tokens = new int[length];
+            Native.llama_tokenize(model, text, text.Length, tokens, tokens.Length, add_special, parse_special);
 
-                var check = Native.llama_tokenize(model, bytes, bytes.Length, result, result.Length, add_bos, special);
-                Debug.Assert(check == -n_tokens);
-                n_tokens = result.Length;
-            }
-
-            if (add_eos)
-                result[n_tokens] = Native.llama_token_eos(model);
-
-            return new(result, 0, n_tokens + (add_eos ? 1 : 0));
+            return tokens;
         }
 
-        public static Span<byte> llama_token_to_piece(llama_model model, llama_token token, bool special = true)
+        public static byte[] llama_detokenize(llama_model model, int[] tokens, bool remove_special = false, bool unparse_special = false)
         {
-            var n_pieces = 0;
-            var result = new byte[8];
+            var length = -Native.llama_detokenize(model, tokens, tokens.Length, [], 0, remove_special, unparse_special);
 
-            n_pieces = Native.llama_token_to_piece(model, token, result, result.Length, special);
-            if (n_pieces < 0)
-            {
-                result = new byte[-n_pieces];
+            var text = new byte[length];
+            Native.llama_detokenize(model, tokens, tokens.Length, text, text.Length, remove_special, unparse_special);
 
-                var check = Native.llama_token_to_piece(model, token, result, result.Length, special);
-                Debug.Assert(check == -n_pieces);
-                n_pieces = result.Length;
-            }
-
-            return new(result, 0, n_pieces);
+            return text;
         }
 
         public static unsafe string llama_apply_template(llama_context context, List<LlmMessage> messages, bool appendAssistant = true)

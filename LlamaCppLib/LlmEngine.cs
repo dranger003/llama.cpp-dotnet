@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 
 using static LlamaCppLib.Native;
 using static LlamaCppLib.Interop;
+using System.Text;
 
 namespace LlamaCppLib
 {
@@ -128,7 +129,7 @@ namespace LlamaCppLib
             _model.Dispose();
         }
 
-        public Span<int> Tokenize(string prompt, bool prependBosToken = false, bool processSpecialTokens = false) => llama_tokenize(_model.Handle, prompt, prependBosToken, processSpecialTokens);
+        public Span<int> Tokenize(string prompt, bool prependBosToken = false, bool processSpecialTokens = false) => llama_tokenize(_model.Handle, Encoding.UTF8.GetBytes(prompt), prependBosToken, processSpecialTokens);
 
         public Span<int> Tokenize(List<LlmMessage> messages, bool prependBosToken = false, bool processSpecialTokens = false)
         {
@@ -405,7 +406,7 @@ namespace LlamaCppLib
 
                             if (!stop)
                             {
-                                sequence.Prompt.TokenChannel.Writer.TryWrite(llama_token_to_piece(_model.Handle, token).ToArray());
+                                sequence.Prompt.TokenChannel.Writer.TryWrite(llama_detokenize(_model.Handle, [token]));
                                 sequence.Tokens[sequence.PosTokens++] = token;
                             }
 

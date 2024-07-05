@@ -1,4 +1,6 @@
-﻿using static LlamaCppLib.Native;
+﻿using System.Text;
+
+using static LlamaCppLib.Native;
 using static LlamaCppLib.Interop;
 
 namespace LlamaCppCli
@@ -19,6 +21,7 @@ namespace LlamaCppCli
             await Task.CompletedTask;
         }
 
+        // UNTESTED
         static unsafe void RunSampleEmbedding(string[] args)
         {
             var mparams = llama_model_default_params();
@@ -43,7 +46,7 @@ namespace LlamaCppCli
             {
                 var batch = llama_batch_init((int)cparams.n_batch, 0, 1);
 
-                var embd_inp = llama_tokenize(mdl, text, true, false, true);
+                var embd_inp = llama_tokenize(mdl, Encoding.UTF8.GetBytes(text), false, false);
                 for (var i = 0; i < embd_inp.Length; i++)
                     llama_batch_add(ref batch, embd_inp[i], i, [0], i == embd_inp.Length - 1);
 

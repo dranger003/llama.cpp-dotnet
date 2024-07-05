@@ -138,7 +138,7 @@ namespace LlamaCppCli
                     messages.Add(new() { Role = "user", Content = prompt });
                     prompt = llama_apply_template(ctx, messages);
 
-                    var tokens = llama_tokenize(mdl, prompt, false, true, false);
+                    var tokens = llama_tokenize(mdl, Encoding.UTF8.GetBytes(prompt), llama_add_bos_token(mdl) != 0, true);
 
                     var responseMargin = 512;
                     Console.WriteLine($"{tokens.Length}/{llama_n_ctx(ctx)} token(s)");
@@ -302,7 +302,7 @@ namespace LlamaCppCli
                                     request.Tokens[request.PosToken++] = token;
                                     ++tc;
 
-                                    var tokenText = assembler.Consume(llama_token_to_piece(mdl, token));
+                                    var tokenText = assembler.Consume(llama_detokenize(mdl, [token]));
 
                                     if (request.Messages.Last().Role != "assistant")
                                     {
@@ -341,8 +341,8 @@ namespace LlamaCppCli
 
                         if (!stream)
                         {
-                            var promptTokens = r.Tokens.Take(r.PosResponse).SelectMany(token => llama_token_to_piece(mdl, token).ToArray()).ToArray();
-                            var responseTokens = r.Tokens.Skip(r.PosResponse).Take(r.PosToken - r.PosResponse).SelectMany(token => llama_token_to_piece(mdl, token).ToArray()).ToArray();
+                            var promptTokens = r.Tokens.Take(r.PosResponse).SelectMany(token => llama_detokenize(mdl, [token])).ToArray();
+                            var responseTokens = r.Tokens.Skip(r.PosResponse).Take(r.PosToken - r.PosResponse).SelectMany(token => llama_detokenize(mdl, [token], false, true).ToArray()).ToArray();
 
                             Console.WriteLine(new String('=', 128));
                             Console.WriteLine($"request id {r.Id} [{r.PosToken / r.Elapsed.TotalMilliseconds * 1000:F2} t/s]");
