@@ -36,6 +36,7 @@ namespace LlamaCppLib
             LLAMA_VOCAB_TYPE_SPM = 1,
             LLAMA_VOCAB_TYPE_BPE = 2,
             LLAMA_VOCAB_TYPE_WPM = 3,
+            LLAMA_VOCAB_TYPE_UGM = 4,
         }
 
         public enum llama_model_kv_override_type
@@ -103,6 +104,14 @@ namespace LlamaCppLib
             LLAMA_POOLING_TYPE_NONE = 0,
             LLAMA_POOLING_TYPE_MEAN = 1,
             LLAMA_POOLING_TYPE_CLS = 2,
+            LLAMA_POOLING_TYPE_LAST = 3,
+        }
+
+        public enum llama_attention_type
+        {
+            LLAMA_ATTENTION_TYPE_UNSPECIFIED = -1,
+            LLAMA_ATTENTION_TYPE_CAUSAL = 0,
+            LLAMA_ATTENTION_TYPE_NON_CAUSAL = 1,
         }
 
         [StructLayout(LayoutKind.Explicit)]
@@ -157,6 +166,7 @@ namespace LlamaCppLib
 
             public llama_rope_scaling_type rope_scaling_type;
             public llama_pooling_type pooling_type;
+            public llama_attention_type attention_type;
 
             public float rope_freq_base;
             public float rope_freq_scale;
@@ -298,7 +308,7 @@ namespace LlamaCppLib
 
         [LibraryImport(LibName)]
         public static partial llama_batch llama_batch_get_one(
-            llama_token[] tokens,
+            [In] llama_token[] tokens,
             int n_tokens,
             llama_pos pos_0,
             llama_seq_id seq_id);
@@ -331,11 +341,22 @@ namespace LlamaCppLib
             [MarshalAs(UnmanagedType.I1)] bool parse_special);
 
         [LibraryImport(LibName)]
+        public static partial int llama_detokenize(
+            llama_model model,
+            [In] llama_token[] tokens,
+            int n_tokens,
+            [In, Out] byte[] text,
+            int text_len_max,
+            [MarshalAs(UnmanagedType.I1)] bool remove_special,
+            [MarshalAs(UnmanagedType.I1)] bool unparse_special);
+
+        [LibraryImport(LibName)]
         public static partial int llama_token_to_piece(
             llama_model model,
             llama_token token,
             [In, Out] byte[] buf,
             int length,
+            int lstrip,
             [MarshalAs(UnmanagedType.I1)] bool special);
 
         [LibraryImport(LibName)]
@@ -389,19 +410,19 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial nuint llama_state_get_data(
             llama_context ctx,
-            byte[] dst);
+            [In, Out] byte[] dst);
 
         [LibraryImport(LibName)]
         public static partial nuint llama_state_set_data(
             llama_context ctx,
-            byte[] dst);
+            [In, Out] byte[] dst);
 
         [LibraryImport(LibName)]
         [return: MarshalAs(UnmanagedType.I1)]
         public static partial bool llama_state_load_file(
             llama_context ctx,
-            byte[] path_session,
-            llama_token[] tokens_out,
+            [In] byte[] path_session,
+            [In, Out] llama_token[] tokens_out,
             nuint n_token_capacity,
             ref nuint n_token_count_out);
 
@@ -409,8 +430,8 @@ namespace LlamaCppLib
         [return: MarshalAs(UnmanagedType.I1)]
         public static partial bool llama_state_save_file(
             llama_context ctx,
-            byte[] path_session,
-            llama_token[] tokens,
+            [In] byte[] path_session,
+            [In] llama_token[] tokens,
             nuint n_token_count);
 
         [LibraryImport(LibName)]
@@ -421,36 +442,46 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial nuint llama_state_seq_get_data(
             llama_context ctx,
-            byte[] dst,
+            [In, Out] byte[] dst,
             llama_seq_id seq_id);
 
         [LibraryImport(LibName)]
         public static partial nuint llama_state_seq_set_data(
             llama_context ctx,
-            byte[] src,
+            [In] byte[] src,
             llama_seq_id dest_seq_id);
 
         [LibraryImport(LibName)]
         public static partial nuint llama_state_seq_save_file(
             llama_context ctx,
-            byte[] filepath,
+            [In] byte[] filepath,
             llama_seq_id seq_id,
-            llama_token[] tokens,
+            [In] llama_token[] tokens,
             nuint n_token_count);
 
         [LibraryImport(LibName)]
         public static partial nuint llama_state_seq_load_file(
             llama_context ctx,
-            byte[] filepath,
+            [In] byte[] filepath,
             llama_seq_id dest_seq_id,
-            llama_token[] tokens_out,
+            [In, Out] llama_token[] tokens_out,
             nuint n_token_capacity,
             ref nuint n_token_count_out);
+
+        [LibraryImport(LibName)]
+        public static partial int llama_encode(
+            llama_context ctx,
+            llama_batch batch);
 
         [LibraryImport(LibName)]
         public static partial int llama_decode(
             llama_context ctx,
             llama_batch batch);
+
+        [LibraryImport(LibName)]
+        public static partial void llama_set_embeddings(
+            llama_context ctx,
+            [MarshalAs(UnmanagedType.I1)] bool embeddings);
 
         [LibraryImport(LibName)]
         public static partial void llama_set_causal_attn(
