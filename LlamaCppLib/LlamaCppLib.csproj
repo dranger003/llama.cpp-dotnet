@@ -43,7 +43,7 @@
 	</Target>
 
 	<Target Name="CMakeBuild" AfterTargets="CMakeConfigure" Condition="'$(NativeLibraries)'!='OFF'">
-		<Exec Command='$(CMakeBin) --build "$(CMakeProject)" -j8 --config $(Configuration)' />
+		<Exec Command='$(CMakeBin) --build "$(CMakeProject)" -j --config $(Configuration)' />
 	</Target>
 
 	<Target Name="CMakeCopyOutput" AfterTargets="CMakeBuild" Condition="'$(NativeLibraries)'!='OFF'">
@@ -53,7 +53,8 @@
 		</PropertyGroup>
 		<ItemGroup>
 			<LibraryFiles Include="$(CMakeProject)/bin/$(Configuration)/$(LibraryFileExtension)" />
-			<LibraryFiles Include="$(CMakeProject)/$(LibraryFileExtension)" />
+			<LibraryFiles Include="$(CMakeProject)/src/$(LibraryFileExtension)" />
+			<LibraryFiles Include="$(CMakeProject)/ggml/src/$(LibraryFileExtension)" />
 		</ItemGroup>
 		<Copy SourceFiles="@(LibraryFiles)" DestinationFolder="$(SolutionDir)/$(Configuration)/$(MSBuildProjectName)" />
 	</Target>
