@@ -410,12 +410,14 @@ namespace LlamaCppLib
         [LibraryImport(LibName)]
         public static partial nuint llama_state_get_data(
             llama_context ctx,
-            [In, Out] byte[] dst);
+            [In, Out] byte[] dst,
+            nuint size);
 
         [LibraryImport(LibName)]
         public static partial nuint llama_state_set_data(
             llama_context ctx,
-            [In, Out] byte[] dst);
+            [In] byte[] src,
+            nuint size);
 
         [LibraryImport(LibName)]
         [return: MarshalAs(UnmanagedType.I1)]
@@ -443,12 +445,14 @@ namespace LlamaCppLib
         public static partial nuint llama_state_seq_get_data(
             llama_context ctx,
             [In, Out] byte[] dst,
+            nuint size,
             llama_seq_id seq_id);
 
         [LibraryImport(LibName)]
         public static partial nuint llama_state_seq_set_data(
             llama_context ctx,
             [In] byte[] src,
+            nuint size,
             llama_seq_id dest_seq_id);
 
         [LibraryImport(LibName)]
