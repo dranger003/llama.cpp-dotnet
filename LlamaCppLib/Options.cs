@@ -14,7 +14,6 @@ namespace LlamaCppLib
         public bool UseMemoryMap { get; set; } = true;
         public bool UseMemoryLock { get; set; } = false;
 
-        public int Seed { get; set; } = -1;
         public int ContextLength { get; set; } = 0;
         public int BatchSize { get; set; } = 512;
         public int ThreadCount { get; set; } = 4;
@@ -29,6 +28,7 @@ namespace LlamaCppLib
 
     public class SamplingOptions
     {
+        public int Seed { get; set; } = -1;
         public int TopK { get; set; } = 40;
         public float TopP { get; set; } = 0.95f;
         public float MinP { get; set; } = 0.05f;

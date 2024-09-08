@@ -56,6 +56,8 @@ namespace LlamaCppCli
 
             //================================================================================================================================================================================================
 
+            var seed = unchecked((uint)-1);
+
             var top_k = 50;
             var top_p = 0.95f;
             var min_p = 0.05f;
@@ -63,15 +65,15 @@ namespace LlamaCppCli
             var typical_p = 1.0f;
             var temp = 0.7f;
 
-            var mirostat = 0;
-            var mirostat_tau = 5.0f;
-            var mirostat_eta = 0.1f;
-            var mirostat_m = 100;
+            //var mirostat = 0;
+            //var mirostat_tau = 5.0f;
+            //var mirostat_eta = 0.1f;
+            //var mirostat_m = 100;
 
-            var penalty_last_n = 64;
-            var penalty_repeat = 1.0f;
-            var penalty_freq = 0.0f;
-            var penalty_present = 0.0f;
+            //var penalty_last_n = 64;
+            //var penalty_repeat = 1.0f;
+            //var penalty_freq = 0.0f;
+            //var penalty_present = 0.0f;
 
             var mparams = llama_model_default_params();
             mparams.n_gpu_layers = args.Length > 1 ? Int32.Parse(args[1]) : 0;
@@ -82,7 +84,6 @@ namespace LlamaCppCli
             cparams.flash_attn = true ? 1 : 0;
             cparams.abort_callback = &AbortCallback;
             cparams.abort_callback_data = GCHandle.ToIntPtr(cancel_handle).ToPointer();
-            //cparams.seed = unchecked((uint)-1);
             //cparams.n_batch = 512;
             //cparams.n_threads = 8;
             //cparams.n_threads_batch = 8;
@@ -91,14 +92,35 @@ namespace LlamaCppCli
             //cparams.type_v = ggml_type.GGML_TYPE_F16;
             //cparams.logits_all = false ? 1 : 0;
 
+            var sparams = llama_sampler_chain_default_params();
+            sparams.no_perf = 0;
+
             llama_backend_init();
             llama_numa_init(ggml_numa_strategy.GGML_NUMA_STRATEGY_DISABLED);
 
             var mdl = llama_load_model_from_file(args[0], mparams);
             var ctx = llama_new_context_with_model(mdl, cparams);
             var bat = llama_batch_init((int)llama_n_ctx(ctx), 0, 1);
+            var spl = llama_sampler_chain_init(sparams);
 
-            var candidates = new llama_token_data[llama_n_vocab(mdl)];
+            if (temp > 0.0f)
+            {
+                llama_sampler_chain_add(spl, llama_sampler_init_top_k(top_k));
+                llama_sampler_chain_add(spl, llama_sampler_init_tail_free(tfs_z, 1));
+                llama_sampler_chain_add(spl, llama_sampler_init_typical(typical_p, 1));
+                llama_sampler_chain_add(spl, llama_sampler_init_top_p(top_p, 1));
+                llama_sampler_chain_add(spl, llama_sampler_init_min_p(min_p, 1));
+                llama_sampler_chain_add(spl, llama_sampler_init_temp(temp));
+
+                llama_sampler_chain_add(spl, llama_sampler_init_softmax());
+                llama_sampler_chain_add(spl, llama_sampler_init_dist(seed));
+            }
+            else
+            {
+                llama_sampler_chain_add(spl, llama_sampler_init_softmax());
+                llama_sampler_chain_add(spl, llama_sampler_init_greedy());
+            }
+
             var messages = new List<LlmMessage> { new() { Role = "system", Content = "You are a helpful assistant." } };
 
             while (true)
@@ -219,119 +241,57 @@ namespace LlamaCppCli
                             if (request.PosLogit < i || request.PosLogit >= i + n_tokens)
                                 continue;
 
-                            var logits = llama_get_logits_ith(ctx, request.PosLogit - i);
+                            var token = llama_sampler_sample(spl, ctx, request.PosLogit - i);
+                            llama_sampler_accept(spl, token);
 
-                            for (var token = 0; token < candidates.Length; token++)
+                            if (request.PosResponse == 0)
+                                request.PosResponse = request.PosToken;
+
+                            if (cancel)
+                                token = llama_token_eos(mdl); // Override stop token with EOS token
+
+                            if (request.PosToken >= request.Tokens.Length)
                             {
-                                candidates[token].id = token;
-                                candidates[token].logit = logits[token];
-                                candidates[token].p = 0.0f;
+                                if (stream)
+                                    Console.Write(" [Out of context]");
+
+                                request.Tokens[request.Tokens.Length - 1] = llama_token_eos(mdl);
+                                break;
                             }
-
-                            fixed (llama_token_data* ptr1 = &candidates[0])
+                            else
                             {
-                                var candidates_p = new llama_token_data_array
-                                {
-                                    data = ptr1,
-                                    size = (nuint)candidates.Length,
-                                    sorted = false ? 1 : 0,
-                                };
+                                request.Tokens[request.PosToken++] = token;
+                                ++tc;
 
-                                if (penalty_repeat != 1.0f)
+                                var tokenText = assembler.Consume(llama_detokenize(mdl, [token]));
+
+                                if (request.Messages.Last().Role != "assistant")
                                 {
-                                    var index = Math.Max(0, request.PosToken - penalty_last_n);
-                                    llama_sample_repetition_penalties(
-                                        ctx,
-                                        ref candidates_p,
-                                        new Span<int>(request.Tokens, index, request.Tokens.Length - index),
-                                        (nuint)penalty_last_n,
-                                        penalty_repeat,
-                                        penalty_freq,
-                                        penalty_present
-                                    );
+                                    request.Messages.Add(new() { Role = "assistant" });
                                 }
 
-                                var token = llama_token_eos(mdl);
-
-                                if (temp < 0.0f)
+                                if (!llama_token_is_eog(mdl, token))
                                 {
-                                    llama_sample_softmax(ctx, ref candidates_p);
-                                    token = candidates_p.data[0].id;
-                                }
-                                else if (temp == 0.0f)
-                                {
-                                    token = llama_sample_token_greedy(ctx, ref candidates_p);
-                                }
-                                else if (mirostat == 1)
-                                {
-                                    llama_sample_temp(ctx, ref candidates_p, temp);
-                                    token = llama_sample_token_mirostat(ctx, ref candidates_p, mirostat_tau, mirostat_eta, mirostat_m, ref request.MirostatMU);
-                                }
-                                else if (mirostat == 2)
-                                {
-                                    llama_sample_temp(ctx, ref candidates_p, temp);
-                                    token = llama_sample_token_mirostat_v2(ctx, ref candidates_p, mirostat_tau, mirostat_eta, ref request.MirostatMU);
-                                }
-                                else
-                                {
-                                    llama_sample_top_k(ctx, ref candidates_p, top_k, 1);
-                                    llama_sample_tail_free(ctx, ref candidates_p, tfs_z, 1);
-                                    llama_sample_typical(ctx, ref candidates_p, typical_p, 1);
-                                    llama_sample_top_p(ctx, ref candidates_p, top_p, 1);
-                                    llama_sample_min_p(ctx, ref candidates_p, min_p, 1);
-                                    llama_sample_temp(ctx, ref candidates_p, temp);
-                                    token = llama_sample_token(ctx, ref candidates_p);
+                                    request.Messages.Last().Content += tokenText;
                                 }
 
-                                if (request.PosResponse == 0)
-                                    request.PosResponse = request.PosToken;
-
-                                if (cancel)
-                                    token = llama_token_eos(mdl); // Override stop token with EOS token
-
-                                if (request.PosToken >= request.Tokens.Length)
+                                if (stream)
                                 {
-                                    if (stream)
-                                        Console.Write(" [Out of context]");
-
-                                    request.Tokens[request.Tokens.Length - 1] = llama_token_eos(mdl);
-                                    break;
-                                }
-                                else
-                                {
-                                    request.Tokens[request.PosToken++] = token;
-                                    ++tc;
-
-                                    var tokenText = assembler.Consume(llama_detokenize(mdl, [token]));
-
-                                    if (request.Messages.Last().Role != "assistant")
-                                    {
-                                        request.Messages.Add(new() { Role = "assistant" });
-                                    }
-
                                     if (!llama_token_is_eog(mdl, token))
                                     {
-                                        request.Messages.Last().Content += tokenText;
+                                        Console.Write(tokenText);
                                     }
 
-                                    if (stream)
-                                    {
-                                        if (!llama_token_is_eog(mdl, token))
-                                        {
-                                            Console.Write(tokenText);
-                                        }
-
-                                        if (cancel)
-                                            Console.Write(" [Cancelled]");
-                                    }
+                                    if (cancel)
+                                        Console.Write(" [Cancelled]");
                                 }
-
-                                if (request.T1 == default)
-                                    request.T1 = DateTime.Now;
-
-                                if (llama_token_is_eog(mdl, token))
-                                    request.T2 = DateTime.Now;
                             }
+
+                            if (request.T1 == default)
+                                request.T1 = DateTime.Now;
+
+                            if (llama_token_is_eog(mdl, token))
+                                request.T2 = DateTime.Now;
                         }
                     }
 
@@ -365,6 +325,7 @@ namespace LlamaCppCli
             cancel_handle.Free();
 
             llama_batch_free(bat);
+            llama_sampler_free(spl);
             llama_free(ctx);
             llama_free_model(mdl);
 
