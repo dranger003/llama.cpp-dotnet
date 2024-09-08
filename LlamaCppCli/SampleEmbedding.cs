@@ -22,6 +22,9 @@ namespace LlamaCppCli
         }
 
         // UNTESTED
+        // I am leaving the code here for reference purposes but this code hasn't been tested in a while.
+        // There has been numerous changes upstream affecting how embeddings work and I suspect this is rather broken.
+        // TODO: Revisit the embeddings sample as some point.
         static unsafe void RunSampleEmbedding(string[] args)
         {
             var mparams = llama_model_default_params();
@@ -29,7 +32,7 @@ namespace LlamaCppCli
             mparams.progress_callback = &ProgressCallback;
 
             var cparams = llama_context_default_params();
-            cparams.seed = unchecked((uint)-1);
+            //cparams.seed = unchecked((uint)-1); // The see is now part of the new sampling API
             cparams.n_ctx = 4096;
             cparams.n_batch = 4096;
             cparams.n_threads = 8;
