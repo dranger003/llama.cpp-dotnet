@@ -358,7 +358,11 @@ namespace LlamaCppLib
 
                         if (!stop)
                         {
-                            sequence.Prompt.TokenChannel.Writer.TryWrite(llama_detokenize(_model.Handle, [token]));
+                            sequence.Prompt.TokenChannel.Writer.TryWrite(
+                                //llama_detokenize(_model.Handle, [token])
+                                Interop.llama_token_to_piece(_model.Handle, token, true)
+                            );
+
                             sequence.Tokens[sequence.PosTokens++] = token;
                         }
 

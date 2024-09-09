@@ -263,7 +263,10 @@ namespace LlamaCppCli
                                 request.Tokens[request.PosToken++] = token;
                                 ++tc;
 
-                                var tokenText = assembler.Consume(llama_detokenize(mdl, [token]));
+                                var tokenText = assembler.Consume(
+                                    //llama_detokenize(mdl, [token])
+                                    Interop.llama_token_to_piece(mdl, token, true)
+                                );
 
                                 if (request.Messages.Last().Role != "assistant")
                                 {

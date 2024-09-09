@@ -50,6 +50,14 @@ namespace LlamaCppLib
             return text;
         }
 
+        private static byte[] _bytes = new byte[1024];
+
+        public static byte[] llama_token_to_piece(llama_model model, int token, bool special)
+        {
+            var count = Native.llama_token_to_piece(model, token, _bytes, _bytes.Length, 0, special);
+            return _bytes[0..count];
+        }
+
         public static unsafe string llama_apply_template(llama_context context, List<LlmMessage> messages, bool appendAssistant = true)
         {
             var encoding = Encoding.UTF8;
