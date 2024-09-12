@@ -342,7 +342,6 @@ namespace LlamaCppLib
                             continue;
 
                         var token = llama_sampler_sample(_sampler.Handle, _context.Handle, sequence.PosLogit - i);
-                        llama_sampler_accept(_sampler.Handle, token);
 
                         if (sequence.T2 == default)
                         {

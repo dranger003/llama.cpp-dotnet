@@ -546,11 +546,6 @@ namespace LlamaCppLib
         //
 
         [LibraryImport(LibName)]
-        public static partial void llama_sampler_accept(
-            llama_sampler smpl,
-            llama_token token);
-
-        [LibraryImport(LibName)]
         public static partial void llama_sampler_reset(
             llama_sampler smpl);
 

@@ -242,7 +242,6 @@ namespace LlamaCppCli
                                 continue;
 
                             var token = llama_sampler_sample(spl, ctx, request.PosLogit - i);
-                            llama_sampler_accept(spl, token);
 
                             if (request.PosResponse == 0)
                                 request.PosResponse = request.PosToken;
