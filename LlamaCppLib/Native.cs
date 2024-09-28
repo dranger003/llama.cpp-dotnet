@@ -107,6 +107,7 @@ namespace LlamaCppLib
             LLAMA_POOLING_TYPE_MEAN = 1,
             LLAMA_POOLING_TYPE_CLS = 2,
             LLAMA_POOLING_TYPE_LAST = 3,
+            LLAMA_POOLING_TYPE_RANK = 4,
         }
 
         public enum llama_attention_type
