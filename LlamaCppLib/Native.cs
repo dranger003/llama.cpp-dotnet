@@ -413,20 +413,6 @@ namespace LlamaCppLib
         //
 
         [LibraryImport(LibName)]
-        public static partial llama_batch llama_batch_get_one(
-            [In] llama_token[] tokens,
-            int n_tokens,
-            llama_pos pos_0,
-            llama_seq_id seq_id);
-
-        [LibraryImport(LibName)]
-        public static partial llama_batch llama_batch_get_one(
-            Span<llama_token> tokens,
-            int n_tokens,
-            llama_pos pos_0,
-            llama_seq_id seq_id);
-
-        [LibraryImport(LibName)]
         public static partial llama_batch llama_batch_init(
             int n_tokens,
             int embd,
@@ -482,10 +468,6 @@ namespace LlamaCppLib
 
         [LibraryImport(LibName)]
         public static partial llama_token llama_token_eos(
-            llama_model model);
-
-        [LibraryImport(LibName)]
-        public static partial llama_token llama_token_eot(
             llama_model model);
 
         [LibraryImport(LibName)]
