@@ -319,6 +319,31 @@ namespace LlamaCppLib
         public static partial _llama_vocab_type llama_vocab_type(
             llama_model model);
 
+        [LibraryImport(LibName)]
+        public static partial int llama_model_meta_val_str(
+            llama_model model,
+            [In] byte[] key,
+            [In, Out] byte[] buf,
+            nuint buf_size);
+
+        [LibraryImport(LibName)]
+        public static partial int llama_model_meta_count(
+            llama_model model);
+
+        [LibraryImport(LibName)]
+        public static partial int llama_model_meta_key_by_index(
+            llama_model model,
+            int i,
+            [In, Out] byte[] buf,
+            nuint buf_size);
+
+        [LibraryImport(LibName)]
+        public static partial int llama_model_meta_val_str_by_index(
+            llama_model model,
+            int i,
+            [In, Out] byte[] buf,
+            nuint buf_size);
+
         //
         // KV cache
         //

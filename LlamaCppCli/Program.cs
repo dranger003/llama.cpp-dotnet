@@ -22,7 +22,8 @@ namespace LlamaCppCli
                 Console.WriteLine($"    1. {nameof(RunSampleRawAsync)}");
                 Console.WriteLine($"    2. {nameof(RunSampleLibraryAsync)}");
                 Console.WriteLine($"    3. {nameof(RunSampleClientAsync)}");
-                //Console.WriteLine($"    4. {nameof(RunSampleEmbeddingAsync)}"); // TODO: Sync with updated upstream API
+                Console.WriteLine($"    4. {nameof(RunDumpMetaAsync)}");
+                //Console.WriteLine($"    X. {nameof(RunSampleEmbeddingAsync)}"); // TODO: Sync with updated upstream API
                 return;
             }
 
@@ -36,8 +37,10 @@ namespace LlamaCppCli
                 2 => RunSampleLibraryAsync(args),
                 // Remote API using wrapped client calls (first run `LlamaCppWeb.exe` for the API hosting)
                 3 => RunSampleClientAsync(args),
+                // Dump GGUF meta data
+                4 => RunDumpMetaAsync(args),
                 //// Embeddings API using raw function calls (intfloat/e5-mistral-7b-instruct)
-                //4 => RunSampleEmbeddingAsync(args),
+                //X => RunSampleEmbeddingAsync(args),
 
                 _ => Console.Out.WriteLineAsync("Invalid sample no.")
             });
