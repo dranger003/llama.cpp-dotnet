@@ -322,11 +322,12 @@ namespace LlamaCppLib
                         llama_sampler_reset(_sampler.Handle);
                         if (sequence.SamplingOptions.Temperature > 0.0f)
                         {
+                            // TODO: Add new DRY sampler
                             llama_sampler_chain_add(_sampler.Handle, llama_sampler_init_top_k(sequence.SamplingOptions.TopK));
-                            llama_sampler_chain_add(_sampler.Handle, llama_sampler_init_tail_free(sequence.SamplingOptions.TfsZ, 1));
                             llama_sampler_chain_add(_sampler.Handle, llama_sampler_init_typical(sequence.SamplingOptions.TypicalP, 1));
                             llama_sampler_chain_add(_sampler.Handle, llama_sampler_init_top_p(sequence.SamplingOptions.TopP, 1));
                             llama_sampler_chain_add(_sampler.Handle, llama_sampler_init_min_p(sequence.SamplingOptions.MinP, 1));
+                            // TODO: Add new XTC sampler
                             llama_sampler_chain_add(_sampler.Handle, llama_sampler_init_temp(sequence.SamplingOptions.Temperature));
 
                             llama_sampler_chain_add(_sampler.Handle, llama_sampler_init_softmax());

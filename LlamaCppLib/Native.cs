@@ -596,11 +596,6 @@ namespace LlamaCppLib
             nuint min_keep);
 
         [LibraryImport(LibName)]
-        public static partial llama_sampler llama_sampler_init_tail_free(
-            float z,
-            nuint min_keep);
-
-        [LibraryImport(LibName)]
         public static partial llama_sampler llama_sampler_init_typical(
             float p,
             nuint min_keep);

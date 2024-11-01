@@ -106,7 +106,6 @@ namespace LlamaCppCli
             if (temp > 0.0f)
             {
                 llama_sampler_chain_add(spl, llama_sampler_init_top_k(top_k));
-                llama_sampler_chain_add(spl, llama_sampler_init_tail_free(tfs_z, 1));
                 llama_sampler_chain_add(spl, llama_sampler_init_typical(typical_p, 1));
                 llama_sampler_chain_add(spl, llama_sampler_init_top_p(top_p, 1));
                 llama_sampler_chain_add(spl, llama_sampler_init_min_p(min_p, 1));
