@@ -61,7 +61,6 @@ namespace LlamaCppCli
             var top_k = 50;
             var top_p = 0.95f;
             var min_p = 0.05f;
-            var tfs_z = 1.0f;
             var typical_p = 1.0f;
             var temp = 0.7f;
 
@@ -110,13 +109,10 @@ namespace LlamaCppCli
                 llama_sampler_chain_add(spl, llama_sampler_init_top_p(top_p, 1));
                 llama_sampler_chain_add(spl, llama_sampler_init_min_p(min_p, 1));
                 llama_sampler_chain_add(spl, llama_sampler_init_temp(temp));
-
-                llama_sampler_chain_add(spl, llama_sampler_init_softmax());
                 llama_sampler_chain_add(spl, llama_sampler_init_dist(seed));
             }
             else
             {
-                llama_sampler_chain_add(spl, llama_sampler_init_softmax());
                 llama_sampler_chain_add(spl, llama_sampler_init_greedy());
             }
 
@@ -325,12 +321,134 @@ namespace LlamaCppCli
 
             cancel_handle.Free();
 
-            llama_batch_free(bat);
             llama_sampler_free(spl);
+            llama_batch_free(bat);
             llama_free(ctx);
             llama_free_model(mdl);
 
             llama_backend_free();
+        }
+
+        static async Task RunSampleStateRawAsync(string[] args)
+        {
+            if (args.Length < 1)
+            {
+                Console.WriteLine($"Usage: RunSampleStateRawAsync <ModelPath>");
+                return;
+            }
+
+            RunSampleStateRaw(args);
+            await Task.CompletedTask;
+        }
+
+        static void RunSampleStateRaw(string[] args)
+        {
+            var mparams = llama_model_default_params();
+            mparams.n_gpu_layers = 999;
+
+            var cparams = llama_context_default_params();
+            cparams.n_ctx = 4096;
+            cparams.flash_attn = true ? 1 : 0;
+
+            var sparams = llama_sampler_chain_default_params();
+            sparams.no_perf = true ? 1 : 0;
+
+            var mdl = llama_load_model_from_file(args[0], mparams);
+
+            var seed = 42;
+
+            { // First run
+                var ctx = llama_new_context_with_model(mdl, cparams);
+                var bat = llama_batch_init((int)llama_n_ctx(ctx), 0, 1);
+                var spl = llama_sampler_chain_init(sparams);
+                llama_sampler_chain_add(spl, llama_sampler_init_dist((uint)seed));
+
+                Console.Write(new String('=', Console.WindowWidth));
+
+                var messages = new List<LlmMessage>
+                {
+                    new() { Role = "system", Content = "You are a helpful assistant." },
+                    new() { Role = "user", Content = "Hello?" }
+                };
+
+                var prompt = llama_apply_template(ctx, messages);
+                var tokens = llama_tokenize(mdl, Encoding.UTF8.GetBytes(prompt), llama_add_bos_token(mdl) != 0, true);
+
+                var n_past = 0;
+                var run = 0;
+
+                while (true)
+                {
+                    llama_batch_clear(ref bat);
+
+                    for (var i = 0; i < tokens.Length; i++)
+                        llama_batch_add(ref bat, tokens[i], n_past++, [0], i == tokens.Length - 1);
+
+                    llama_decode(ctx, bat);
+
+                    if (++run == 1)
+                    {
+                        var state_mem = new byte[(int)llama_state_get_size(ctx)];
+                        var written = (int)llama_state_get_data(ctx, state_mem, (nuint)state_mem.Length);
+                        File.WriteAllBytes($"dump_state_{n_past}.bin", new Span<byte>(state_mem, 0, written).ToArray());
+                    }
+
+                    tokens = [llama_sampler_sample(spl, ctx, -1)];
+                    if (tokens[0] == llama_token_eos(mdl))
+                        break;
+
+                    var piece = llama_token_to_piece(mdl, tokens[0], true);
+                    Console.Write(Encoding.UTF8.GetString(piece));
+                }
+
+                llama_sampler_free(spl);
+                llama_batch_free(bat);
+                llama_free(ctx);
+
+                Console.Write($"\n{new String('=', Console.WindowWidth)}");
+            }
+
+            { // Second run
+                var ctx = llama_new_context_with_model(mdl, cparams);
+                var bat = llama_batch_init((int)llama_n_ctx(ctx), 0, 1);
+                var spl = llama_sampler_chain_init(sparams);
+                llama_sampler_chain_add(spl, llama_sampler_init_dist((uint)seed));
+
+                Console.Write(new String('=', Console.WindowWidth));
+
+                var n_past = 0;
+                {
+                    var path = Directory.EnumerateFiles(".", "dump_state_*.bin").Single();
+                    n_past = Int32.Parse(Regex.Match(path, @"dump_state_(?<n_past>\d+)\.bin").Groups["n_past"].Value);
+                    var state_mem = File.ReadAllBytes(path) ?? [];
+                    llama_state_set_data(ctx, state_mem, (nuint)state_mem.Length);
+                }
+
+                var tokens = new int[0];
+
+                while (true)
+                {
+                    tokens = [llama_sampler_sample(spl, ctx, -1)];
+                    if (tokens[0] == llama_token_eos(mdl))
+                        break;
+
+                    var piece = llama_token_to_piece(mdl, tokens[0], true);
+                    Console.Write(Encoding.UTF8.GetString(piece));
+
+                    llama_batch_clear(ref bat);
+                    llama_batch_add(ref bat, tokens[0], n_past++, [0], true);
+
+                    llama_decode(ctx, bat);
+                }
+
+                llama_sampler_free(spl);
+                llama_batch_free(bat);
+                llama_free(ctx);
+
+                Console.Write($"\n{new String('=', Console.WindowWidth)}");
+            }
+
+            llama_free_model(mdl);
         }
     }
 

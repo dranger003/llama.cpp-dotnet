@@ -23,6 +23,7 @@ namespace LlamaCppCli
                 Console.WriteLine($"    2. {nameof(RunSampleLibraryAsync)}");
                 Console.WriteLine($"    3. {nameof(RunSampleClientAsync)}");
                 Console.WriteLine($"    4. {nameof(RunDumpMetaAsync)}");
+                Console.WriteLine($"    5. {nameof(RunSampleStateRawAsync)}");
                 //Console.WriteLine($"    X. {nameof(RunSampleEmbeddingAsync)}"); // TODO: Sync with updated upstream API
                 return;
             }
@@ -39,6 +40,8 @@ namespace LlamaCppCli
                 3 => RunSampleClientAsync(args),
                 // Dump GGUF meta data
                 4 => RunDumpMetaAsync(args),
+                // State load/save using raw function calls
+                5 => RunSampleStateRawAsync(args),
                 //// Embeddings API using raw function calls (intfloat/e5-mistral-7b-instruct)
                 //X => RunSampleEmbeddingAsync(args),
 
