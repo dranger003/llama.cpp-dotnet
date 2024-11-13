@@ -329,13 +329,10 @@ namespace LlamaCppLib
                             llama_sampler_chain_add(_sampler.Handle, llama_sampler_init_min_p(sequence.SamplingOptions.MinP, 1));
                             // TODO: Add new XTC sampler
                             llama_sampler_chain_add(_sampler.Handle, llama_sampler_init_temp(sequence.SamplingOptions.Temperature));
-
-                            llama_sampler_chain_add(_sampler.Handle, llama_sampler_init_softmax());
                             llama_sampler_chain_add(_sampler.Handle, llama_sampler_init_dist((uint)sequence.SamplingOptions.Seed));
                         }
                         else
                         {
-                            llama_sampler_chain_add(_sampler.Handle, llama_sampler_init_softmax());
                             llama_sampler_chain_add(_sampler.Handle, llama_sampler_init_greedy());
                         }
 

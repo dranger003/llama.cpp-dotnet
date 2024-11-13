@@ -579,9 +579,6 @@ namespace LlamaCppLib
             uint seed);
 
         [LibraryImport(LibName)]
-        public static partial llama_sampler llama_sampler_init_softmax();
-
-        [LibraryImport(LibName)]
         public static partial llama_sampler llama_sampler_init_top_k(
             int k);
 
@@ -605,6 +602,33 @@ namespace LlamaCppLib
             float t);
 
         [LibraryImport(LibName)]
+        public static partial llama_sampler llama_sampler_init_temp_ext(
+            float t,
+            float delta,
+            float exponent);
+
+        [LibraryImport(LibName)]
+        public static partial llama_sampler llama_sampler_init_xtc(
+            float p,
+            float t,
+            nuint min_keep,
+            uint seed);
+
+        [LibraryImport(LibName)]
+        public static partial llama_sampler llama_sampler_init_mirostat(
+            int n_vocab,
+            uint seed,
+            float tau,
+            float eta,
+            int m);
+
+        [LibraryImport(LibName)]
+        public static partial llama_sampler llama_sampler_init_mirostat_v2(
+            uint seed,
+            float tau,
+            float eta);
+
+        [LibraryImport(LibName)]
         public static partial llama_sampler llama_sampler_init_penalties(
             int n_vocab,
             llama_token special_eos_id,
@@ -615,6 +639,16 @@ namespace LlamaCppLib
             float penalty_present,
             [MarshalAs(UnmanagedType.I1)] bool penalize_nl,
             [MarshalAs(UnmanagedType.I1)] bool ignore_eos);
+
+        [LibraryImport(LibName)]
+        public static partial llama_sampler llama_sampler_init_dry(
+            llama_model model,
+            float dry_multiplier,
+            float dry_base,
+            int dry_allowed_length,
+            int dry_penalty_last_n,
+            [In] byte[][] seq_breakers,
+            nuint num_breakers);
 
         [LibraryImport(LibName)]
         public static partial int llama_sampler_sample(
