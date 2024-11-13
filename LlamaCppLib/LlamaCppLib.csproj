@@ -35,7 +35,7 @@
 		<PropertyGroup>
 			<CMakeCompilerFlags Condition="$(IsWindows)">-DCMAKE_CXX_FLAGS="/W0 /EHsc /w /D _MBCS" -DCMAKE_C_FLAGS="/W0 /w"</CMakeCompilerFlags>
 			<CMakeCompilerFlags Condition="!$(IsWindows)">-DCMAKE_CXX_FLAGS=-w -DCMAKE_C_FLAGS=-w</CMakeCompilerFlags>
-			<CMakeOptions Condition="$(IsWindows)">-DLLAMA_CCACHE=OFF</CMakeOptions>
+			<CMakeOptions Condition="$(IsWindows)">-DGGML_CCACHE=OFF</CMakeOptions>
 			<CMakeOptions Condition="!$(IsWindows)"></CMakeOptions>
 		</PropertyGroup>
 		<!-- https://github.com/ggerganov/llama.cpp/pull/1827#issuecomment-1588722643 -->
