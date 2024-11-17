@@ -100,7 +100,7 @@ namespace LlamaCppLib
             LLAMA_ROPE_SCALING_TYPE_MAX_VALUE = LLAMA_ROPE_SCALING_TYPE_YARN,
         }
 
-        public enum llama_pooling_type
+        public enum _llama_pooling_type
         {
             LLAMA_POOLING_TYPE_UNSPECIFIED = -1,
             LLAMA_POOLING_TYPE_NONE = 0,
@@ -201,7 +201,7 @@ namespace LlamaCppLib
             public int n_threads_batch;
 
             public llama_rope_scaling_type rope_scaling_type;
-            public llama_pooling_type pooling_type;
+            public _llama_pooling_type pooling_type;
             public llama_attention_type attention_type;
 
             public float rope_freq_base;
@@ -316,6 +316,10 @@ namespace LlamaCppLib
             llama_context ctx);
 
         [LibraryImport(LibName)]
+        public static partial _llama_pooling_type llama_pooling_type(
+            llama_context ctx);
+
+        [LibraryImport(LibName)]
         public static partial _llama_vocab_type llama_vocab_type(
             llama_model model);
 
@@ -343,6 +347,16 @@ namespace LlamaCppLib
             int i,
             [In, Out] byte[] buf,
             nuint buf_size);
+
+        [LibraryImport(LibName)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public static partial bool llama_model_has_encoder(
+            llama_model model);
+
+        [LibraryImport(LibName)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public static partial bool llama_model_has_decoder(
+            llama_model model);
 
         //
         // KV cache

@@ -15,38 +15,40 @@ namespace LlamaCppCli
             // uncomment this line and implement `ResolveLibrary()` below.
             //NativeLibrary.SetDllImportResolver(typeof(LlamaCppLib.Native).Assembly, ResolveLibrary);
 
-            if (args.Length < 1 || !Int32.TryParse(args[0], out var i))
+            var samples = new Dictionary<string, Func<string[], Task>>
+            {
+                // Native API using raw function calls (standalone)
+                [nameof(RunSampleRawAsync)] = RunSampleRawAsync,
+                // Library API using wrapped native calls (standalone)
+                [nameof(RunSampleLibraryAsync)] = RunSampleLibraryAsync,
+                // Remote API using wrapped client calls (first run `LlamaCppWeb.exe` for the API hosting)
+                [nameof(RunSampleClientAsync)] = RunSampleClientAsync,
+                // Dump GGUF meta data
+                [nameof(RunDumpMetaAsync)] = RunDumpMetaAsync,
+                // State load/save using raw function calls
+                [nameof(RunSampleStateRawAsync)] = RunSampleStateRawAsync,
+                // Embeddings API using raw function calls (intfloat/e5-mistral-7b-instruct)
+                [nameof(RunSampleEmbeddingAsync)] = RunSampleEmbeddingAsync,
+            }
+                .Select((x, i) => (Index: i, Sample: (Name: x.Key, Func: x.Value)))
+                .ToList();
+
+            if (args.Length < 1 || !Int32.TryParse(args[0], out var sampleIndex))
             {
                 Console.WriteLine($"Usage: LlamaCppCli <SampleNo> [SampleOpt1] [SampleOpt2] [...]");
                 Console.WriteLine($"SampleNo:");
-                Console.WriteLine($"    1. {nameof(RunSampleRawAsync)}");
-                Console.WriteLine($"    2. {nameof(RunSampleLibraryAsync)}");
-                Console.WriteLine($"    3. {nameof(RunSampleClientAsync)}");
-                Console.WriteLine($"    4. {nameof(RunDumpMetaAsync)}");
-                Console.WriteLine($"    5. {nameof(RunSampleStateRawAsync)}");
-                //Console.WriteLine($"    X. {nameof(RunSampleEmbeddingAsync)}"); // TODO: Sync with updated upstream API
+                samples.ForEach(x => Console.WriteLine($"    {x.Index}. {x.Sample.Name}"));
                 return;
             }
 
-            args = args.Skip(1).ToArray();
-
-            await (i switch
+            if (sampleIndex > 0 && sampleIndex < samples.Count)
             {
-                // Native API using raw function calls (standalone)
-                1 => RunSampleRawAsync(args),
-                // Library API using wrapped native calls (standalone)
-                2 => RunSampleLibraryAsync(args),
-                // Remote API using wrapped client calls (first run `LlamaCppWeb.exe` for the API hosting)
-                3 => RunSampleClientAsync(args),
-                // Dump GGUF meta data
-                4 => RunDumpMetaAsync(args),
-                // State load/save using raw function calls
-                5 => RunSampleStateRawAsync(args),
-                //// Embeddings API using raw function calls (intfloat/e5-mistral-7b-instruct)
-                //X => RunSampleEmbeddingAsync(args),
-
-                _ => Console.Out.WriteLineAsync("Invalid sample no.")
-            });
+                await samples[sampleIndex].Sample.Func(args.Skip(1).ToArray());
+            }
+            else
+            {
+                Console.WriteLine($"Invalid sample no. {sampleIndex}.");
+            }
         }
 
         static nint ResolveLibrary(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
