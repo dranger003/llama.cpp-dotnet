@@ -288,9 +288,6 @@ namespace LlamaCppLib
                     batchView.n_seq_id = batch.n_seq_id + i;
                     batchView.seq_id = batch.seq_id + i;
                     batchView.logits = batch.logits + i;
-                    batchView.all_pos_0 = 0;
-                    batchView.all_pos_1 = 0;
-                    batchView.all_seq_id = 0;
 
                     var result = llama_decode(_context.Handle, batchView);
 

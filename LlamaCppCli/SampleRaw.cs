@@ -208,9 +208,6 @@ namespace LlamaCppCli
                                 n_seq_id = &bat.n_seq_id[i],
                                 seq_id = &bat.seq_id[i],
                                 logits = &bat.logits[i],
-                                all_pos_0 = 0,
-                                all_pos_1 = 0,
-                                all_seq_id = 0,
                             }
                         );
 

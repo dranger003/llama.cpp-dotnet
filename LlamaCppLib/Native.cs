@@ -135,10 +135,6 @@ namespace LlamaCppLib
             public int* n_seq_id;
             public llama_seq_id** seq_id;
             public sbyte* logits;
-
-            public llama_pos all_pos_0;
-            public llama_pos all_pos_1;
-            public llama_seq_id all_seq_id;
         }
 
         public enum llama_model_kv_override_type
