@@ -30,7 +30,7 @@ namespace LlamaCppCli
                 // Embeddings API using raw function calls (intfloat/e5-mistral-7b-instruct)
                 [nameof(RunSampleEmbeddingAsync)] = RunSampleEmbeddingAsync,
             }
-                .Select((x, i) => (Index: i, Sample: (Name: x.Key, Func: x.Value)))
+                .Select((x, i) => (Index: i + 1, Sample: (Name: x.Key, Func: x.Value)))
                 .ToList();
 
             if (args.Length < 1 || !Int32.TryParse(args[0], out var sampleIndex))
@@ -43,7 +43,7 @@ namespace LlamaCppCli
 
             if (sampleIndex > 0 && sampleIndex < samples.Count)
             {
-                await samples[sampleIndex].Sample.Func(args.Skip(1).ToArray());
+                await samples[sampleIndex - 1].Sample.Func(args.Skip(1).ToArray());
             }
             else
             {
