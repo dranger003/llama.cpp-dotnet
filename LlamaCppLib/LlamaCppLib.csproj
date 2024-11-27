@@ -39,7 +39,7 @@
 			<CMakeOptions Condition="!$(IsWindows)"></CMakeOptions>
 		</PropertyGroup>
 		<!-- https://github.com/ggerganov/llama.cpp/pull/1827#issuecomment-1588722643 -->
-		<Exec Command='$(CMakeBin) -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_CUDA=ON -DGGML_CUDA_DMMV_X=64 -DGGML_CUDA_MMV_Y=2 -DLLAMA_ALL_WARNINGS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=OFF -DLLAMA_BUILD_TESTS=OFF $(CMakeOptions) -S "$(CMakeProject)" -B "$(CMakeProject)" $(CMakeCompilerFlags)' />
+		<Exec Command='$(CMakeBin) -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_CUDA=ON -DLLAMA_ALL_WARNINGS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=OFF -DLLAMA_BUILD_TESTS=OFF $(CMakeOptions) -S "$(CMakeProject)" -B "$(CMakeProject)" $(CMakeCompilerFlags)' />
 	</Target>
 
 	<Target Name="CMakeBuild" AfterTargets="CMakeConfigure" Condition="'$(NativeLibraries)'!='OFF'">
