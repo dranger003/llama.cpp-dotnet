@@ -165,6 +165,8 @@ namespace LlamaCppLib
         [StructLayout(LayoutKind.Sequential)]
         public struct llama_model_params
         {
+            public void* devices;
+
             public int n_gpu_layers;
             public llama_split_mode split_mode;
 
