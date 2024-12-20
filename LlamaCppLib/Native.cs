@@ -642,15 +642,10 @@ namespace LlamaCppLib
 
         [LibraryImport(LibName)]
         public static partial llama_sampler llama_sampler_init_penalties(
-            int n_vocab,
-            llama_token special_eos_id,
-            llama_token linefeed_id,
             int penalty_last_n,
             float penalty_repeat,
             float penalty_freq,
-            float penalty_present,
-            [MarshalAs(UnmanagedType.I1)] bool penalize_nl,
-            [MarshalAs(UnmanagedType.I1)] bool ignore_eos);
+            float penalty_present);
 
         [LibraryImport(LibName)]
         public static partial llama_sampler llama_sampler_init_dry(
